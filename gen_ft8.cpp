@@ -165,10 +165,10 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    //const char *message = "G0UPL YL3JG 73";
     const char *message = argv[1];
     const char *wav_path = argv[2];
 
+    // First, pack the text data into 72-bit binary message
     uint8_t packed[9];
     int rc = packmsg(message, packed);
     if (rc < 0) {
@@ -183,7 +183,8 @@ int main(int argc, char **argv) {
     }
     printf("\n");
 
-    uint8_t tones[NN];
+    // Second, encode the binary message as a sequence of FSK tones
+    uint8_t tones[NN];          // NN = 79, lack of better name at the moment
     genft8(packed, 0, tones);
 
     printf("FSK tones: ");
@@ -192,6 +193,7 @@ int main(int argc, char **argv) {
     }
     printf("\n");
 
+    // Third, convert the FSK tones into an audio signal
     const int num_samples = (int)(0.5 + NN / 6.25 * 12000);
     const int num_silence = (15 * 12000 - num_samples) / 2;
     float signal[num_silence + num_samples + num_silence];
