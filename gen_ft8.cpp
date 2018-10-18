@@ -148,8 +148,22 @@ void test3() {
 }
 
 
+void usage() {
+    printf("Generate a 15-second WAV file encoding a given message.\n");
+    printf("Usage:\n");
+    printf("\n");
+    printf("gen_ft8 MESSAGE WAV_FILE\n");
+    printf("\n");
+    printf("(Note that you might have to enclose your message in quote marks if it contains spaces)\n");
+}
+
+
 int main(int argc, char **argv) {
-    if (argc < 3) return -1;
+    // Expect two command-line arguments
+    if (argc < 3) {
+        usage();
+        return -1;
+    }
 
     //const char *message = "G0UPL YL3JG 73";
     const char *message = argv[1];

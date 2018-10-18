@@ -3,8 +3,12 @@
 
 #include "pack.h"
 
+
 constexpr int NBASE = 37*36*10*27*27*27;
 constexpr int NGBASE = 180*180;
+
+
+// Utility functions for characters and strings
 
 char to_upper(char c) {
     return (c >= 'a' && c <= 'z') ? (c - 'a' + 'A') : c;
@@ -31,7 +35,7 @@ bool equals(const char *string1, const char *string2) {
 }
 
 
-// Message formatting: 
+// Text message formatting: 
 //   - replaces lowercase letters with uppercase
 //   - merges consecutive spaces into single space
 void fmtmsg(char *msg_out, const char *msg_in) {
@@ -50,9 +54,9 @@ void fmtmsg(char *msg_out, const char *msg_in) {
 
 
 // Returns integer encoding of a character (number/digit/space).
-// * Digits are encoded as 0..9
-// * Letters a..z are encoded as 10..35 (case insensitive)
-// * Space is encoded as 36
+//   - Digits are encoded as 0..9
+//   - Letters a..z are encoded as 10..35 (case insensitive)
+//   - Space is encoded as 36
 uint8_t nchar(char c) {
     if (is_digit(c)) {
         return (c - '0');
@@ -87,7 +91,7 @@ void pack3_8bit(uint32_t nc1, uint32_t nc2, uint16_t ng, uint8_t *payload) {
 
 
 // Pack FT8 source/destination and grid data into 72 bits (stored as 12 bytes of 6-bit values)
-// (For compatibility with WSJT-X and testing)
+// (Unused here, included for compatibility with WSJT-X and testing)
 // [IN] nc1      - first callsign data (28 bits)
 // [IN] nc2      - second callsign data (28 bits)
 // [IN] ng       - grid data (16 bits)
@@ -115,11 +119,11 @@ int dd_to_int(const char *str, int length) {
     int i;
     if (str[0] == '-') {
         negative = true;
-        i = 1;
+        i = 1;                          // Consume the - sign
     }
     else {
         negative = false;
-        i = (str[0] == '+') ? 1 : 0;
+        i = (str[0] == '+') ? 1 : 0;    // Consume a + sign if found
     }
     
     while (i < length) {
@@ -134,15 +138,16 @@ int dd_to_int(const char *str, int length) {
 }
 
 
+// Convert a 2 digit integer to string
 void int_to_dd(char *str, int value, int width) {
     if (value < 0) {
         *str = '-';
-        str++;
+        ++str;
         value = -value;
     }
 
     int divisor = 1;
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < width; ++i) {
         divisor *= 10;
     }
 
@@ -150,18 +155,18 @@ void int_to_dd(char *str, int value, int width) {
         int digit = value / divisor;
 
         *str = '0' + digit;
-        str++;
+        ++str;
 
         value -= digit * divisor;
         divisor /= 10;
     }
-    *str = 0;
+    *str = 0;   // Add zero terminator
 }
 
 
 // Pack a valid callsign into a 28-bit integer.
 int32_t packcall(const char *callsign) {
-    printf("Callsign = [%s]\n", callsign);
+    //LOG("Callsign = [%s]\n", callsign);
     if (equals(callsign, "CQ")) { 
         // TODO: support 'CQ nnn' frequency specification
         //if (callsign(4:4).ge.'0' .and. callsign(4:4).le.'9' .and.        &
@@ -241,13 +246,14 @@ int32_t packcall(const char *callsign) {
 
 // Pack a valid grid locator into an integer.
 int16_t packgrid(const char *grid) {
-    printf("Grid = [%s]\n", grid);
+    //LOG("Grid = [%s]\n", grid);
     int len = strlen(grid);
 
     if (len == 0) {
         // Blank grid is OK
         return NGBASE + 1;
     }
+    
     // Check for RO, RRR, or 73 in the message field normally used for grid
     if (equals(grid, "RO")) {
         return NGBASE + 62;
@@ -259,7 +265,7 @@ int16_t packgrid(const char *grid) {
         return NGBASE + 64;
     }
       
-    // TODO: 
+    // Attempt to parse signal reports (e.g. "-07", "R+20")
     char c1 = grid[0];
     int n;
     if (c1 == 'R') {
@@ -282,7 +288,7 @@ int16_t packgrid(const char *grid) {
     char grid4[4];
     memcpy(grid4, grid, 4);
 
-    // Check for extended-range signal reports: -50 to -31, and 0 to +49
+    // TODO: Check for extended-range signal reports: -50 to -31, and 0 to +49
     // if (n >= -50 && n <= 49) {
     //     if (c1 == 'R') {
     //          // write(grid,1002) n+50   1002    format('LA',i2.2)
@@ -297,14 +303,14 @@ int16_t packgrid(const char *grid) {
     //     return -1;
     // }
 
-    // Check the locator 
+    // Check if the grid locator is properly formatted 
     if (len != 4) return -1;
     if (grid4[0] < 'A' || grid4[0] > 'R') return -1;
     if (grid4[1] < 'A' || grid4[1] > 'R') return -1;
     if (grid4[2] < '0' || grid4[2] > '9') return -1;
     if (grid4[3] < '0' || grid4[3] > '9') return -1;
 
-    // OK, we have a properly formatted grid locator
+    // Extract latitude and longitude
     int lng = (grid4[0] - 'A') * 20;
     lng += (grid4[2] - '0') * 2;
     lng = 179 - lng;
@@ -313,6 +319,7 @@ int16_t packgrid(const char *grid) {
     lat += (grid4[3] - '0') * 1;
     lat -= 90;
 
+    // Convert latitude and longitude into single number
     int16_t ng = (lng + 180) / 2;
     ng *= 180;
     ng += lat + 90;
@@ -322,16 +329,16 @@ int16_t packgrid(const char *grid) {
 
 
 int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
-    // TODO: maximum allowed length?
-    if (strlen(msg) > 18) {
+    // TODO: check what is maximum allowed length?
+    if (strlen(msg) > 22) {
         return -1;
     }
     
-    char msg2[19];  // Including zero terminator!
+    char msg2[23];  // Including zero terminator!
     
     fmtmsg(msg2, msg);
     
-    //printf("msg2 = [%s]\n", msg2);
+    //LOG("msg2 = [%s]\n", msg2);
 
     // TODO: Change 'CQ n ' type messages to 'CQ 00n '
     //if(msg(1:3).eq.'CQ ' .and. msg(4:4).ge.'0' .and. msg(4:4).le.'9'   &
@@ -355,16 +362,19 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
         }
     }
     
-    // Locate the first space in the message and replace it with zero terminator
+    // Try to split the message into three space-delimited fields
+    //   by locating spaces and changing them to zero terminators
+
+    // Locate the first delimiter in the message
     char *s1 = strchr(msg2, ' ');
     if (s1 == NULL) {
         // TODO: handle this (plain text message?)
         return -2;
     }
-    *s1 = 0;
-    ++s1;
+    *s1 = 0;    // Separate fields by zero terminator
+    ++s1;       // Now s1 points to the second field
 
-    // Locate the second space in the message
+    // Locate the second delimiter in the message
     char *s2 = strchr(s1 + 1, ' ');
     if (s2 == NULL) {
         // If the second space is not found, point to the end of string
@@ -372,17 +382,17 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
         s2 = msg2 + strlen(msg2);
     }
     else {
-        *s2 = 0;
-        ++s2;
+        *s2 = 0;// Separate fields by zero terminator
+        ++s2;   // Now s2 points to the third field
     }
+
+    // TODO: process callsign prefixes/suffixes
 
     // Pack message fields into integers
     int nc1 = packcall(msg2);
     int nc2 = packcall(s1);
     int ng = packgrid(s2);
-    
-    // TODO: callsign prefixes/suffixes
-    
+        
     // TODO: plain text messages
     //call packtext(msg,nc1,nc2,ng)
     //ng=ng+32768
@@ -390,12 +400,12 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
     if (nc1 < 0 || nc2 < 0 || ng < 0) {
         return -3;
     }
-    //printf("nc1 = %d [%04X], nc2 = %d [%04X], ng = %d\n", nc1, nc1, nc2, nc2, ng);
+    //LOG("nc1 = %d [%04X], nc2 = %d [%04X], ng = %d\n", nc1, nc1, nc2, nc2, ng);
 
     // Originally the data was packed in bytes of 6 bits. 
     // This seems to waste memory unnecessary and complicate the code, so we pack it in 8 bit values.
     pack3_8bit(nc1, nc2, ng, dat);
     //pack3_6bit(nc1, nc2, ng, dat);
 
-    return 0;
+    return 0;   // Success!
 }

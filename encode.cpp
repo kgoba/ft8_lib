@@ -1,11 +1,11 @@
 #include "encode.h"
 
-constexpr int N = 174, K = 87, M = N-K;
+constexpr int N = 174, K = 87, M = N-K;  // Define the LDPC sizes
 
 constexpr uint16_t  POLYNOMIAL = 0xC06;  // CRC-12 polynomial without the leading (MSB) 1
 
-// Parity generator matrix for (174,87) code, stored in bitpacked format (MSB first)
-constexpr uint8_t G[87][11] = {
+// Parity generator matrix for (174,87) LDPC code, stored in bitpacked format (MSB first)
+const uint8_t G[87][11] = {
     { 0x23, 0xbb, 0xa8, 0x30, 0xe2, 0x3b, 0x6b, 0x6f, 0x50, 0x98, 0x2e },
     { 0x1f, 0x8e, 0x55, 0xda, 0x21, 0x8c, 0x5d, 0xf3, 0x30, 0x90, 0x52 },
     { 0xca, 0x7b, 0x32, 0x17, 0xcd, 0x92, 0xbd, 0x59, 0xa5, 0xae, 0x20 },
@@ -128,11 +128,9 @@ uint8_t parity8(uint8_t x) {
 // After creating the codeword, the columns are re-ordered according to 
 // "colorder" to make the codeword compatible with the parity-check matrix 
 // Arguments:
-//   * message - array of 87 bits stored as 11 bytes (MSB first)
-//   * codeword - array of 174 bits stored as 22 bytes (MSB first)
+// [IN] message   - array of 87 bits stored as 11 bytes (MSB first)
+// [OUT] codeword - array of 174 bits stored as 22 bytes (MSB first)
 void encode174(const uint8_t *message, uint8_t *codeword) {
-    static bool first = true;
-
     // Here we don't generate the generator bit matrix as in WSJT-X implementation
     // Instead we access the generator bits straight from the binary representation in G
 
@@ -186,18 +184,23 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
 }
 
 
-uint16_t ft8_crc(uint8_t *message, int nBits) {
-    const int       WIDTH = 12;
-    const uint16_t  TOPBIT = (1 << (WIDTH - 1));
+// Compute 12-bit CRC for a sequence of given number of bits
+// [IN] message  - byte sequence (MSB first)
+// [IN] num_bits - number of bits in the sequence
+uint16_t ft8_crc(uint8_t *message, int num_bits) {
+    // Adapted from https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
+    constexpr int       WIDTH = 12;
+    constexpr uint16_t  TOPBIT = (1 << (WIDTH - 1));
 
     uint16_t remainder = 0;
-    int iByte = 0;
+    int idx_byte = 0;
+
     // Perform modulo-2 division, a bit at a time.
-    for (int iBit = 0; iBit < nBits; ++iBit) {
-        if (iBit % 8 == 0) {
+    for (int idx_bit = 0; idx_bit < num_bits; ++idx_bit) {
+        if (idx_bit % 8 == 0) {
             // Bring the next byte into the remainder.
-            remainder ^= (message[iByte] << (WIDTH - 8));
-            ++iByte;
+            remainder ^= (message[idx_byte] << (WIDTH - 8));
+            ++idx_byte;
         }
 
         // Try to divide the current data bit.
@@ -213,7 +216,7 @@ uint16_t ft8_crc(uint8_t *message, int nBits) {
 
 
 // Generate FT8 tone sequence from payload data
-// [IN] payload - 9 byte array consisting of 72 bit payload
+// [IN] payload - 9 byte array consisting of 72 bit payload (MSB first)
 // [IN] i3      - 3 bits containing message type (zero?)
 // [OUT] itone  - array of NN (79) bytes to store the generated tones (encoded as 0..7)
 void genft8(const uint8_t *payload, uint8_t i3, uint8_t *itone) {
