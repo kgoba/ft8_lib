@@ -8,8 +8,26 @@ The intent of this library is to foster experimentation with e.g. automated beac
 
 Work is in progress (possibly taking forever) to explore decoding options. On a fast 32-bit microcontroller decoding might be possible, perhaps with some tradeoffs.
 
+# What works
+
+So far only encoding is implemented. It should support the basic set of FT8 messages:
+* CQ <call> <grid>, e.g. CQ CA0LL GG77
+* CQ <xy> <call> <grid>, e.g. CQ JA CA0LL GG77
+* <call> <call> <report>, e.g. CA0LL OT7ER R-07
+* <call> <call> 73/RRR/RR73, e.g. OT7ER CA0LL 73
+
+# What doesn't
+
+* Encoding free-text messages
+* Encoding contest mode messages
+* Encoding compound callsigns with country prefixes and mode suffixes
+* Decoding
+
 # References and credits
 
 Thanks to Robert Morris, AB1HL, whose Python code (https://github.com/rtmrtmrtmrtm/weakmon) inspired this and helped to test various parts of the code.
 
 This would not of course be possible without the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html). I believe that is the only 'documentation' of the FT8 protocol available, and the source code was used as such in this project.
+
+Karlis Goba,
+YL3JG
