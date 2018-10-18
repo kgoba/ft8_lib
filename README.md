@@ -15,14 +15,15 @@ So far only encoding is implemented. It should support the basic set of FT8 mess
 * CQ {xy} {call} {grid}, e.g. CQ JA CA0LL GG77
 * {call} {call} {report}, e.g. CA0LL OT7ER R-07
 * {call} {call} 73/RRR/RR73, e.g. OT7ER CA0LL 73
+* Free-text messages (up to 13 characters from a limited alphabet)
 
 # What doesn't
 
-* Encoding free-text messages
-* Encoding contest mode messages
+* Encoding contest mode message
+* Encoding extended range signal reports (<-30dB or >=0dB S/N)
 * Encoding compound callsigns with country prefixes and mode suffixes
 * Decoding
-* The revised FT8 protocol using 77-bit payload messages (since WSJT-X version 2.0)
+* The revised FT8 protocol using 77-bit payload messages (introduced since WSJT-X version 2.0)
 
 # What to do with it
 

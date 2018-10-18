@@ -170,9 +170,13 @@ void int_to_dd(char *str, int value, int width) {
 
 
 // Pack a valid callsign into a 28-bit integer.
-int32_t packcall(const char *callsign) {
-    //LOG("Callsign = [%s]\n", callsign);
-    if (equals(callsign, "CQ")) { 
+// Note that callsign points to a portion of text and may not be zero-terminated.
+int32_t packcall(const char *callsign, int length) {
+    if (length > 6) {
+        return -1;
+    }
+
+    if (starts_with(callsign, "CQ ")) { 
         // TODO: support 'CQ nnn' frequency specification
         //if (callsign(4:4).ge.'0' .and. callsign(4:4).le.'9' .and.        &
         //    callsign(5:5).ge.'0' .and. callsign(5:5).le.'9' .and.      &
@@ -182,44 +186,43 @@ int32_t packcall(const char *callsign) {
         //endif
         return NBASE + 1;
     }
-    if (equals(callsign, "QRZ")) { 
+    if (starts_with(callsign, "QRZ ")) { 
         return NBASE + 2;
     }
-    if (equals(callsign, "DE")) {
+    if (starts_with(callsign, "DE ")) {
         return 267796945;
     }
-    
-    int len = strlen(callsign);
-    if (len > 6) {
-        return -1;
-    }
-    
+        
     char callsign2[7] = {' ', ' ', ' ', ' ', ' ', ' ', 0};    // 6 spaces with zero terminator
 
     // Work-around for Swaziland prefix (see WSJT-X code):
     if (starts_with(callsign, "3DA0")) {
         // callsign='3D0'//callsign(5:6)
         memcpy(callsign2, "3D0", 3);
-        memcpy(callsign2 + 3, callsign + 4, 2);
+        if (length > 4) {
+            memcpy(callsign2 + 3, callsign + 4, length - 4);
+        }
     }
     // Work-around for Guinea prefixes (see WSJT-X code):
     else if (starts_with(callsign, "3X") && is_letter(callsign[2])) {
         //callsign='Q'//callsign(3:6)
         memcpy(callsign2, "Q", 1);
-        memcpy(callsign2 + 1, callsign + 2, 4);
+        if (length > 2) {
+            memcpy(callsign2 + 1, callsign + 2, length - 2);
+        }
     }
     else {
         // Just copy, no modifications needed
         // Check for callsigns with 1 symbol prefix
         if (!is_digit(callsign[2]) && is_digit(callsign[1])) {
-            if (len > 5) {
+            if (length > 5) {
                 return -1;
             }
             // Leave one space at the beginning as padding
-            memcpy(callsign2 + 1, callsign, len);
+            memcpy(callsign2 + 1, callsign, length);
         }
         else {
-            memcpy(callsign2, callsign, len);
+            memcpy(callsign2, callsign, length);
         }
     }
  
@@ -251,7 +254,7 @@ int32_t packcall(const char *callsign) {
 
 // Pack a valid grid locator into an integer.
 int16_t packgrid(const char *grid) {
-    //LOG("Grid = [%s]\n", grid);
+    printf("Grid = [%s]\n", grid);
     int len = strlen(grid);
 
     if (len == 0) {
@@ -333,9 +336,11 @@ int16_t packgrid(const char *grid) {
 }
 
 // Pack a free-text message into 3 integers (28+28+15 bits)
+// NOTE: msg MUST contain at least 13 characters! 
+// No checking is done. Exactly 13 characters will be processed.
 void packtext(const char *msg, int32_t &nc1, int32_t &nc2, int16_t &ng) {
     int32_t nc3;
-    nc1 = nc2 = ng = 0;
+    nc1 = nc2 = nc3 = 0;
 
     // Pack 5 characters (42^5) into 27 bits
     for (int i = 0; i < 5; ++i) { // First 5 characters in nc1
@@ -373,7 +378,7 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
     char msg2[23];  // Including zero terminator!
     
     fmtmsg(msg2, msg);
-    
+
     //LOG("msg2 = [%s]\n", msg2);
 
     // TODO: Change 'CQ n ' type messages to 'CQ 00n '
@@ -398,6 +403,7 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
         }
     }
     
+    int msg2len = strlen(msg2);
     int32_t nc1 = -1;
     int32_t nc2 = -1;
     int16_t ng = -1;
@@ -406,34 +412,44 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
     //   by locating spaces and changing them to zero terminators
 
     // Locate the first delimiter in the message
-    char *s1 = (char *)strchr(msg2, ' ');
-    if (s1 != NULL) {
-        *s1 = 0;    // Separate fields by zero terminator
+    const char *s1 = strchr(msg2, ' ');
+    if (s1 != 0) {
+        int s1len = s1 - msg2;
+        int s2len;
         ++s1;       // s1 now points to the second field
 
         // Locate the second delimiter in the message
-        char *s2 = (char *)strchr(s1 + 1, ' ');
-        if (s2 == NULL) {
+        const char *s2 = strchr(s1 + 1, ' ');
+        if (s2 == 0) {
             // If the second space is not found, point to the end of string
             // to allow for blank grid (third field)
-            s2 = msg2 + strlen(msg2);
+            s2 = msg2 + msg2len;
+            s2len = s2 - s1;
         }
         else {
-            *s2 = 0;// Separate fields by zero terminator
+            s2len = s2 - s1;
             ++s2;   // s2 now points to the third field
         }
 
         // TODO: process callsign prefixes/suffixes    
 
         // Pack message fields into integers
-        nc1 = packcall(msg2);
-        nc2 = packcall(s1);
+        nc1 = packcall(msg2, s1len);
+        nc2 = packcall(s1, s2len);
         ng  = packgrid(s2);
     }
 
     // Check for success in all three fields
     if (nc1 < 0 || nc2 < 0 || ng < 0) {
         // Treat as plain text message
+
+        // Pad with spaces at the end if necessary
+        for (int i = msg2len; i < 13; ++i) {
+            msg2[i] = ' ';
+        }
+        msg2[13] = 0;
+
+        printf("Treating as free text\n");
         packtext(msg2, nc1, nc2, ng);
         ng += 0x8000;   // Set bit 15 (we abuse signed int here)
     }
