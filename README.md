@@ -22,6 +22,7 @@ So far only encoding is implemented. It should support the basic set of FT8 mess
 * Encoding contest mode messages
 * Encoding compound callsigns with country prefixes and mode suffixes
 * Decoding
+* The revised FT8 protocol using 77-bit payload messages (since WSJT-X version 2.0)
 
 # What to do with it
 
