@@ -1,6 +1,6 @@
 # FT8 library 
 
-A C++ implementation of FT8 protocol, mostly intended for experimentation with microcontrollers. At the moment only encoding is implemented.
+A C++ implementation of FT8 protocol, mostly intended for experimental use on microcontrollers. At the moment only encoding is implemented.
 
 The encoding process is relatively light on resources, and an Arduino should be perfectly capable of running this code.
 
