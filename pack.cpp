@@ -4,8 +4,8 @@
 #include "pack.h"
 
 
-constexpr int NBASE = 37*36*10*27*27*27;
-constexpr int NGBASE = 180*180;
+constexpr int32_t NBASE = 37*36*10*27*27*27L;
+constexpr int32_t NGBASE = 180*180L;
 
 
 // Utility functions for characters and strings
@@ -54,21 +54,26 @@ void fmtmsg(char *msg_out, const char *msg_in) {
 
 
 // Returns integer encoding of a character (number/digit/space).
+// Alphabet: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ +-./?"
 //   - Digits are encoded as 0..9
 //   - Letters a..z are encoded as 10..35 (case insensitive)
 //   - Space is encoded as 36
 uint8_t nchar(char c) {
-    if (is_digit(c)) {
+    if (is_digit(c))
         return (c - '0');
-    }
-    if (is_letter(c)) {
+    if (is_letter(c))
         return (to_upper(c) - 'A') + 10;
+
+    switch (c) {
+        case ' ': return 36;
+        case '+': return 37;
+        case '-': return 38;
+        case '.': return 39;
+        case '/': return 40;
+        case '?': return 41;
+
+        default:  return 36;    // Equal to ' '
     }
-    if (c == ' ') {
-        return 36;
-    }
-    // we should never reach here
-    return 36;
 }
 
 
@@ -327,6 +332,37 @@ int16_t packgrid(const char *grid) {
     return ng;
 }
 
+// Pack a free-text message into 3 integers (28+28+15 bits)
+void packtext(const char *msg, int32_t &nc1, int32_t &nc2, int16_t &ng) {
+    int32_t nc3;
+    nc1 = nc2 = ng = 0;
+
+    // Pack 5 characters (42^5) into 27 bits
+    for (int i = 0; i < 5; ++i) { // First 5 characters in nc1
+        uint8_t j = nchar(msg[i]); // Get character code
+        nc1 = 42*nc1 + j;
+    }
+
+    // Pack 5 characters (42^5) into 27 bits
+    for (int i = 5; i < 10; ++i) { // Characters 6-10 in nc2
+        uint8_t j = nchar(msg[i]); // Get character code
+        nc2 = 42*nc2 + j;
+    }
+
+    // Pack 3 characters (42^3) into 17 bits
+    for (int i = 10; i < 13; ++i) { // Characters 11-13 in nc3
+        uint8_t j = nchar(msg[i]); // Get character code
+        nc3 = 42*nc3 + j;
+    }
+
+    // We now have used 17 bits in nc3.  Must move one each to nc1 and nc2.
+    nc1 <<= 1;
+    if (nc3 & 0x08000) nc1 |= 1;
+    nc2 <<= 1;
+    if (nc3 & 0x10000) nc2 |= 1;
+    ng = nc3 & 0x7FFF;
+}
+
 
 int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
     // TODO: check what is maximum allowed length?
@@ -362,49 +398,51 @@ int packmsg(const char *msg, uint8_t *dat) {  // , itype, bcontest
         }
     }
     
+    int32_t nc1 = -1;
+    int32_t nc2 = -1;
+    int16_t ng = -1;
+
     // Try to split the message into three space-delimited fields
     //   by locating spaces and changing them to zero terminators
 
     // Locate the first delimiter in the message
-    char *s1 = strchr(msg2, ' ');
-    if (s1 == NULL) {
-        // TODO: handle this (plain text message?)
-        return -2;
-    }
-    *s1 = 0;    // Separate fields by zero terminator
-    ++s1;       // Now s1 points to the second field
+    char *s1 = (char *)strchr(msg2, ' ');
+    if (s1 != NULL) {
+        *s1 = 0;    // Separate fields by zero terminator
+        ++s1;       // s1 now points to the second field
 
-    // Locate the second delimiter in the message
-    char *s2 = strchr(s1 + 1, ' ');
-    if (s2 == NULL) {
-        // If the second space is not found, point to the end of string
-        // to allow for blank grid (third field)
-        s2 = msg2 + strlen(msg2);
-    }
-    else {
-        *s2 = 0;// Separate fields by zero terminator
-        ++s2;   // Now s2 points to the third field
+        // Locate the second delimiter in the message
+        char *s2 = (char *)strchr(s1 + 1, ' ');
+        if (s2 == NULL) {
+            // If the second space is not found, point to the end of string
+            // to allow for blank grid (third field)
+            s2 = msg2 + strlen(msg2);
+        }
+        else {
+            *s2 = 0;// Separate fields by zero terminator
+            ++s2;   // s2 now points to the third field
+        }
+
+        // TODO: process callsign prefixes/suffixes    
+
+        // Pack message fields into integers
+        nc1 = packcall(msg2);
+        nc2 = packcall(s1);
+        ng  = packgrid(s2);
     }
 
-    // TODO: process callsign prefixes/suffixes
-
-    // Pack message fields into integers
-    int nc1 = packcall(msg2);
-    int nc2 = packcall(s1);
-    int ng = packgrid(s2);
-        
-    // TODO: plain text messages
-    //call packtext(msg,nc1,nc2,ng)
-    //ng=ng+32768
-    
+    // Check for success in all three fields
     if (nc1 < 0 || nc2 < 0 || ng < 0) {
-        return -3;
+        // Treat as plain text message
+        packtext(msg2, nc1, nc2, ng);
+        ng += 0x8000;   // Set bit 15 (we abuse signed int here)
     }
+
     //LOG("nc1 = %d [%04X], nc2 = %d [%04X], ng = %d\n", nc1, nc1, nc2, nc2, ng);
 
     // Originally the data was packed in bytes of 6 bits. 
     // This seems to waste memory unnecessary and complicate the code, so we pack it in 8 bit values.
-    pack3_8bit(nc1, nc2, ng, dat);
+    pack3_8bit((uint32_t)nc1, (uint32_t)nc2, (uint16_t)ng, dat);
     //pack3_6bit(nc1, nc2, ng, dat);
 
     return 0;   // Success!
