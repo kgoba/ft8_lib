@@ -119,12 +119,19 @@ void pack77_1(const char *msg, uint8_t i3, uint8_t *b77) {
     // if(index(w(1),'/P').ge.4 .or. index(w(1),'/R').ge.4) ipa=1
     // if(index(w(2),'/P').ge.4 .or. index(w(2),'/R').ge.4) ipb=1
 
-    uint32_t n28a, n28b;
+    int32_t n28a, n28b;
     uint16_t igrid4;
+
+    const char *call1, *call2;
+
+    n28a = pack28(call1);
+    n28b = pack28(call2);
     
+    // Add ipa and ipb bits to the right
     n28a <<= 1; // ipa = 0
     n28b <<= 1; // ipb = 0
 
+    // Add igrid4 bit to the left
     //igrid4 |= 0x8000;   // ir = 1
 
     // write(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
