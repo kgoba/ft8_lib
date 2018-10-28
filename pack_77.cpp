@@ -3,6 +3,7 @@
 
 #include "text.h"
 
+// TODO: This is wasteful, should figure out something more elegant
 const char *A0 = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 const char *A1 = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const char *A2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -24,13 +25,10 @@ int32_t pack28(const char *callsign) {
     constexpr int32_t NTOKENS = 2063592L;
     constexpr int32_t MAX22   = 4194304L;
 
-    int length = strlen(callsign);  // We will need it later
-    if (length > 13) return -1;
-
     // Check for special tokens first
-    if (equals(callsign, "DE")) return 0;
-    if (equals(callsign, "QRZ")) return 1;
-    if (equals(callsign, "CQ")) return 2;
+    if (starts_with(callsign, "DE ")) return 0;
+    if (starts_with(callsign, "QRZ ")) return 1;
+    if (starts_with(callsign, "CQ ")) return 2;
 
     if (starts_with(callsign, "CQ_")) {
         int nnum = 0, nlet = 0;
@@ -45,6 +43,11 @@ int32_t pack28(const char *callsign) {
     //   n28=NTOKENS + n22
 
     char c6[6] = {' ', ' ', ' ', ' ', ' ', ' '};
+
+    int length = 0; // strlen(callsign);  // We will need it later
+    while (callsign[length] != ' ' && callsign[length] != 0) {
+        length++;
+    }
 
     // Work-around for Swaziland prefix:
     if (starts_with(callsign, "3DA0") && length <= 7) {
@@ -83,6 +86,8 @@ int32_t pack28(const char *callsign) {
 
     //char c13[13];
 
+    //if (length > 13) return -1;
+
     // Treat this as a nonstandard callsign: compute its 22-bit hash
     // call save_hash_call(c13,n10,n12,n22)   !Save callsign in hash table
     // n28=NTOKENS + n22
@@ -113,26 +118,81 @@ bool chkcall(const char *call, char *bc) {
 }
 
 
+uint16_t packgrid(const char *grid4) {
+    constexpr uint16_t MAXGRID4 = 32400;
+
+    if (grid4 == 0) {
+        // Two callsigns only, no report/grid
+        return MAXGRID4 + 1;
+    }
+
+    // Take care of special cases
+    if (equals(grid4, "RRR")) return MAXGRID4 + 2;
+    if (equals(grid4, "RR73")) return MAXGRID4 + 3;
+    if (equals(grid4, "73")) return MAXGRID4 + 4;
+
+    // Check for standard 4 letter grid
+    if (in_range(grid4[0], 'A', 'R') && 
+        in_range(grid4[1], 'A', 'R') &&
+        is_digit(grid4[2]) && is_digit(grid4[3])) 
+    {
+        //if (w(3).eq.'R ') ir=1
+        uint16_t igrid4 = (grid4[3] - '0');
+        igrid4 = igrid4 * 10 + (grid4[2] - '0');
+        igrid4 = igrid4 * 10 + (grid4[1] - 'A');
+        igrid4 = igrid4 * 18 + (grid4[0] - 'A');
+        return igrid4;
+    }
+
+    // Parse report: +dd / -dd / R+dd / R-dd
+    // TODO: check the range of dd
+    if (grid4[0] == 'R') {
+        int dd = dd_to_int(grid4 + 1, 3);
+        uint16_t irpt = 35 + dd;
+        return (MAXGRID4 + irpt) | 0x8000;  // ir = 1
+    }
+    else {
+        int dd = dd_to_int(grid4, 3);
+        uint16_t irpt = 35 + dd;
+        return (MAXGRID4 + irpt);           // ir = 0
+    }
+
+    return MAXGRID4 + 1;
+}
+
 // Pack Type 1 (Standard 77-bit message) and Type 2 (ditto, with a "/P" call)
-void pack77_1(const char *msg, uint8_t i3, uint8_t *b77) {
+int pack77_1(const char *msg, uint8_t *b77) {
+    // Locate the first delimiter
+    const char *s1 = strchr(msg, ' ');
+    if (s1 == 0) return -1;
+
+    const char *call1 = msg;        // 1st call
+    const char *call2 = s1 + 1;     // 2nd call
+
+    int32_t n28a = pack28(call1);
+    int32_t n28b = pack28(call2);
+
+    uint16_t igrid4;
+
+    // Locate the second delimiter
+    const char *s2 = strchr(s1 + 1, ' ');
+    if (s2 != 0) {
+        igrid4 = packgrid(s2 + 1);
+    }
+    else {
+        // Two callsigns, no grid/report
+        igrid4 = packgrid(0);
+    }
+
+    uint8_t i3 = 1;
+    // if(index(w(1),'/P').ge.4 .or. index(w(2),'/P').ge.4) i3=2  !Type 2, with "/P"
 
     // if(index(w(1),'/P').ge.4 .or. index(w(1),'/R').ge.4) ipa=1
     // if(index(w(2),'/P').ge.4 .or. index(w(2),'/R').ge.4) ipb=1
 
-    int32_t n28a, n28b;
-    uint16_t igrid4;
-
-    const char *call1, *call2;
-
-    n28a = pack28(call1);
-    n28b = pack28(call2);
-    
-    // Add ipa and ipb bits to the right
+    // Shift in ipa and ipb bits into n28a and n28b
     n28a <<= 1; // ipa = 0
     n28b <<= 1; // ipb = 0
-
-    // Add igrid4 bit to the left
-    //igrid4 |= 0x8000;   // ir = 1
 
     // write(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
     // 1000 format(2(b28.28,b1),b1,b15.15,b3.3)  
@@ -148,6 +208,8 @@ void pack77_1(const char *msg, uint8_t i3, uint8_t *b77) {
     b77[7] = (uint8_t)(n28a << 6) | (uint8_t)(igrid4 >> 10);
     b77[8] = (igrid4 >> 2);
     b77[9] = (uint8_t)(igrid4 << 6) | (uint8_t)(i3 << 3);
+
+    return 0;
 }
 
 
@@ -182,10 +244,9 @@ void packtext77(const char *c13, uint8_t *b71) {
 
 int pack77(const char *msg, uint8_t *c77) {
     // Check Type 1 (Standard 77-bit message) or Type 2, with optional "/P"
-    if (starts_with(msg, "CQ ")) {
-        pack77_1(nwords,w,i3,n3,c77);
-        return;
-    }
+    //if (starts_with(msg, "CQ ")) {
+    return pack77_1(msg, c77);
+    //}
     // Check 0.5 (telemetry)
     // i3=0 n3=5 write(c77,1006) ntel,n3,i3 1006 format(b23.23,2b24.24,2b3.3)
 
