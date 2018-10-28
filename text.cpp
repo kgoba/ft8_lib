@@ -49,3 +49,55 @@ void fmtmsg(char *msg_out, const char *msg_in) {
     }
     *msg_out = 0; // Add zero termination
 }
+
+
+// Parse a 2 digit integer from string
+int dd_to_int(const char *str, int length) {
+    int result = 0;
+    bool negative;
+    int i;
+    if (str[0] == '-') {
+        negative = true;
+        i = 1;                          // Consume the - sign
+    }
+    else {
+        negative = false;
+        i = (str[0] == '+') ? 1 : 0;    // Consume a + sign if found
+    }
+    
+    while (i < length) {
+        if (str[i] == 0) break;
+        if (!is_digit(str[i])) break;
+        result *= 10;
+        result += (str[i] - '0');
+        ++i;
+    }
+
+    return negative ? -result : result;
+}
+
+
+// Convert a 2 digit integer to string
+void int_to_dd(char *str, int value, int width) {
+    if (value < 0) {
+        *str = '-';
+        ++str;
+        value = -value;
+    }
+
+    int divisor = 1;
+    for (int i = 0; i < width; ++i) {
+        divisor *= 10;
+    }
+
+    while (divisor > 1) {
+        int digit = value / divisor;
+
+        *str = '0' + digit;
+        ++str;
+
+        value -= digit * divisor;
+        divisor /= 10;
+    }
+    *str = 0;   // Add zero terminator
+}
