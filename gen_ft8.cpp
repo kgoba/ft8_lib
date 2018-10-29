@@ -6,6 +6,9 @@
 #include "pack.h"
 #include "encode.h"
 
+#include "pack_77.h"
+#include "encode_91.h"
+
 
 void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits) {
     // Zero-fill the destination array as we will only be setting bits later
@@ -169,8 +172,9 @@ int main(int argc, char **argv) {
     const char *wav_path = argv[2];
 
     // First, pack the text data into 72-bit binary message
-    uint8_t packed[9];
-    int rc = packmsg(message, packed);
+    uint8_t packed[10];
+    //int rc = packmsg(message, packed);
+    int rc = ft8_v2::pack77(message, packed);
     if (rc < 0) {
         printf("Cannot parse message!\n");
         printf("RC = %d\n", rc);
@@ -178,14 +182,15 @@ int main(int argc, char **argv) {
     }
 
     printf("Packed data: ");
-    for (int j = 0; j < 9; ++j) {
+    for (int j = 0; j < 10; ++j) {
         printf("%02x ", packed[j]);
     }
     printf("\n");
 
     // Second, encode the binary message as a sequence of FSK tones
     uint8_t tones[NN];          // NN = 79, lack of better name at the moment
-    genft8(packed, 0, tones);
+    //genft8(packed, 0, tones);
+    ft8_v2::genft8(packed, tones);
 
     printf("FSK tones: ");
     for (int j = 0; j < NN; ++j) {

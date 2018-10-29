@@ -228,8 +228,8 @@ void genft8(const uint8_t *payload, uint8_t i3, uint8_t *itone) {
     // Append 3 bits of i3 at the end of 72 bit payload
     a87[9] = ((i3 & 0x07) << 5);
 
-    // Calculate CRC of 76 bits (yes, 72 + 3 + 1 zero bit), see WSJT-X code
-    uint16_t checksum = ft8_crc(a87, 76);
+    // Calculate CRC of 11 bytes = 88 bits, see WSJT-X code
+    uint16_t checksum = ft8_crc(a87, 88 - 12);
 
     // Store the CRC at the end of 75 bit message (yes, 72 + 3)
     uint16_t tmp = (checksum << 1);

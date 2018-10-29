@@ -3,6 +3,8 @@
 
 #include "text.h"
 
+#include <stdio.h>
+
 namespace ft8_v2 {
 
 // TODO: This is wasteful, should figure out something more elegant
@@ -77,6 +79,7 @@ int32_t pack28(const char *callsign) {
         (i2 = index(A3, c6[2])) >= 0 && (i3 = index(A4, c6[3])) >= 0 &&
         (i4 = index(A4, c6[4])) >= 0 && (i5 = index(A4, c6[5])) >= 0) 
     {
+        printf("Pack28: idx=[%d, %d, %d, %d, %d, %d]\n", i0, i1, i2, i3, i4, i5);
         // This is a standard callsign
         int32_t n28 = i0;
         n28 = n28 * 36 + i1;
@@ -84,6 +87,7 @@ int32_t pack28(const char *callsign) {
         n28 = n28 * 27 + i3;
         n28 = n28 * 27 + i4;
         n28 = n28 * 27 + i5;
+        printf("Pack28: n28=%d (%04xh)\n", n28, n28);
         return NTOKENS + MAX22 + n28;
     }
 
@@ -144,10 +148,10 @@ uint16_t packgrid(const char *grid4) {
         is_digit(grid4[2]) && is_digit(grid4[3])) 
     {
         //if (w(3).eq.'R ') ir=1
-        uint16_t igrid4 = (grid4[3] - '0');
+        uint16_t igrid4 = (grid4[0] - 'A');
+        igrid4 = igrid4 * 18 + (grid4[1] - 'A');
         igrid4 = igrid4 * 10 + (grid4[2] - '0');
-        igrid4 = igrid4 * 10 + (grid4[1] - 'A');
-        igrid4 = igrid4 * 18 + (grid4[0] - 'A');
+        igrid4 = igrid4 * 10 + (grid4[3] - '0');
         return igrid4;
     }
 
@@ -208,14 +212,18 @@ int pack77_1(const char *msg, uint8_t *b77) {
     // write(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
     // 1000 format(2(b28.28,b1),b1,b15.15,b3.3)  
 
+    // 00 00 00 27 b3 00 01 0b 27 8f b9 e0
+    // (00 00 00 2) 0 (f0 85 ab e) (0) 
+    // 7842D5F
+
     b77[0] = (n28a >> 21);
     b77[1] = (n28a >> 13);
     b77[2] = (n28a >> 5);
     b77[3] = (uint8_t)(n28a << 3) | (uint8_t)(n28b >> 26);
     b77[4] = (n28b >> 18);
-    b77[5] = (n28a >> 10);
-    b77[6] = (n28a >> 2);
-    b77[7] = (uint8_t)(n28a << 6) | (uint8_t)(igrid4 >> 10);
+    b77[5] = (n28b >> 10);
+    b77[6] = (n28b >> 2);
+    b77[7] = (uint8_t)(n28b << 6) | (uint8_t)(igrid4 >> 10);
     b77[8] = (igrid4 >> 2);
     b77[9] = (uint8_t)(igrid4 << 6) | (uint8_t)(i3 << 3);
 
