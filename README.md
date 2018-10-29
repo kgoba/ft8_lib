@@ -10,12 +10,18 @@ Work is in progress (possibly taking forever) to explore decoding options. On a 
 
 # What works
 
-So far only encoding is implemented. It should support the basic set of FT8 messages:
+So far only encoding is implemented. It should support the basic set of FT8 version 1 (75-bit) messages:
 * CQ {call} {grid}, e.g. CQ CA0LL GG77
 * CQ {xy} {call} {grid}, e.g. CQ JA CA0LL GG77
 * {call} {call} {report}, e.g. CA0LL OT7ER R-07
 * {call} {call} 73/RRR/RR73, e.g. OT7ER CA0LL 73
 * Free-text messages (up to 13 characters from a limited alphabet)
+
+I am working on the revised FT8 protocol with 77-bit payload (introduced since WSJT-X version 2.0), and currently the library supports the basic message set:
+* CQ {call} {grid}, e.g. CQ CA0LL GG77
+* CQ {xy} {call} {grid}, e.g. CQ JA CA0LL GG77
+* {call} {call} {report}, e.g. CA0LL OT7ER R-07
+* {call} {call} 73/RRR/RR73, e.g. OT7ER CA0LL 73
 
 # What doesn't
 
@@ -23,7 +29,6 @@ So far only encoding is implemented. It should support the basic set of FT8 mess
 * Encoding extended range signal reports (<-30dB or >=0dB S/N)
 * Encoding compound callsigns with country prefixes and mode suffixes
 * Decoding
-* The revised FT8 protocol using 77-bit payload messages (introduced since WSJT-X version 2.0)
 
 # What to do with it
 
