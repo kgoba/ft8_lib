@@ -140,34 +140,19 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     // codeword(1:K)=message
     // codeword(K+1:N)=pchecks
 
-    printf("Encode ");
-    for (int i = 0; i < K_BYTES; ++i) {
-        printf("%02x ", message[i]);
-    }
-    printf("\n");
+    // printf("Encode ");
+    // for (int i = 0; i < K_BYTES; ++i) {
+    //     printf("%02x ", message[i]);
+    // }
+    // printf("\n");
 
-    int colidx = 0; // track the current column in codeword
-
-    // Fill the codeword with zeroes, as we will only update binary ones later
-    for (int i = 0; i < (N + 7) / 8; i++) {
-        codeword[i] = 0;
+    // Fill the codeword with message and zeros, as we will only update binary ones later
+    for (int j = 0; j < (7 + N) / 8; ++j) {
+        codeword[j] = (j < K_BYTES) ? message[j] : 0;
     }
 
-    // Compute the second part of itmp (M+1:N) and store the result in codeword
-    uint8_t mask = 0x80;    // Rolling mask starting with the MSB
-    for (int j = 0; j < K; ++j) {
-        // Copy the j-th bit from message to codeword
-        if (message[j/8] & mask) {
-            //uint8_t col = colorder[colidx];     // Index of the bit to set
-            uint8_t col = colidx;
-            codeword[col/8] |= (1 << (7 - col%8));
-        }
-        ++colidx;
-
-        // Roll the bitmask to the right
-        mask >>= 1;
-        if (mask == 0) mask = 0x80;
-    }
+    uint8_t col_mask = (0x80 >> (K % 8));   // bitmask of current byte
+    uint8_t col_idx = K_BYTES - 1;          // index into byte array
 
     // Compute the first part of itmp (1:M) and store the result in codeword
     for (int i = 0; i < M; ++i) { // do i=1,M
@@ -181,18 +166,21 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
         }
         // Check if we need to set a bit in codeword
         if (nsum % 2) { // pchecks(i)=mod(nsum,2)
-            //uint8_t col = colorder[colidx];     // Index of the bit to set
-            uint8_t col = colidx;
-            codeword[col/8] |= (1 << (7 - col%8));
+            codeword[col_idx] |= col_mask;            
         }
-        ++colidx;
+
+        col_mask >>= 1;
+        if (col_mask == 0) { 
+            col_mask = 0x80; 
+            ++col_idx; 
+        }
     }
 
-    printf("Result ");
-    for (int i = 0; i < (N + 7) / 8; ++i) {
-        printf("%02x ", codeword[i]);
-    }
-    printf("\n");
+    // printf("Result ");
+    // for (int i = 0; i < (N + 7) / 8; ++i) {
+    //     printf("%02x ", codeword[i]);
+    // }
+    // printf("\n");
 }
 
 
@@ -204,11 +192,11 @@ uint16_t ft8_crc(uint8_t *message, int num_bits) {
     constexpr int       WIDTH = 14;
     constexpr uint16_t  TOPBIT = (1 << (WIDTH - 1));
 
-    printf("CRC, %d bits: ", num_bits);
-    for (int i = 0; i < (num_bits + 7) / 8; ++i) {
-        printf("%02x ", message[i]);
-    }
-    printf("\n");
+    // printf("CRC, %d bits: ", num_bits);
+    // for (int i = 0; i < (num_bits + 7) / 8; ++i) {
+    //     printf("%02x ", message[i]);
+    // }
+    // printf("\n");
 
     uint16_t remainder = 0;
     int idx_byte = 0;
@@ -229,7 +217,7 @@ uint16_t ft8_crc(uint8_t *message, int num_bits) {
             remainder = (remainder << 1);
         }
     }
-    printf("CRC = %04xh\n", remainder & ((1 << WIDTH) - 1));
+    // printf("CRC = %04xh\n", remainder & ((1 << WIDTH) - 1));
     return remainder & ((1 << WIDTH) - 1);
 }
 
@@ -289,8 +277,6 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
         if (codeword[i_byte] & mask) bits3 |= 1;
         if (0 == (mask >>= 1)) { mask = 0x80; i_byte++; }
 
-        // Before Gray: 2560413 00000000117314000020544743734 2560413 74502537003717523102453566214 2560413
-        // After  Gray: 2560413 00000000117215000030655752725 2560413 75603627002717632103562644315 2560413
         itone[k] = GRAY[bits3];
         ++k;
     }
