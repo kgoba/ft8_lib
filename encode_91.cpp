@@ -1,5 +1,7 @@
 #include "encode.h"
 
+namespace ft8_v2 {
+
 constexpr int N = 174, K = 91, M = N-K;  // Define the LDPC sizes
 
 constexpr uint16_t  POLYNOMIAL = 0x2757;  // CRC-14 polynomial without the leading (MSB) 1
@@ -214,10 +216,9 @@ uint16_t ft8_crc(uint8_t *message, int num_bits) {
 
 
 // Generate FT8 tone sequence from payload data
-// [IN] payload - 9 byte array consisting of 72 bit payload (MSB first)
-// [IN] i3      - 3 bits containing message type (zero?)
+// [IN] payload - 10 byte array consisting of 77 bit payload (MSB first)
 // [OUT] itone  - array of NN (79) bytes to store the generated tones (encoded as 0..7)
-void genft8(const uint8_t *payload, uint8_t i3, uint8_t *itone) {
+void genft8(const uint8_t *payload, uint8_t *itone) {
     uint8_t a91[12];    // Store 77 bits of payload + 14 bits CRC
 
     // Copy 77 bits of payload data
@@ -261,3 +262,5 @@ void genft8(const uint8_t *payload, uint8_t i3, uint8_t *itone) {
         ++k;
     }
 }
+
+};  // namespace

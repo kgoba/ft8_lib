@@ -3,6 +3,8 @@
 
 #include "text.h"
 
+namespace ft8_v2 {
+
 // TODO: This is wasteful, should figure out something more elegant
 const char *A0 = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 const char *A1 = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -33,11 +35,12 @@ int32_t pack28(const char *callsign) {
     if (starts_with(callsign, "CQ_")) {
         int nnum = 0, nlet = 0;
 
+        // TODO:
         // if(nnum.eq.3 .and. nlet.eq.0) then n28=3+nqsy
         // if(nlet.ge.1 .and. nlet.le.4 .and. nnum.eq.0) then n28=3+1000+m
     }
 
-    // Check for <...> callsign
+    // TODO: Check for <...> callsign
     // if(c13(1:1).eq.'<')then
     //   call save_hash_call(c13,n10,n12,n22)   !Save callsign in hash table
     //   n28=NTOKENS + n22
@@ -88,6 +91,7 @@ int32_t pack28(const char *callsign) {
 
     //if (length > 13) return -1;
 
+    // TODO:
     // Treat this as a nonstandard callsign: compute its 22-bit hash
     // call save_hash_call(c13,n10,n12,n22)   !Save callsign in hash table
     // n28=NTOKENS + n22
@@ -109,12 +113,15 @@ bool chkcall(const char *call, char *bc) {
     if (0 != strchr(call, '?')) return false;
     if (length > 6 && 0 != strchr(call, '/')) return false;
 
+    // TODO: implement suffix parsing (or rework?)
   //bc=w(1:6)
   //i0=index(w,'/')
   //if(max(i0-1,n1-i0).gt.6) go to 100      !Base call must be < 7 characters
   //if(i0.ge.2 .and. i0.le.n1-1) then       !Extract base call from compound call
   //   if(i0-1.le.n1-i0) bc=w(i0+1:n1)//'   '
   //   if(i0-1.gt.n1-i0) bc=w(1:i0-1)//'   '
+
+    return true;
 }
 
 
@@ -171,6 +178,8 @@ int pack77_1(const char *msg, uint8_t *b77) {
 
     int32_t n28a = pack28(call1);
     int32_t n28b = pack28(call2);
+    
+    if (n28a < 0 || n28b < 0) return -1;
 
     uint16_t igrid4;
 
@@ -184,9 +193,10 @@ int pack77_1(const char *msg, uint8_t *b77) {
         igrid4 = packgrid(0);
     }
 
-    uint8_t i3 = 1;
+    uint8_t i3 = 1; // No suffix or /R
+    
+    // TODO: check for suffixes
     // if(index(w(1),'/P').ge.4 .or. index(w(2),'/P').ge.4) i3=2  !Type 2, with "/P"
-
     // if(index(w(1),'/P').ge.4 .or. index(w(1),'/R').ge.4) ipa=1
     // if(index(w(2),'/P').ge.4 .or. index(w(2),'/R').ge.4) ipb=1
 
@@ -194,9 +204,9 @@ int pack77_1(const char *msg, uint8_t *b77) {
     n28a <<= 1; // ipa = 0
     n28b <<= 1; // ipb = 0
 
+    // Pack into (28 + 1) + (28 + 1) + (1 + 15) + 3 bits
     // write(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
     // 1000 format(2(b28.28,b1),b1,b15.15,b3.3)  
-    // (28 + 1) + (28 + 1) + (1 + 15) + 3  
 
     b77[0] = (n28a >> 21);
     b77[1] = (n28a >> 13);
@@ -242,11 +252,14 @@ void packtext77(const char *c13, uint8_t *b71) {
     }
 }
 
+
 int pack77(const char *msg, uint8_t *c77) {
     // Check Type 1 (Standard 77-bit message) or Type 2, with optional "/P"
     //if (starts_with(msg, "CQ ")) {
     return pack77_1(msg, c77);
     //}
+
+    // TODO:
     // Check 0.5 (telemetry)
     // i3=0 n3=5 write(c77,1006) ntel,n3,i3 1006 format(b23.23,2b24.24,2b3.3)
 
@@ -258,3 +271,66 @@ int pack77(const char *msg, uint8_t *c77) {
     // packtext77(msg(1:13),c77(1:71))
     // write(c77(72:77),'(2b3.3)') n3,i3
 }
+
+};  // namespace
+
+#ifdef UNIT_TEST
+
+#include <iostream>
+
+using namespace std;
+
+bool test1() {
+    const char *inputs[] = {
+        "",
+        " ",
+        "ABC",
+        "A9",
+        "L9A",
+        "L7BC",
+        "L0ABC",
+        "LL3JG",
+        "LL3AJG",
+        "CQ ",
+        0
+    };
+
+    for (int i = 0; inputs[i]; ++i) {
+        int32_t result = ft8_v2::pack28(inputs[i]);
+        printf("pack28(\"%s\") = %d\n", inputs[i], result);
+    }
+
+    return true;
+}
+
+bool test2() {
+    const char *inputs[] = {
+        "CQ LL3JG",
+        "CQ LL3JG KO26",
+        "L0UAA LL3JG KO26",
+        "L0UAA LL3JG +02",
+        "L0UAA LL3JG RRR",
+        "L0UAA LL3JG 73",
+        0
+    };
+
+    for (int i = 0; inputs[i]; ++i) {
+        uint8_t result[10];
+        int rc = ft8_v2::pack77_1(inputs[i], result);
+        printf("pack77_1(\"%s\") = %d\t[", inputs[i], rc);
+        for (int j = 0; j < 10; ++j) {
+            printf("%02x ", result[j]);
+        }
+        printf("]\n");
+    }
+
+    return true;
+}
+
+int main() {
+    test1();
+    test2();
+    return 0;
+}
+
+#endif
