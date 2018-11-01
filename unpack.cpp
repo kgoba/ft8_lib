@@ -42,40 +42,42 @@ void unpackcall(uint32_t nc, char *callsign) {
 
 // extract maidenhead locator
 void unpackgrid(uint32_t ng, char *grid) {
-    // start of special grid locators for sig strength &c.
-    NGBASE = 180*180
+    // // start of special grid locators for sig strength &c.
+    // NGBASE = 180*180
 
-    if ng == NGBASE+1:
-        return "    "
-    if ng >= NGBASE+1 and ng < NGBASE+31:
-        return " -%02d" % (ng - (NGBASE+1)) // sig str, -01 to -30 DB
-    if ng >= NGBASE+31 and ng < NGBASE+62:
-        return "R-%02d" % (ng - (NGBASE+31))
-    if ng == NGBASE+62:
-        return "RO  "
-    if ng == NGBASE+63:
-        return "RRR "
-    if ng == NGBASE+64:
-        return "73  "
+    // if ng == NGBASE+1:
+    //     return "    "
+    // if ng >= NGBASE+1 and ng < NGBASE+31:
+    //     return " -%02d" % (ng - (NGBASE+1)) // sig str, -01 to -30 DB
+    // if ng >= NGBASE+31 and ng < NGBASE+62:
+    //     return "R-%02d" % (ng - (NGBASE+31))
+    // if ng == NGBASE+62:
+    //     return "RO  "
+    // if ng == NGBASE+63:
+    //     return "RRR "
+    // if ng == NGBASE+64:
+    //     return "73  "
 
-    lat = (ng % 180) - 90
-    ng = int(ng / 180)
-    lng = (ng * 2) - 180
+    // lat = (ng % 180) - 90
+    // ng = int(ng / 180)
+    // lng = (ng * 2) - 180
 
-    g = "%c%c%c%c" % (ord('A') + int((179-lng)/20),
-                        ord('A') + int((lat+90)/10),
-                        ord('0') + int(((179-lng)%20)/2),
-                        ord('0') + (lat+90)%10)
+    // g = "%c%c%c%c" % (ord('A') + int((179-lng)/20),
+    //                     ord('A') + int((lat+90)/10),
+    //                     ord('0') + int(((179-lng)%20)/2),
+    //                     ord('0') + (lat+90)%10)
 
-    if g[0:2] == "KA":
-        // really + signal strength
-        sig = int(g[2:4]) - 50
-        return "+%02d" % (sig)
+    // if g[0:2] == "KA":
+    //     // really + signal strength
+    //     sig = int(g[2:4]) - 50
+    //     return "+%02d" % (sig)
 
-    if g[0:2] == "LA":
-        // really R+ signal strength
-        sig = int(g[2:4]) - 50
-        return "R+%02d" % (sig)    
+    // if g[0:2] == "LA":
+    //     // really R+ signal strength
+    //     sig = int(g[2:4]) - 50
+    //     return "R+%02d" % (sig)    
+
+    grid[0] = 0;
 }
 
 
@@ -118,7 +120,7 @@ int unpack(const uint8_t *a72, char *message) {
     nc1 |= (a72[2] << 4);
     nc1 |= (a72[3] >> 4);
     
-    nc2 = (a72[3] << 24);
+    nc2 = ((a72[3] & 0x0F) << 24);
     nc2 |= (a72[4] << 16);
     nc2 |= (a72[5] << 8);
     nc2 |= (a72[6]);

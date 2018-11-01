@@ -10,33 +10,6 @@
 #include "encode_91.h"
 
 
-void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits) {
-    // Zero-fill the destination array as we will only be setting bits later
-    for (int j = 0; j < (nBits + 5) / 6; ++j) {
-        dst[j] = 0;
-    }
-
-    // Set the relevant bits
-    uint8_t mask_src = (1 << 7);
-    uint8_t mask_dst = (1 << 5);
-    for (int i = 0, j = 0; nBits > 0; --nBits) {
-        if (src[i] & mask_src) {
-            dst[j] |= mask_dst;
-        }
-        mask_src >>= 1;
-        if (mask_src == 0) {
-            mask_src = (1 << 7);
-            ++i;
-        }
-        mask_dst >>= 1;
-        if (mask_dst == 0) {
-            mask_dst = (1 << 5);
-            ++j;
-        }
-    }
-}
-
-
 void synth_fsk(const uint8_t *symbols, int nSymbols, float f0, float spacing, float symbol_rate, float signal_rate, float *signal) {
     float phase = 0;
     float dt = 1/signal_rate;
@@ -107,47 +80,6 @@ void save_wav(const float *signal, int num_samples, int sample_rate, const char 
     fclose(f);
 
     free(raw_data);
-}
-
-
-void test1() {
-    //const char *test_in3 = "CQ DL7ACA JO40"; // 62, 32, 32, 49, 37, 27, 59, 2, 30, 19, 49, 16
-    //const char *test_in3 = "VA3UG   F1HMR 73"; // 52, 54, 60, 12, 55, 54, 7, 19, 2, 23, 59, 16
-    const char *test_in3 = "RA3Y VE3NLS 73";   // 46, 6, 32, 22, 55, 20, 11, 32, 53, 23, 59, 16
-    uint8_t test_out3[9];
-    int rc = packmsg(test_in3, test_out3);
-  
-    printf("RC = %d\n", rc);
-    
-    for (int i = 0; i < 9; ++i) {
-        printf("%02x ", test_out3[i]);
-    }
-    printf("\n");
-
-    uint8_t test_out4[12];
-    convert_8bit_to_6bit(test_out4, test_out3, 72);
-    for (int i = 0; i < 12; ++i) {
-        printf("%d ", test_out4[i]);
-    }
-    printf("\n");    
-}
-
-void test2() {
-    uint8_t test_in[11] = { 0xF1, 0x02, 0x03, 0x04, 0x05, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xFF };
-    uint8_t test_out[22];
-
-    encode174(test_in, test_out);
-
-    for (int j = 0; j < 22; ++j) {
-        printf("%02x ", test_out[j]);
-    }
-    printf("\n");
-}
-
-void test3() {
-    uint8_t test_in2[10] = { 0x11, 0x00, 0x00, 0x00, 0x00, 0x0E, 0x10, 0x04, 0x01, 0x00 };
-    uint16_t crc1 = ft8_crc(test_in2, 76);  // Calculate CRC of 76 bits only
-    printf("CRC: %04x\n", crc1);            // should be 0x0708
 }
 
 
