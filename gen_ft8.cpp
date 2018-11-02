@@ -10,14 +10,18 @@
 #include "encode_91.h"
 
 
-void synth_fsk(const uint8_t *symbols, int nSymbols, float f0, float spacing, float symbol_rate, float signal_rate, float *signal) {
+// Convert a sequence of symbols (tones) into a sinewave of continuous phase (FSK).
+// Symbol 0 gets encoded as a sine of frequency f0, the others are spaced in incresing
+// fashion.
+void synth_fsk(const uint8_t *symbols, int num_symbols, float f0, float spacing, 
+                float symbol_rate, float signal_rate, float *signal) {
     float phase = 0;
     float dt = 1/signal_rate;
     float dt_sym = 1/symbol_rate;
     float t = 0;
     int j = 0;
     int i = 0;
-    while (j < nSymbols) {
+    while (j < num_symbols) {
         float f = f0 + symbols[j] * spacing;
         phase += 2 * M_PI * f / signal_rate;
         signal[i] = sin(phase);
@@ -31,7 +35,7 @@ void synth_fsk(const uint8_t *symbols, int nSymbols, float f0, float spacing, fl
     }
 }
 
-
+// Save signal in floating point format (-1 .. +1) as a WAVE file using 16-bit signed integers.
 void save_wav(const float *signal, int num_samples, int sample_rate, const char *path) {
     FILE *f = fopen(path, "wb");
     char subChunk1ID[4] = {'f', 'm', 't', ' '};

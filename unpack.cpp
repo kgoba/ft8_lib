@@ -41,55 +41,66 @@ void unpackcall(uint32_t nc, char *callsign) {
 
 
 // extract maidenhead locator
-void unpackgrid(uint32_t ng, char *grid) {
-    // // start of special grid locators for sig strength &c.
-    // NGBASE = 180*180
+void unpackgrid(uint16_t ng, char *grid) {
+    // start of special grid locators for sig strength &c.
+    constexpr uint16_t NGBASE = 180*180;
 
-    // if ng == NGBASE+1:
-    //     return "    "
+    if (ng == NGBASE + 1) {
+        grid[0] = 0;
+        return;
+    }
     // if ng >= NGBASE+1 and ng < NGBASE+31:
     //     return " -%02d" % (ng - (NGBASE+1)) // sig str, -01 to -30 DB
     // if ng >= NGBASE+31 and ng < NGBASE+62:
     //     return "R-%02d" % (ng - (NGBASE+31))
-    // if ng == NGBASE+62:
-    //     return "RO  "
-    // if ng == NGBASE+63:
-    //     return "RRR "
-    // if ng == NGBASE+64:
-    //     return "73  "
+    if (ng == NGBASE + 62) {
+        strcpy(grid, "RO");
+        return;
+    }
+    if (ng == NGBASE + 63) {
+        strcpy(grid, "RRR");
+        return;
+    }
+    if (ng == NGBASE + 64) {
+        strcpy(grid, "73");
+        return;        
+    }
 
-    // lat = (ng % 180) - 90
-    // ng = int(ng / 180)
-    // lng = (ng * 2) - 180
+    int16_t lat = (int16_t)(ng % 180) - 90;
+    int16_t lng = ((int16_t)(ng / 180) * 2) - 180;
 
-    // g = "%c%c%c%c" % (ord('A') + int((179-lng)/20),
-    //                     ord('A') + int((lat+90)/10),
-    //                     ord('0') + int(((179-lng)%20)/2),
-    //                     ord('0') + (lat+90)%10)
+    grid[0] = 'A' + ((179 - lng) / 20);
+    grid[1] = 'A' + ((90 + lat) / 10);
+    grid[2] = '0' + (((179 - lng) % 20) / 2);
+    grid[3] = '0' + ((90 + lat) % 10);
+    grid[4] = 0;
 
-    // if g[0:2] == "KA":
-    //     // really + signal strength
-    //     sig = int(g[2:4]) - 50
-    //     return "+%02d" % (sig)
-
-    // if g[0:2] == "LA":
-    //     // really R+ signal strength
-    //     sig = int(g[2:4]) - 50
-    //     return "R+%02d" % (sig)    
-
-    grid[0] = 0;
+    if ((grid[0] == 'K') && (grid[1] == 'A')) {
+        // really + signal strength
+        //     sig = int(g[2:4]) - 50
+        //     return "+%02d" % (sig)
+        return;
+    }
+    else if ((grid[0] == 'L') && (grid[1] == 'A')) {
+        // really R+ signal strength
+        //     sig = int(g[2:4]) - 50
+        //     return "R+%02d" % (sig)    
+        return;
+    }
 }
 
 
 void unpacktext(uint32_t nc1, uint32_t nc2, uint16_t ng, char *text) {
-    uint32_t nc3 = ng & 0x7FFF;
+    uint32_t nc3 = (ng & 0x7FFF);
 
-    if (nc1 & 1 != 0)
+    // Check for bit 0 and copy it to nc3
+    if ((nc1 & 1) != 0)
         nc3 |= 0x08000;
-    nc1 >>= 1;
 
-    if (nc2 & 1 != 0)
+    if ((nc2 & 1) != 0)
         nc3 |= 0x10000;
+
+    nc1 >>= 1;
     nc2 >>= 1;
 
     for (int i = 4; i >= 0; --i) {
@@ -169,6 +180,7 @@ int unpack(const uint8_t *a72, char *message) {
         return 0;
     }
 
+    // Standard two-call exchange
     char c1[7];
     
     unpackcall(nc1, c1);

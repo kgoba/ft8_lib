@@ -3,28 +3,16 @@
 #include <cstdio>
 #include <cmath>
 
-#include <string>
-#include <vector>
-
 #include "text.h"
-
 #include "pack.h"
+#include "pack_77.h"
 #include "encode.h"
-
+#include "encode_91.h"
 #include "unpack.h"
 
-#include "pack_77.h"
-#include "encode_91.h"
-
+#include "debug.h"
 
 #define LOG_LEVEL   LOG_INFO
-
-#define LOG_INFO    0
-#define LOG_WARN    1
-#define LOG_ERROR   2
-#define LOG_FATAL   3
-
-#define LOG(level, ...)     if (level >= LOG_LEVEL) printf(__VA_ARGS__)
 
 
 void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits) {
@@ -52,28 +40,6 @@ void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits) {
         }
     }
 }
-
-class TestCase {
-public:
-    TestCase(const std::string &name) : _name(name) {
-        //_all_cases.push_back(this);
-    }
-
-    virtual bool run(const std::string &params) = 0;
-private:
-    std::string     _name;
-    //static std::vector<TestCase *> _all_cases;
-};
-
-//std::vector<TestCase *> TestCase::_all_cases;
-
-class TestCase1 : public TestCase {
-public:
-    TestCase1() : TestCase("Test Case 1") {}
-    bool run(const std::string &params) override {
-        return true;
-    }
-};
 
 
 bool test1() {
@@ -116,16 +82,16 @@ void test2() {
     encode174(test_in, test_out);
 
     for (int j = 0; j < 22; ++j) {
-        printf("%02x ", test_out[j]);
+        LOG(LOG_INFO, "%02x ", test_out[j]);
     }
-    printf("\n");
+    LOG(LOG_INFO, "\n");
 }
 
 
 void test3() {
     uint8_t test_in2[10] = { 0x11, 0x00, 0x00, 0x00, 0x00, 0x0E, 0x10, 0x04, 0x01, 0x00 };
     uint16_t crc1 = ft8_crc(test_in2, 76);  // Calculate CRC of 76 bits only
-    printf("CRC: %04x\n", crc1);            // should be 0x0708
+    LOG(LOG_INFO, "CRC: %04x\n", crc1);            // should be 0x0708
 }
 
 
