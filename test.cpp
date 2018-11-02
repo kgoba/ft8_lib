@@ -5,9 +5,9 @@
 
 #include "ft8/text.h"
 #include "ft8/pack.h"
-#include "ft8/pack_77.h"
+#include "ft8/pack_v2.h"
 #include "ft8/encode.h"
-#include "ft8/encode_91.h"
+#include "ft8/encode_v2.h"
 #include "ft8/unpack.h"
 
 #include "common/debug.h"

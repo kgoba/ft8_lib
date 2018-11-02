@@ -6,8 +6,8 @@
 #include "common/wave.h"
 #include "ft8/pack.h"
 #include "ft8/encode.h"
-#include "ft8/pack_77.h"
-#include "ft8/encode_91.h"
+#include "ft8/pack_v2.h"
+#include "ft8/encode_v2.h"
 
 
 // Convert a sequence of symbols (tones) into a sinewave of continuous phase (FSK).

@@ -1,8 +1,9 @@
-#include <string.h>
-#include <stdint.h>
+#include "pack_v2.h"
 
 #include "text.h"
 
+#include <stdint.h>
+#include <string.h>
 #include <stdio.h>
 
 namespace ft8_v2 {
