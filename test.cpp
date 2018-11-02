@@ -3,14 +3,14 @@
 #include <cstdio>
 #include <cmath>
 
-#include "text.h"
-#include "pack.h"
-#include "pack_77.h"
-#include "encode.h"
-#include "encode_91.h"
-#include "unpack.h"
+#include "ft8/text.h"
+#include "ft8/pack.h"
+#include "ft8/pack_77.h"
+#include "ft8/encode.h"
+#include "ft8/encode_91.h"
+#include "ft8/unpack.h"
 
-#include "debug.h"
+#include "common/debug.h"
 
 #define LOG_LEVEL   LOG_INFO
 
