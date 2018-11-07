@@ -25,10 +25,10 @@ I am working on the revised FT8 protocol with 77-bit payload (introduced since W
 
 # What doesn't
 
-* Encoding contest mode message
+* Encoding contest mode messages
 * Encoding extended range signal reports (<-30dB or >=0dB S/N)
 * Encoding compound callsigns with country prefixes and mode suffixes
-* Decoding
+* Decoding (working on it)
 
 # What to do with it
 
@@ -39,6 +39,8 @@ You can generate 15-second WAV files with your own messages as a proof of concep
 Thanks to Robert Morris, AB1HL, whose Python code (https://github.com/rtmrtmrtmrtm/weakmon) inspired this and helped to test various parts of the code.
 
 This would not of course be possible without the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html). I believe that is the only 'documentation' of the FT8 protocol available, and the source code was used as such in this project.
+
+Thanks to Mark Borgerding for his FFT implementation (https://github.com/mborgerding/kissfft). I have included a portion of his code.
 
 Karlis Goba,
 YL3JG
