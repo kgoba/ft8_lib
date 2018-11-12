@@ -3,7 +3,7 @@ LDFLAGS = -lm
 
 .PHONY: run_tests all
 
-all: gen_ft8 wav_decode test
+all: gen_ft8 decode_ft8 test
 
 run_tests: test
 	@./test
