@@ -88,11 +88,10 @@ void find_sync(const uint8_t * power, int num_blocks, int num_bins, int num_cand
             for (int freq_offset = 0; freq_offset < num_bins - 8; ++freq_offset) {
                 int score = 0;
 
-                // Compute score over bins 0-7, 36-43, 72-79
+                // Compute score over Costas symbols (0-7, 36-43, 72-79)
                 for (int m = 0; m <= 72; m += 36) {
                     for (int k = 0; k < 7; ++k) {
                         int offset = ((time_offset + k + m) * 4 + alt) * num_bins + freq_offset;
-                        // score += 8 * (int)power[time_offset + k + m][alt][freq_offset + ICOS7[k]] -
                         score += 8 * (int)power[offset + ICOS7[k]] -
                                     power[offset + 0] - power[offset + 1] - 
                                     power[offset + 2] - power[offset + 3] - 
@@ -101,17 +100,17 @@ void find_sync(const uint8_t * power, int num_blocks, int num_bins, int num_cand
                     }
                 }
 
-                // update the candidate list
+                // If the heap is full AND the current candidate is better than 
+                // the worst of the heap, we remove the worst and make space
                 if (heap_size == num_candidates && score > heap[0].score) {
-                    // extract the least promising candidate
                     heap[0] = heap[heap_size - 1];
                     --heap_size;
 
                     heapify_down(heap, heap_size);
                 }
 
+                // If there's free space in the heap, we add the current candidate
                 if (heap_size < num_candidates) {
-                    // add the current candidate
                     heap[heap_size].score = score;
                     heap[heap_size].time_offset = time_offset;
                     heap[heap_size].freq_offset = freq_offset;
@@ -176,7 +175,7 @@ void extract_power(const float * signal, int num_blocks, int num_bins, uint8_t *
                     float db = (db1 + db2) / 2;
 
                     // Scale decibels to unsigned 8-bit range
-                    int scaled = (int)(0.5f + 2 * (db + 100));
+                    int scaled = (int)(2 * (db + 100));
                     power[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
                     ++offset;
                 }
@@ -187,6 +186,60 @@ void extract_power(const float * signal, int num_blocks, int num_bins, uint8_t *
     free(fft_work);
 }
 
+
+uint8_t max2(uint8_t a, uint8_t b) {
+    return (a >= b) ? a : b;
+}
+
+
+uint8_t max4(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+    return max2(max2(a, b), max2(c, d));
+}
+
+
+// Compute log likelihood log(p(0) / p(1)) of 174 message bits 
+// for later use in soft-decision LDPC decoding
+void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & c, float * log174) {
+    int offset = (c.time_offset * 4 + c.time_sub * 2 + c.freq_sub) * num_bins + c.freq_offset;
+
+    int k = 0;
+    // Go over FSK tones and skip Costas sync symbols
+    for (int i = 7; i < NN - 7; ++i) {
+        if (i == 36) i += 7;
+
+        // Pointer to 8 bins of the current symbol
+        const uint8_t * ps = power + (offset + i * 4 * num_bins);
+
+        // Extract bit significance (and convert them to float)
+        // 8 FSK tones = 3 bits
+        log174[k + 0] = -(int)max4(ps[4], ps[5], ps[6], ps[7]) + (int)max4(ps[0], ps[1], ps[2], ps[3]);
+        log174[k + 1] = -(int)max4(ps[2], ps[3], ps[6], ps[7]) + (int)max4(ps[0], ps[1], ps[4], ps[5]);
+        log174[k + 2] = -(int)max4(ps[1], ps[3], ps[5], ps[7]) + (int)max4(ps[0], ps[2], ps[4], ps[6]);
+        // printf("%d %d %d %d %d %d %d %d : %.0f %.0f %.0f\n", 
+        //         ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], 
+        //         log174[k + 0], log174[k + 1], log174[k + 2]);
+        k += 3;
+    }
+
+    // Compute the variance of log174
+    float sum   = 0;
+    float sum2  = 0;
+    float inv_n = 1.0f / (3 * ND);
+    for (int i = 0; i < 3 * ND; ++i) {
+        sum  += log174[i];
+        sum2 += log174[i] * log174[i];
+    }
+    float var = (sum2 - sum * sum * inv_n) * inv_n;
+
+    // Normalize log174 such that sigma = 2.83 (Why? It's in WSJT-X)
+    float norm_factor = 2.83f / sqrtf(var);
+
+    for (int i = 0; i < 3 * ND; ++i) {
+        log174[i] *= norm_factor;
+        //printf("%.1f ", log174[i]);
+    }
+    //printf("\n");
+}
 
 int main(int argc, char ** argv) {
     // Expect one command-line argument
@@ -223,37 +276,25 @@ int main(int argc, char ** argv) {
     find_sync(power, num_blocks, num_bins, num_candidates, heap);
 
     for (int i = 0; i < num_candidates; ++i) {
-        float freq_offset = (heap[i].freq_offset + heap[i].freq_sub / 2.0f) * fsk_dev;
-        float time_offset = (heap[i].time_offset + heap[i].time_sub / 2.0f) / fsk_dev;
-        // int offset = (heap[i].time_offset * 4 + heap[i].time_sub * 2 + heap[i].freq_sub) * num_bins + heap[i].freq_offset;
-        printf("%03d: score = %.1f freq = %.1f time = %.2f\n", i, heap[i].score / 7.0f / 2, freq_offset, time_offset);
+        float freq_hz = (heap[i].freq_offset + heap[i].freq_sub / 2.0f) * fsk_dev;
+        float time_sec = (heap[i].time_offset + heap[i].time_sub / 2.0f) / fsk_dev;
+        // printf("%03d: score = %d freq = %.1f time = %.2f\n", i, 
+        //         heap[i].score, freq_hz, time_sec);
+
+        float log174[3 * ND];
+        extract_likelihood(power, num_bins, heap[i], log174);
+
+        const int num_iters = 10;
+        int plain[3 * ND];
+        int ok;
+
+        ldpc_decode(log174, num_iters, plain, &ok);
+        //printf("ldpc_decode() = %d\n", ok);
+        if (ok == 87) {
+            printf("%03d: score = %d freq = %.1f time = %.2f\n", i, 
+                    heap[i].score, freq_hz, time_sec);
+        }
     }
-
-    /*
-
-     // take absolute magnitude
-     s2(0:7,k)=abs(csymb(1:8))/1e3
-     
-     // skip Costas sync symbols
-     s1(0:7,j)=s2(0:7,k)
-     
-     // Normalize by median magnitude
-     s1=s1/xmeds1
-
-     // Extract bit significance
-     ps=s1(0:7,j)
-     bmeta(i4)=max(ps(4),ps(5),ps(6),ps(7))-max(ps(0),ps(1),ps(2),ps(3))
-     bmeta(i2)=max(ps(2),ps(3),ps(6),ps(7))-max(ps(0),ps(1),ps(4),ps(5))
-     bmeta(i1)=max(ps(1),ps(3),ps(5),ps(7))-max(ps(0),ps(2),ps(4),ps(6))
-
-     // Normalize by std. deviation
-     call normalizebmet(bmeta,3*ND)
-     
-     // Magical fudge/scale factor
-     scalefac=2.83
-     llr0=scalefac*bmeta
-
-     */
 
     return 0;
 }

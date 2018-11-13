@@ -8,8 +8,6 @@
 // from Sarah Johnson's Iterative Error Correction book.
 // codeword[i] = log ( P(x=0) / P(x=1) )
 //
-// cc -O3 libldpc.c -shared -fPIC -o libldpc.so
-//
 
 #include <stdio.h>
 #include <math.h>
@@ -21,14 +19,11 @@ int ldpc_check(int codeword[]);
 
 // thank you Douglas Bagnall
 // https://math.stackexchange.com/a/446411
-float fast_tanh(float x)
-{
-    if (x < -4.97f)
-    {
+float fast_tanh(float x) {
+    if (x < -4.97f) {
         return -1.0f;
     }
-    if (x > 4.97f)
-    {
+    if (x > 4.97f) {
         return 1.0f;
     }
     float x2 = x * x;
@@ -42,86 +37,64 @@ float fast_tanh(float x)
 // plain is a return value, 174 ints, to be 0 or 1.
 // iters is how hard to try.
 // ok == 87 means success.
-void ldpc_decode(float codeword[], int iters, int plain[], int *ok)
-{
+void ldpc_decode(float codeword[], int iters, int plain[], int *ok) {
     float m[87][174];       // ~60 kB
     float e[87][174];       // ~60 kB
     int best_score = -1;
     int best_cw[174];
 
-    for (int i = 0; i < 174; i++)
-        for (int j = 0; j < 87; j++)
+    for (int i = 0; i < 174; i++) {
+        for (int j = 0; j < 87; j++) {
             m[j][i] = codeword[i];
-
-    for (int i = 0; i < 174; i++)
-        for (int j = 0; j < 87; j++)
             e[j][i] = 0.0f;
+        }
+    }
 
-    for (int iter = 0; iter < iters; iter++)
-    {
-        for (int j = 0; j < 87; j++)
-        {
-            for (int ii1 = 0; ii1 < 7; ii1++)
-            {
+    for (int iter = 0; iter < iters; iter++) {
+        for (int j = 0; j < 87; j++) {
+            for (int ii1 = 0; ii1 < 7; ii1++) {
                 int i1 = Nm[j][ii1] - 1;
-                if (i1 < 0)
+                if (i1 < 0) {
                     continue;
+                }
                 float a = 1.0f;
-                for (int ii2 = 0; ii2 < 7; ii2++)
-                {
+                for (int ii2 = 0; ii2 < 7; ii2++) {
                     int i2 = Nm[j][ii2] - 1;
-                    if (i2 >= 0 && i2 != i1)
-                    {
+                    if (i2 >= 0 && i2 != i1) {
                         a *= fast_tanh(m[j][i2] / 2.0f);
                     }
                 }
-                e[j][i1] = log((1 + a) / (1 - a));
+                e[j][i1] = logf((1 + a) / (1 - a));
             }
         }
 
         int cw[174];
-        for (int i = 0; i < 174; i++)
-        {
+        for (int i = 0; i < 174; i++) {
             float l = codeword[i];
             for (int j = 0; j < 3; j++)
                 l += e[Mn[i][j] - 1][i];
             cw[i] = (l <= 0.0f);
         }
         int score = ldpc_check(cw);
-        if (score == 87)
-        {
-            // Found a perfect answer
-#if 0
-      int cw1[174];
-      for(int i = 0; i < 174; i++)
-        cw1[i] = cw[colorder[i]];
-      for(int i = 0; i < 87; i++)
-        plain[i] = cw1[174-87+i];
-#else
-            for (int i = 0; i < 174; i++)
-                plain[i] = cw[colorder[i]];
-#endif
-            *ok = 87;
-            return;
-        }
 
-        if (score > best_score)
-        {
-            for (int i = 0; i < 174; i++)
+        if (score > best_score) {
+            for (int i = 0; i < 174; i++) {
                 best_cw[i] = cw[i];
+            }
             best_score = score;
         }
 
-        for (int i = 0; i < 174; i++)
-        {
-            for (int ji1 = 0; ji1 < 3; ji1++)
-            {
+        if (score == 87) {
+            // Found a perfect answer
+            break;
+        }
+
+        for (int i = 0; i < 174; i++) {
+            for (int ji1 = 0; ji1 < 3; ji1++) {
                 int j1 = Mn[i][ji1] - 1;
                 float l = codeword[i];
-                for (int ji2 = 0; ji2 < 3; ji2++)
-                {
-                    if (ji1 != ji2)
-                    {
+                for (int ji2 = 0; ji2 < 3; ji2++) {
+                    if (ji1 != ji2) {
                         int j2 = Mn[i][ji2] - 1;
                         l += e[j2][i];
                     }
@@ -131,16 +104,15 @@ void ldpc_decode(float codeword[], int iters, int plain[], int *ok)
         }
     }
 
-    // decode didn't work, return something anyway.
+    // decode complete (perhaps partially)
 #if 0
-  int cw1[174];
-  for(int i = 0; i < 174; i++)
-    cw1[i] = best_cw[colorder[i]];
-  for(int i = 0; i < 87; i++)
-    plain[i] = cw1[174-87+i];
+    for(int i = 0; i < 87; i++) {
+        plain[i] = best_cw[colorder[174-87+i]];
+    }
 #else
-    for (int i = 0; i < 174; i++)
+    for (int i = 0; i < 174; i++) {
         plain[i] = best_cw[colorder[i]];
+    }
 #endif
 
     *ok = best_score;
@@ -152,24 +124,21 @@ void ldpc_decode(float codeword[], int iters, int plain[], int *ok)
 // returns the number of parity checks that passed.
 // 87 means total success.
 //
-int ldpc_check(int codeword[])
-{
+int ldpc_check(int codeword[]) {
     int score = 0;
 
     // Nm[87][7]
-    for (int j = 0; j < 87; j++)
-    {
+    for (int j = 0; j < 87; j++) {
         int x = 0;
-        for (int ii1 = 0; ii1 < 7; ii1++)
-        {
+        for (int ii1 = 0; ii1 < 7; ii1++) {
             int i1 = Nm[j][ii1] - 1;
-            if (i1 >= 0)
-            {
+            if (i1 >= 0) {
                 x ^= codeword[i1];
             }
         }
-        if (x == 0)
+        if (x == 0) {
             score++;
+        }
     }
     return score;
 }
