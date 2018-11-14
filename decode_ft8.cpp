@@ -192,15 +192,15 @@ uint8_t max2(uint8_t a, uint8_t b) {
 }
 
 
-uint8_t max4(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
-    return max2(max2(a, b), max2(c, d));
+uint8_t max4(uint8_t a, uint8_t b, uint8_t cand, uint8_t d) {
+    return max2(max2(a, b), max2(cand, d));
 }
 
 
-// Compute log likelihood log(p(0) / p(1)) of 174 message bits 
+// Compute log likelihood log(p(1) / p(0)) of 174 message bits 
 // for later use in soft-decision LDPC decoding
-void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & c, float * log174) {
-    int offset = (c.time_offset * 4 + c.time_sub * 2 + c.freq_sub) * num_bins + c.freq_offset;
+void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & cand, float * log174) {
+    int offset = (cand.time_offset * 4 + cand.time_sub * 2 + cand.freq_sub) * num_bins + cand.freq_offset;
 
     int k = 0;
     // Go over FSK tones and skip Costas sync symbols
@@ -212,9 +212,9 @@ void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & c
 
         // Extract bit significance (and convert them to float)
         // 8 FSK tones = 3 bits
-        log174[k + 0] = -(int)max4(ps[4], ps[5], ps[6], ps[7]) + (int)max4(ps[0], ps[1], ps[2], ps[3]);
-        log174[k + 1] = -(int)max4(ps[2], ps[3], ps[6], ps[7]) + (int)max4(ps[0], ps[1], ps[4], ps[5]);
-        log174[k + 2] = -(int)max4(ps[1], ps[3], ps[5], ps[7]) + (int)max4(ps[0], ps[2], ps[4], ps[6]);
+        log174[k + 0] = (int)max4(ps[4], ps[5], ps[6], ps[7]) - (int)max4(ps[0], ps[1], ps[2], ps[3]);
+        log174[k + 1] = (int)max4(ps[2], ps[3], ps[6], ps[7]) - (int)max4(ps[0], ps[1], ps[4], ps[5]);
+        log174[k + 2] = (int)max4(ps[1], ps[3], ps[5], ps[7]) - (int)max4(ps[0], ps[2], ps[4], ps[6]);
         // printf("%d %d %d %d %d %d %d %d : %.0f %.0f %.0f\n", 
         //         ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], 
         //         log174[k + 0], log174[k + 1], log174[k + 2]);
@@ -270,29 +270,31 @@ int main(int argc, char ** argv) {
 
     extract_power(signal, num_blocks, num_bins, power);
 
-    const int num_candidates = 250;
+    int num_candidates = 250;
     Candidate heap[num_candidates];
 
     find_sync(power, num_blocks, num_bins, num_candidates, heap);
 
-    for (int i = 0; i < num_candidates; ++i) {
-        float freq_hz = (heap[i].freq_offset + heap[i].freq_sub / 2.0f) * fsk_dev;
-        float time_sec = (heap[i].time_offset + heap[i].time_sub / 2.0f) / fsk_dev;
+    for (int idx = 0; idx < num_candidates; ++idx) {
+        Candidate &cand = heap[idx];
+        float freq_hz = (cand.freq_offset + cand.freq_sub / 2.0f) * fsk_dev;
+        float time_sec = (cand.time_offset + cand.time_sub / 2.0f) / fsk_dev;
         // printf("%03d: score = %d freq = %.1f time = %.2f\n", i, 
         //         heap[i].score, freq_hz, time_sec);
 
         float log174[3 * ND];
-        extract_likelihood(power, num_bins, heap[i], log174);
+        extract_likelihood(power, num_bins, cand, log174);
 
-        const int num_iters = 10;
+        const int num_iters = 20;
         int plain[3 * ND];
         int ok;
 
-        ldpc_decode(log174, num_iters, plain, &ok);
+        bp_decode(log174, num_iters, plain, &ok);
+        //ldpc_decode(log174, num_iters, plain, &ok);
         //printf("ldpc_decode() = %d\n", ok);
         if (ok == 87) {
-            printf("%03d: score = %d freq = %.1f time = %.2f\n", i, 
-                    heap[i].score, freq_hz, time_sec);
+            printf("%03d: score = %d freq = %.1f time = %.2f\n", idx, 
+                    cand.score, freq_hz, time_sec);
         }
     }
 

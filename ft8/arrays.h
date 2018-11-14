@@ -1,7 +1,9 @@
+#include <stdint.h>
+
 // LDPC(174,87) parameters from WSJT-X.
 // this is an indirection table that moves a
 // codeword's 87 systematic (message) bits to the end.
-int colorder[] = {
+uint8_t colorder[] = {
       0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 11, 32, 12, 40, 13, 14, 15, 16,
      17,  18, 37, 45, 29, 19, 20, 21, 41, 22, 42, 31, 33, 34, 44, 35, 47,
      51,  50, 43, 36, 52, 63, 46, 25, 55, 27, 24, 23, 53, 39, 49, 59, 38,
@@ -21,7 +23,7 @@ int colorder[] = {
 // each number is an index into the codeword (1-origin).
 // the codeword bits mentioned in each row must xor to zero.
 // From WSJT-X's bpdecode174.f90.
-int Nm[][7] = {
+uint8_t Nm[][7] = {
     {1, 30, 60, 89, 118, 147, 0},
     {2, 31, 61, 90, 119, 147, 0},
     {3, 32, 62, 91, 120, 148, 0},
@@ -116,7 +118,7 @@ int Nm[][7] = {
 // the numbers indicate which three parity
 // checks (rows in Nm) refer to the codeword bit.
 // 1-origin.
-int Mn[][3] = {
+uint8_t Mn[][3] = {
     {1, 25, 69},
     {2, 5, 73},
     {3, 32, 68},
@@ -291,4 +293,16 @@ int Mn[][3] = {
     {40, 52, 78},
     {54, 61, 71},
     {46, 58, 69},
+};
+
+uint8_t nrw[] = {
+  6,6,6,6,6,6,6,6,6,6,
+  6,6,6,6,6,6,6,6,6,6,
+  6,6,6,6,6,6,6,6,6,6,
+  6,6,6,6,6,6,6,6,6,7,
+  6,6,6,6,6,7,6,6,6,6,
+  6,6,6,6,6,7,6,6,6,6,
+  7,6,5,6,6,6,6,6,6,5,
+  6,6,6,6,6,6,6,6,6,6,
+  5,6,6,6,5,6,6
 };
