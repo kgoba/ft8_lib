@@ -84,13 +84,17 @@ void int_to_dd(char *str, int value, int width) {
         ++str;
         value = -value;
     }
+    else {
+        *str = '+';
+        ++str;
+    }
 
     int divisor = 1;
-    for (int i = 0; i < width; ++i) {
+    for (int i = 0; i < width - 1; ++i) {
         divisor *= 10;
     }
 
-    while (divisor > 1) {
+    while (divisor >= 1) {
         int digit = value / divisor;
 
         *str = '0' + digit;

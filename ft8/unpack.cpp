@@ -46,13 +46,23 @@ void unpackgrid(uint16_t ng, char *grid) {
     constexpr uint16_t NGBASE = 180*180;
 
     if (ng == NGBASE + 1) {
+        // Empty grid is allowed
         grid[0] = 0;
         return;
     }
-    // if ng >= NGBASE+1 and ng < NGBASE+31:
-    //     return " -%02d" % (ng - (NGBASE+1)) // sig str, -01 to -30 DB
-    // if ng >= NGBASE+31 and ng < NGBASE+62:
-    //     return "R-%02d" % (ng - (NGBASE+31))
+
+    // Check for signal strength reports (-01 to -30 dB)
+    if (ng >= NGBASE + 1 && ng < NGBASE + 31) {
+        int_to_dd(grid, ((NGBASE + 1) - ng), 2);
+        return;
+    }
+    if (ng >= NGBASE + 31 && ng < NGBASE + 62) {
+        grid[0] = 'R';
+        int_to_dd(grid + 1, ((NGBASE + 31) - ng), 2); 
+        return;
+    }
+
+    // Check for special cases
     if (ng == NGBASE + 62) {
         strcpy(grid, "RO");
         return;
@@ -66,6 +76,7 @@ void unpackgrid(uint16_t ng, char *grid) {
         return;        
     }
 
+    // Decode 4-symbol grid
     int16_t lat = (int16_t)(ng % 180) - 90;
     int16_t lng = ((int16_t)(ng / 180) * 2) - 180;
 
@@ -75,16 +86,16 @@ void unpackgrid(uint16_t ng, char *grid) {
     grid[3] = '0' + ((90 + lat) % 10);
     grid[4] = 0;
 
+    // Check for extended range signal reports
     if ((grid[0] == 'K') && (grid[1] == 'A')) {
-        // really + signal strength
-        //     sig = int(g[2:4]) - 50
-        //     return "+%02d" % (sig)
+        int sig = dd_to_int(grid + 2, 2) - 50;
+        int_to_dd(grid, sig, 2);
         return;
     }
-    else if ((grid[0] == 'L') && (grid[1] == 'A')) {
-        // really R+ signal strength
-        //     sig = int(g[2:4]) - 50
-        //     return "R+%02d" % (sig)    
+    if ((grid[0] == 'L') && (grid[1] == 'A')) {
+        int sig = dd_to_int(grid + 2, 2) - 50;
+        grid[0] = 'R';
+        int_to_dd(grid + 1, sig, 2);
         return;
     }
 }
@@ -136,7 +147,7 @@ int unpack(const uint8_t *a72, char *message) {
     nc2 |= (a72[5] << 8);
     nc2 |= (a72[6]);
 
-    ng = (a72[7] >> 8);
+    ng = (a72[7] << 8);
     ng |= (a72[8]);
 
     if (ng & 0x8000) {
@@ -200,7 +211,5 @@ int unpack(const uint8_t *a72, char *message) {
     strcat(message, " ");
     strcat(message, grid);
 
-    //if "000AAA" in msg:
-    //    return None
     return 0;
 }
