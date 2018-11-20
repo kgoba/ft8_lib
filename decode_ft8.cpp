@@ -8,6 +8,7 @@
 #include "ft8/encode.h"
 #include "ft8/pack_v2.h"
 #include "ft8/encode_v2.h"
+#include "ft8/unpack.h"
 
 #include "ft8/ldpc.h"
 #include "fft/kiss_fftr.h"
@@ -77,6 +78,7 @@ void heapify_up(Candidate * heap, int heap_size) {
 
 
 // Find top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
+// We treat and organize the candidate list as a min-heap (empty initially).
 void find_sync(const uint8_t * power, int num_blocks, int num_bins, int num_candidates, Candidate * heap) {
     // Costas 7x7 tone pattern
     const uint8_t ICOS7[] = { 2,5,6,0,4,1,3 };
@@ -101,7 +103,7 @@ void find_sync(const uint8_t * power, int num_blocks, int num_bins, int num_cand
                 }
 
                 // If the heap is full AND the current candidate is better than 
-                // the worst of the heap, we remove the worst and make space
+                // the worst in the heap, we remove the worst and make space
                 if (heap_size == num_candidates && score > heap[0].score) {
                     heap[0] = heap[heap_size - 1];
                     --heap_size;
@@ -229,10 +231,10 @@ void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & c
         sum  += log174[i];
         sum2 += log174[i] * log174[i];
     }
-    float var = (sum2 - sum * sum * inv_n) * inv_n;
+    float variance = (sum2 - sum * sum * inv_n) * inv_n;
 
     // Normalize log174 such that sigma = 2.83 (Why? It's in WSJT-X)
-    float norm_factor = 2.83f / sqrtf(var);
+    float norm_factor = 2.83f / sqrtf(variance);
 
     for (int i = 0; i < 3 * ND; ++i) {
         log174[i] *= norm_factor;
@@ -277,24 +279,51 @@ int main(int argc, char ** argv) {
 
     for (int idx = 0; idx < num_candidates; ++idx) {
         Candidate &cand = heap[idx];
-        float freq_hz = (cand.freq_offset + cand.freq_sub / 2.0f) * fsk_dev;
-        float time_sec = (cand.time_offset + cand.time_sub / 2.0f) / fsk_dev;
-        // printf("%03d: score = %d freq = %.1f time = %.2f\n", i, 
-        //         heap[i].score, freq_hz, time_sec);
 
         float log174[3 * ND];
         extract_likelihood(power, num_bins, cand, log174);
 
         const int num_iters = 20;
         int plain[3 * ND];
-        int ok;
+        int ok = 0;
 
         bp_decode(log174, num_iters, plain, &ok);
         //ldpc_decode(log174, num_iters, plain, &ok);
         //printf("ldpc_decode() = %d\n", ok);
+
         if (ok == 87) {
-            printf("%03d: score = %d freq = %.1f time = %.2f\n", idx, 
-                    cand.score, freq_hz, time_sec);
+            float freq_hz  = (cand.freq_offset + cand.freq_sub / 2.0f) * fsk_dev;
+            float time_sec = (cand.time_offset + cand.time_sub / 2.0f) / fsk_dev;
+            //printf("%03d: score = %d freq = %.1f time = %.2f\n", idx, 
+            //        cand.score, freq_hz, time_sec);
+
+            uint8_t a87[11];
+            uint8_t mask = 0x80;
+            uint8_t position = 0;
+            for (int i = 0; i < 11; ++i) {
+                a87[i] = 0;
+            }
+            // Extract payload + CRC (last 87 bits)
+            for (int i = 174 - 87; i < 174; ++i) {
+                if (plain[i]) {
+                    a87[position] |= mask;
+                }
+                mask >>= 1;
+                if (!mask) {
+                    mask = 0x80;
+                    ++position;
+                }
+            }
+
+            for (int i = 0; i < 11; ++i) {
+                //printf("%02x ", a87[i]);
+            }
+            //printf("\n");
+
+            char message[20];
+            unpack(a87, message);
+
+            printf("000000   0 %4.1f %4d ~  %s\n", time_sec, (int)(freq_hz + 0.5f), message);
         }
     }
 

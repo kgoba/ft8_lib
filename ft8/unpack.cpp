@@ -133,6 +133,7 @@ void unpacktext(uint32_t nc1, uint32_t nc2, uint16_t ng, char *text) {
 }
 
 
+// message should have at least 19 bytes allocated (18 characters + zero terminator)
 int unpack(const uint8_t *a72, char *message) {
     uint32_t nc1, nc2;
     uint16_t ng;
