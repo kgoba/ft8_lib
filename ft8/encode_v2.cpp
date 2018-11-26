@@ -4,14 +4,17 @@
 
 namespace ft8_v2 {
 
-constexpr int N = 174, K = 91, M = N-K;  // Define the LDPC sizes
+// Define the LDPC sizes
+constexpr int N = 174;      // Number of bits in the encoded message
+constexpr int K = 91;       // Number of payload bits
+constexpr int M = N - K;    // Number of checksum bits
 
 constexpr uint16_t  POLYNOMIAL = 0x2757;  // CRC-14 polynomial without the leading (MSB) 1
 
-constexpr int K_BYTES = (K + 7) / 8;
+constexpr int K_BYTES = (K + 7) / 8;    // Number of whole bytes needed to store K bits
 
 // Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
-const uint8_t G[M][K_BYTES] = {
+const uint8_t kGenerator[M][K_BYTES] = {
     { 0x83, 0x29, 0xce, 0x11, 0xbf, 0x31, 0xea, 0xf5, 0x09, 0xf2, 0x7f, 0xc0 },
     { 0x76, 0x1c, 0x26, 0x4e, 0x25, 0xc2, 0x59, 0x33, 0x54, 0x93, 0x13, 0x20 },
     { 0xdc, 0x26, 0x59, 0x02, 0xfb, 0x27, 0x7c, 0x64, 0x10, 0xa1, 0xbd, 0xc0 },
@@ -98,7 +101,7 @@ const uint8_t G[M][K_BYTES] = {
 };
 
 // Column order (permutation) in which the bits in codeword are stored
-const uint8_t colorder[N] = {
+const uint8_t kColumn_order[N] = {
       0,  1,  2,  3, 28,  4,  5,  6,  7,  8,  9, 10, 11, 34, 12, 32, 13, 14, 15, 16,
      17, 18, 36, 29, 43, 19, 20, 42, 21, 40, 30, 37, 22, 47, 61, 45, 44, 23, 41, 39,
      49, 24, 46, 50, 48, 26, 31, 33, 51, 38, 52, 59, 55, 66, 57, 27, 60, 35, 54, 58,
@@ -111,10 +114,10 @@ const uint8_t colorder[N] = {
 };
 
 // Costas 7x7 tone pattern
-const uint8_t ICOS7[] = { 3,1,4,0,6,5,2 };
+const uint8_t kCostas_map[7] = { 3,1,4,0,6,5,2 };
 
 // Gray code map
-const uint8_t GRAY[8] = { 0,1,3,2,5,6,4,7 };
+const uint8_t kGray_map[8] = { 0,1,3,2,5,6,4,7 };
 
 // Returns 1 if an odd number of bits are set in x, zero otherwise
 uint8_t parity8(uint8_t x) {
@@ -134,7 +137,7 @@ uint8_t parity8(uint8_t x) {
 // [OUT] codeword - array of 174 bits stored as 22 bytes (MSB first)
 void encode174(const uint8_t *message, uint8_t *codeword) {
     // Here we don't generate the generator bit matrix as in WSJT-X implementation
-    // Instead we access the generator bits straight from the binary representation in G
+    // Instead we access the generator bits straight from the binary representation in kGenerator
 
     // For reference:
     // codeword(1:K)=message
@@ -157,11 +160,11 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     // Compute the first part of itmp (1:M) and store the result in codeword
     for (int i = 0; i < M; ++i) { // do i=1,M
         // Fast implementation of bitwise multiplication and parity checking
-        // Normally nsum would contain the result of dot product between message and G[i], 
+        // Normally nsum would contain the result of dot product between message and kGenerator[i], 
         // but we only compute the sum modulo 2.
         uint8_t nsum = 0;
         for (int j = 0; j < K_BYTES; ++j) {
-            uint8_t bits = message[j] & G[i][j];    // bitwise AND (bitwise multiplication)
+            uint8_t bits = message[j] & kGenerator[i][j];    // bitwise AND (bitwise multiplication)
             nsum ^= parity8(bits);                  // bitwise XOR (addition modulo 2)
         }
         // Check if we need to set a bit in codeword
@@ -239,8 +242,6 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
 
     // Calculate CRC of 12 bytes = 96 bits, see WSJT-X code
     uint16_t checksum = ft8_crc(a91, 96 - 14);
-    // 3dcf = 0011 1101 1100 1111
-    //          111 1011 1001 111
 
     // Store the CRC at the end of 77 bit message
     a91[9] |= (uint8_t)(checksum >> 11);
@@ -253,9 +254,9 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
 
     // Message structure: S7 D29 S7 D29 S7
     for (int i = 0; i < 7; ++i) {
-        itone[i] = ICOS7[i];
-        itone[36 + i] = ICOS7[i];
-        itone[72 + i] = ICOS7[i];
+        itone[i]      = kCostas_map[i];
+        itone[36 + i] = kCostas_map[i];
+        itone[72 + i] = kCostas_map[i];
     }
 
     int k = 7;          // Skip over the first set of Costas symbols
@@ -277,9 +278,9 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
         if (codeword[i_byte] & mask) bits3 |= 1;
         if (0 == (mask >>= 1)) { mask = 0x80; i_byte++; }
 
-        itone[k] = GRAY[bits3];
+        itone[k] = kGray_map[bits3];
         ++k;
     }
 }
 
-};  // namespace
+};  // ft8_v2

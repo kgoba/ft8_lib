@@ -79,10 +79,7 @@ void heapify_up(Candidate * heap, int heap_size) {
 
 // Find top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
-void find_sync(const uint8_t * power, int num_blocks, int num_bins, int num_candidates, Candidate * heap) {
-    // Costas 7x7 tone pattern
-    const uint8_t ICOS7[] = { 2,5,6,0,4,1,3 };
-
+void find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t *sync_map, int num_candidates, Candidate *heap) {
     int heap_size = 0;
 
     for (int alt = 0; alt < 4; ++alt) {
@@ -94,7 +91,7 @@ void find_sync(const uint8_t * power, int num_blocks, int num_bins, int num_cand
                 for (int m = 0; m <= 72; m += 36) {
                     for (int k = 0; k < 7; ++k) {
                         int offset = ((time_offset + k + m) * 4 + alt) * num_bins + freq_offset;
-                        score += 8 * (int)power[offset + ICOS7[k]] -
+                        score += 8 * (int)power[offset + sync_map[k]] -
                                     power[offset + 0] - power[offset + 1] - 
                                     power[offset + 2] - power[offset + 3] - 
                                     power[offset + 4] - power[offset + 5] - 
@@ -201,7 +198,7 @@ uint8_t max4(uint8_t a, uint8_t b, uint8_t cand, uint8_t d) {
 
 // Compute log likelihood log(p(1) / p(0)) of 174 message bits 
 // for later use in soft-decision LDPC decoding
-void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & cand, float * log174) {
+void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & cand, const uint8_t *code_map, float *log174) {
     int offset = (cand.time_offset * 4 + cand.time_sub * 2 + cand.freq_sub) * num_bins + cand.freq_offset;
 
     int k = 0;
@@ -211,12 +208,17 @@ void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & c
 
         // Pointer to 8 bins of the current symbol
         const uint8_t * ps = power + (offset + i * 4 * num_bins);
+        uint8_t s2[8];
+
+        for (int i = 0; i < 8; ++i) {
+            s2[i] = ps[code_map[i]];
+        }
 
         // Extract bit significance (and convert them to float)
         // 8 FSK tones = 3 bits
-        log174[k + 0] = (int)max4(ps[4], ps[5], ps[6], ps[7]) - (int)max4(ps[0], ps[1], ps[2], ps[3]);
-        log174[k + 1] = (int)max4(ps[2], ps[3], ps[6], ps[7]) - (int)max4(ps[0], ps[1], ps[4], ps[5]);
-        log174[k + 2] = (int)max4(ps[1], ps[3], ps[5], ps[7]) - (int)max4(ps[0], ps[2], ps[4], ps[6]);
+        log174[k + 0] = (int)max4(s2[4], s2[5], s2[6], s2[7]) - (int)max4(s2[0], s2[1], s2[2], s2[3]);
+        log174[k + 1] = (int)max4(s2[2], s2[3], s2[6], s2[7]) - (int)max4(s2[0], s2[1], s2[4], s2[5]);
+        log174[k + 2] = (int)max4(s2[1], s2[3], s2[5], s2[7]) - (int)max4(s2[0], s2[2], s2[4], s2[6]);
         // printf("%d %d %d %d %d %d %d %d : %.0f %.0f %.0f\n", 
         //         ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], 
         //         log174[k + 0], log174[k + 1], log174[k + 2]);
@@ -243,6 +245,7 @@ void extract_likelihood(const uint8_t * power, int num_bins, const Candidate & c
     //printf("\n");
 }
 
+
 int main(int argc, char ** argv) {
     // Expect one command-line argument
     if (argc < 2) {
@@ -261,6 +264,13 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
+    // Costas 7x7 tone pattern
+    const uint8_t kCostas_map_v1[] = { 2,5,6,0,4,1,3 };
+    const uint8_t kCostas_map_v2[] = { 3,1,4,0,6,5,2 };
+    // Gray maps (used only in v2)
+    const uint8_t kGray_map_v1[8] = { 0,1,2,3,4,5,6,7 };    // identity map
+    const uint8_t kGray_map_v2[8] = { 0,1,3,2,5,6,4,7 };
+
     const float fsk_dev = 6.25f;
 
     const int num_bins = (int)(sample_rate / (2 * fsk_dev));
@@ -275,13 +285,13 @@ int main(int argc, char ** argv) {
     int num_candidates = 250;
     Candidate heap[num_candidates];
 
-    find_sync(power, num_blocks, num_bins, num_candidates, heap);
+    find_sync(power, num_blocks, num_bins, kCostas_map_v1, num_candidates, heap);
 
     for (int idx = 0; idx < num_candidates; ++idx) {
         Candidate &cand = heap[idx];
 
         float log174[3 * ND];
-        extract_likelihood(power, num_bins, cand, log174);
+        extract_likelihood(power, num_bins, cand, kGray_map_v1, log174);
 
         const int num_iters = 20;
         int plain[3 * ND];

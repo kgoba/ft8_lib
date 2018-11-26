@@ -1,11 +1,16 @@
 #include "encode.h"
 
-constexpr int N = 174, K = 87, M = N-K;  // Define the LDPC sizes
+// Define the LDPC sizes
+constexpr int N = 174;          // Number of bits in the encoded message
+constexpr int K = 87;           // Number of payload bits
+constexpr int M = N - K;        // Number of checksum bits
 
 constexpr uint16_t  POLYNOMIAL = 0xC06;  // CRC-12 polynomial without the leading (MSB) 1
 
+constexpr int K_BYTES = (K + 7) / 8;    // Number of whole bytes needed to store K bits
+
 // Parity generator matrix for (174,87) LDPC code, stored in bitpacked format (MSB first)
-const uint8_t G[87][11] = {
+const uint8_t kGenerator[M][K_BYTES] = {
     { 0x23, 0xbb, 0xa8, 0x30, 0xe2, 0x3b, 0x6b, 0x6f, 0x50, 0x98, 0x2e },
     { 0x1f, 0x8e, 0x55, 0xda, 0x21, 0x8c, 0x5d, 0xf3, 0x30, 0x90, 0x52 },
     { 0xca, 0x7b, 0x32, 0x17, 0xcd, 0x92, 0xbd, 0x59, 0xa5, 0xae, 0x20 },
@@ -96,7 +101,7 @@ const uint8_t G[87][11] = {
 };
 
 // Column order (permutation) in which the bits in codeword are stored
-const uint8_t colorder[174] = {
+const uint8_t kColumn_order[174] = {
    0,  1,  2,  3, 30,  4,  5,  6,  7,  8,  9, 10, 11, 32, 12, 40, 13, 14, 15, 16,
   17, 18, 37, 45, 29, 19, 20, 21, 41, 22, 42, 31, 33, 34, 44, 35, 47, 51, 50, 43,
   36, 52, 63, 46, 25, 55, 27, 24, 23, 53, 39, 49, 59, 38, 48, 61, 60, 57, 28, 62,
@@ -109,7 +114,7 @@ const uint8_t colorder[174] = {
 };
 
 // Costas 7x7 tone pattern
-const uint8_t ICOS7[] = { 2,5,6,0,4,1,3 };
+const uint8_t kCostas_map[] = { 2,5,6,0,4,1,3 };
 
 
 // Returns 1 if an odd number of bits are set in x, zero otherwise
@@ -126,13 +131,13 @@ uint8_t parity8(uint8_t x) {
 // The code is a (174,87) regular ldpc code with column weight 3.
 // The code was generated using the PEG algorithm.
 // After creating the codeword, the columns are re-ordered according to 
-// "colorder" to make the codeword compatible with the parity-check matrix 
+// "kColumn_order" to make the codeword compatible with the parity-check matrix 
 // Arguments:
 // [IN] message   - array of 87 bits stored as 11 bytes (MSB first)
 // [OUT] codeword - array of 174 bits stored as 22 bytes (MSB first)
 void encode174(const uint8_t *message, uint8_t *codeword) {
     // Here we don't generate the generator bit matrix as in WSJT-X implementation
-    // Instead we access the generator bits straight from the binary representation in G
+    // Instead we access the generator bits straight from the binary representation in kGenerator
 
     // Also we don't use the itmp temporary buffer, instead filling codeword bit by bit
     // in the reordered order as we compute the result. 
@@ -140,7 +145,7 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     // For reference:
     //   itmp(1:M)=pchecks
     //   itmp(M+1:N)=message(1:K)
-    //   codeword(colorder+1)=itmp(1:N)
+    //   codeword(kColumn_order+1)=itmp(1:N)
 
     int colidx = 0; // track the current column in codeword
 
@@ -152,16 +157,16 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     // Compute the first part of itmp (1:M) and store the result in codeword
     for (int i = 0; i < M; ++i) { // do i=1,M
         // Fast implementation of bitwise multiplication and parity checking
-        // Normally nsum would contain the result of dot product between message and G[i], 
+        // Normally nsum would contain the result of dot product between message and kGenerator[i], 
         // but we only compute the sum modulo 2.
         uint8_t nsum = 0;
-        for (int j = 0; j < 11; ++j) {
-            uint8_t bits = message[j] & G[i][j];    // bitwise AND (bitwise multiplication)
+        for (int j = 0; j < K_BYTES; ++j) {
+            uint8_t bits = message[j] & kGenerator[i][j];    // bitwise AND (bitwise multiplication)
             nsum ^= parity8(bits);                  // bitwise XOR (addition modulo 2)
         }
         // Check if we need to set a bit in codeword
         if (nsum % 2) { // pchecks(i)=mod(nsum,2)
-            uint8_t col = colorder[colidx];     // Index of the bit to set
+            uint8_t col = kColumn_order[colidx];     // Index of the bit to set
             codeword[col/8] |= (1 << (7 - col%8));
         }
         ++colidx;
@@ -172,7 +177,7 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     for (int j = 0; j < K; ++j) {
         // Copy the j-th bit from message to codeword
         if (message[j/8] & mask) {
-            uint8_t col = colorder[colidx];     // Index of the bit to set
+            uint8_t col = kColumn_order[colidx];     // Index of the bit to set
             codeword[col/8] |= (1 << (7 - col%8));
         }
         ++colidx;
@@ -242,9 +247,9 @@ void genft8(const uint8_t *payload, uint8_t i3, uint8_t *itone) {
 
     // Message structure: S7 D29 S7 D29 S7
     for (int i = 0; i < 7; ++i) {
-        itone[i] = ICOS7[i];
-        itone[36 + i] = ICOS7[i];
-        itone[72 + i] = ICOS7[i];
+        itone[i] = kCostas_map[i];
+        itone[36 + i] = kCostas_map[i];
+        itone[72 + i] = kCostas_map[i];
     }
 
     int k = 7;          // Skip over the first set of Costas symbols
