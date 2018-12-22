@@ -12,12 +12,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include "arrays.h"
+#include "constants.h"
 
 int ldpc_check(int codeword[]);
 
-const int N = 174;
-const int M = 87;
 
 // https://varietyofsound.wordpress.com/2011/02/14/efficient-tanh-computation-using-lamberts-continued-fraction/
 // http://functions.wolfram.com/ElementaryFunctions/ArcTanh/10/0001/
@@ -105,24 +103,24 @@ float platanh(float x) {
 // max_iters is how hard to try.
 // ok == 87 means success.
 void ldpc_decode(float codeword[], int max_iters, int plain[], int *ok) {
-    float m[M][N];       // ~60 kB
-    float e[M][N];       // ~60 kB
+    float m[FT8_M][FT8_N];       // ~60 kB
+    float e[FT8_M][FT8_N];       // ~60 kB
     int best_score = -1;
 
-    for (int j = 0; j < M; j++) {
-        for (int i = 0; i < N; i++) {
+    for (int j = 0; j < FT8_M; j++) {
+        for (int i = 0; i < FT8_N; i++) {
             m[j][i] = codeword[i];
             e[j][i] = 0.0f;
         }
     }
 
     for (int iter = 0; iter < max_iters; iter++) {
-        for (int j = 0; j < M; j++) {
-            for (int ii1 = 0; ii1 < nrw[j]; ii1++) {
-                int i1 = Nm[j][ii1] - 1;
+        for (int j = 0; j < FT8_M; j++) {
+            for (int ii1 = 0; ii1 < kNrw[j]; ii1++) {
+                int i1 = kNm[j][ii1] - 1;
                 float a = 1.0f;
-                for (int ii2 = 0; ii2 < nrw[j]; ii2++) {
-                    int i2 = Nm[j][ii2] - 1;
+                for (int ii2 = 0; ii2 < kNrw[j]; ii2++) {
+                    int i2 = kNm[j][ii2] - 1;
                     if (i2 != i1) {
                         a *= fast_tanh(-m[j][i2] / 2.0f);
                     }
@@ -131,36 +129,38 @@ void ldpc_decode(float codeword[], int max_iters, int plain[], int *ok) {
             }
         }
 
-        int cw[N];
-        for (int i = 0; i < N; i++) {
+        int cw[FT8_N];
+        for (int i = 0; i < FT8_N; i++) {
             float l = codeword[i];
             for (int j = 0; j < 3; j++)
-                l += e[Mn[i][j] - 1][i];
+                l += e[kMn[i][j] - 1][i];
             cw[i] = (l > 0) ? 1 : 0;
         }
 
         int score = ldpc_check(cw);
 
         if (score > best_score) {
-            for (int i = 0; i < N; i++) {
-                plain[i] = cw[colorder[i]];
+            // Update the current best result
+            for (int i = 0; i < FT8_N; i++) {
+                //plain[i] = cw[colorder[i]];   // Reverse the column permutation
+                plain[i] = cw[i];
             }
             best_score = score;
 
-            if (score == M) {
+            if (score == FT8_M) {
                 // Found a perfect answer
                 break;
             }
         }
 
 
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < FT8_N; i++) {
             for (int ji1 = 0; ji1 < 3; ji1++) {
-                int j1 = Mn[i][ji1] - 1;
+                int j1 = kMn[i][ji1] - 1;
                 float l = codeword[i];
                 for (int ji2 = 0; ji2 < 3; ji2++) {
                     if (ji1 != ji2) {
-                        int j2 = Mn[i][ji2] - 1;
+                        int j2 = kMn[i][ji2] - 1;
                         l += e[j2][i];
                     }
                 }
@@ -181,11 +181,11 @@ void ldpc_decode(float codeword[], int max_iters, int plain[], int *ok) {
 int ldpc_check(int codeword[]) {
     int score = 0;
 
-    // Nm[87][7]
-    for (int j = 0; j < M; ++j) {
+    // kNm[87][7]
+    for (int j = 0; j < FT8_M; ++j) {
         int x = 0;
-        for (int ii1 = 0; ii1 < nrw[j]; ++ii1) {
-            x ^= codeword[Nm[j][ii1] - 1];
+        for (int ii1 = 0; ii1 < kNrw[j]; ++ii1) {
+            x ^= codeword[kNm[j][ii1] - 1];
         }
         if (x == 0) {
             ++score;
@@ -196,8 +196,8 @@ int ldpc_check(int codeword[]) {
 
 
 void bp_decode(float codeword[], int max_iters, int plain[], int *ok) {
-    float tov[N][3];
-    float toc[M][7];
+    float tov[FT8_N][3];
+    float toc[FT8_M][7];
 
     int best_score = -1;
 
@@ -205,24 +205,24 @@ void bp_decode(float codeword[], int max_iters, int plain[], int *ok) {
     int ncnt = 0;
 
     // initialize messages to checks
-    for (int i = 0; i < M; ++i) {
-        for (int j = 0; j < nrw[i]; ++j) {
-            toc[i][j] = codeword[Nm[i][j] - 1];
+    for (int i = 0; i < FT8_M; ++i) {
+        for (int j = 0; j < kNrw[i]; ++j) {
+            toc[i][j] = codeword[kNm[i][j] - 1];
         }
     }
 
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < FT8_N; ++i) {
         for (int j = 0; j < 3; ++j) {
             tov[i][j] = 0;
         }
     }
 
     for (int iter = 0; iter < max_iters; ++iter) {
-        float   zn[N];
-        int     cw[N];
+        float   zn[FT8_N];
+        int     cw[FT8_N];
 
         // Update bit log likelihood ratios (tov=0 in iter 0)
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < FT8_N; ++i) {
             zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
             cw[i] = (zn[i] > 0) ? 1 : 0;
         }
@@ -231,25 +231,26 @@ void bp_decode(float codeword[], int max_iters, int plain[], int *ok) {
         int score = ldpc_check(cw);
 
         if (score > best_score) {
-            // we have a better guess - reorder the columns and store it
-            for (int i = 0; i < N; i++) {
-                plain[i] = cw[colorder[i]];
+            // we have a better guess - update the result
+            for (int i = 0; i < FT8_N; i++) {
+                //plain[i] = cw[colorder[i]];   // Reverse the column permutation
+                plain[i] = cw[i];
             }
             best_score = score;
 
-            if (score == M) {
+            if (score == FT8_M) {
                 break;
             }
         }
 
         // Send messages from bits to check nodes 
-        for (int i = 0; i < M; ++i) {
-            for (int j = 0; j < nrw[i]; ++j) {
-                int ibj = Nm[i][j] - 1;
+        for (int i = 0; i < FT8_M; ++i) {
+            for (int j = 0; j < kNrw[i]; ++j) {
+                int ibj = kNm[i][j] - 1;
                 toc[i][j] = zn[ibj];
                 for (int kk = 0; kk < 3; ++kk) { 
                     // subtract off what the bit had received from the check
-                    if (Mn[ibj][kk] - 1 == i) {
+                    if (kMn[ibj][kk] - 1 == i) {
                         toc[i][j] -= tov[ibj][kk];
                     }
                 }
@@ -257,20 +258,20 @@ void bp_decode(float codeword[], int max_iters, int plain[], int *ok) {
         }
         
         // send messages from check nodes to variable nodes
-        for (int i = 0; i < M; ++i) {
-            for (int j = 0; j < nrw[i]; ++j) {
+        for (int i = 0; i < FT8_M; ++i) {
+            for (int j = 0; j < kNrw[i]; ++j) {
                 //toc[i][j] = pltanh(-toc[i][j] / 2);
                 toc[i][j] = fast_tanh(-toc[i][j] / 2);
                 //toc[i][j] = tanhf(-toc[i][j] / 2);
             }
         }
 
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < FT8_N; ++i) {
             for (int j = 0; j < 3; ++j) {
-                int ichk = Mn[i][j] - 1; // Mn(:,j) are the checks that include bit j
+                int ichk = kMn[i][j] - 1; // kMn(:,j) are the checks that include bit j
                 float Tmn = 1.0f;
-                for (int k = 0; k < nrw[ichk]; ++k) {
-                    if (Nm[ichk][k] - 1 != i) {
+                for (int k = 0; k < kNrw[ichk]; ++k) {
+                    if (kNm[ichk][k] - 1 != i) {
                         Tmn *= toc[ichk][k];
                     }
                 }

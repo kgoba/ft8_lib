@@ -4,11 +4,6 @@
 
 namespace ft8_v2 {
 
-    constexpr int ND = 58;      // Data symbols
-    constexpr int NS = 21;      // Sync symbols (3 @ Costas 7x7)
-    constexpr int NN = NS+ND;   // Total channel symbols (79)
-
-
     // Generate FT8 tone sequence from payload data
     // [IN] payload - 9 byte array consisting of 72 bit payload
     // [OUT] itone  - array of NN (79) bytes to store the generated tones (encoded as 0..7)
