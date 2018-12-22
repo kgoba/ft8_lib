@@ -4,11 +4,11 @@
 #include <cmath>
 
 #include "common/wave.h"
-#include "ft8/pack.h"
-#include "ft8/encode.h"
+//#include "ft8/v1/pack.h"
+//#include "ft8/v1/encode.h"
 #include "ft8/pack_v2.h"
 #include "ft8/encode_v2.h"
-
+#include "ft8/constants.h"
 
 // Convert a sequence of symbols (tones) into a sinewave of continuous phase (FSK).
 // Symbol 0 gets encoded as a sine of frequency f0, the others are spaced in increasing
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     const char *message = argv[1];
     const char *wav_path = argv[2];
 
-    // First, pack the text data into 72-bit binary message
+    // First, pack the text data into binary message
     uint8_t packed[10];
     //int rc = packmsg(message, packed);
     int rc = ft8_v2::pack77(message, packed);
@@ -73,25 +73,25 @@ int main(int argc, char **argv) {
     printf("\n");
 
     // Second, encode the binary message as a sequence of FSK tones
-    uint8_t tones[NN];          // NN = 79, lack of better name at the moment
+    uint8_t tones[FT8_NN];          // FT8_NN = 79, lack of better name at the moment
     //genft8(packed, 0, tones);
     ft8_v2::genft8(packed, tones);
 
     printf("FSK tones: ");
-    for (int j = 0; j < NN; ++j) {
+    for (int j = 0; j < FT8_NN; ++j) {
         printf("%d", tones[j]);
     }
     printf("\n");
 
     // Third, convert the FSK tones into an audio signal
-    const int num_samples = (int)(0.5 + NN / 6.25 * 12000);
+    const int num_samples = (int)(0.5 + FT8_NN / 6.25 * 12000);
     const int num_silence = (15 * 12000 - num_samples) / 2;
     float signal[num_silence + num_samples + num_silence];
     for (int i = 0; i < num_silence + num_samples + num_silence; i++) {
         signal[i] = 0;
     }
 
-    synth_fsk(tones, NN, 1000, 6.25, 6.25, 12000, signal + num_silence);
+    synth_fsk(tones, FT8_NN, 1000, 6.25, 6.25, 12000, signal + num_silence);
     save_wav(signal, num_silence + num_samples + num_silence, 12000, wav_path);
 
     return 0;
