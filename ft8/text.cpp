@@ -78,13 +78,13 @@ int dd_to_int(const char *str, int length) {
 
 
 // Convert a 2 digit integer to string
-void int_to_dd(char *str, int value, int width) {
+void int_to_dd(char *str, int value, int width, bool full_sign) {
     if (value < 0) {
         *str = '-';
         ++str;
         value = -value;
     }
-    else {
+    else if (full_sign) {
         *str = '+';
         ++str;
     }

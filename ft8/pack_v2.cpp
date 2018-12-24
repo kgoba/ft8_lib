@@ -9,11 +9,12 @@
 namespace ft8_v2 {
 
 // TODO: This is wasteful, should figure out something more elegant
-const char *A0 = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
-const char *A1 = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const char *A2 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const char *A3 = "0123456789";
-const char *A4 = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char A0[] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
+const char A1[] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char A2[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char A3[] = "0123456789";
+const char A4[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 
 int index(const char *string, char c) {
     for (int i = 0; *string; ++i, ++string) {
@@ -23,6 +24,7 @@ int index(const char *string, char c) {
     }
     return -1;  // Not found
 }
+
 
 // Pack a special token, a 22-bit hash code, or a valid base call 
 // into a 28-bit integer.
@@ -44,8 +46,8 @@ int32_t pack28(const char *callsign) {
     }
 
     // TODO: Check for <...> callsign
-    // if(c13(1:1).eq.'<')then
-    //   call save_hash_call(c13,n10,n12,n22)   !Save callsign in hash table
+    // if(text(1:1).eq.'<')then
+    //   call save_hash_call(text,n10,n12,n22)   !Save callsign in hash table
     //   n28=NTOKENS + n22
 
     char c6[6] = {' ', ' ', ' ', ' ', ' ', ' '};
@@ -55,21 +57,24 @@ int32_t pack28(const char *callsign) {
         length++;
     }
 
-    // Work-around for Swaziland prefix:
+    // Copy callsign to 6 character buffer
     if (starts_with(callsign, "3DA0") && length <= 7) {
+        // Work-around for Swaziland prefix: 3DA0XYZ -> 3D0XYZ
         memcpy(c6, "3D0", 3);
         memcpy(c6 + 3, callsign + 4, length - 4);
     }
-    // Work-around for Guinea prefixes:
     else if (starts_with(callsign, "3X") && is_letter(callsign[2]) && length <= 7) {
+        // Work-around for Guinea prefixes: 3XA0XYZ -> QA0XYZ
         memcpy(c6, "Q", 1);
         memcpy(c6 + 1, callsign + 2, length - 2);
     }
     else {
         if (is_digit(callsign[2]) && length <= 6) {
+            // AB0XYZ
             memcpy(c6, callsign, length);
         }
         else if (is_digit(callsign[1]) && length <= 5) {
+            // A0XYZ -> " A0XYZ"
             memcpy(c6 + 1, callsign, length);
         }
     }
@@ -80,7 +85,7 @@ int32_t pack28(const char *callsign) {
         (i2 = index(A3, c6[2])) >= 0 && (i3 = index(A4, c6[3])) >= 0 &&
         (i4 = index(A4, c6[4])) >= 0 && (i5 = index(A4, c6[5])) >= 0) 
     {
-        printf("Pack28: idx=[%d, %d, %d, %d, %d, %d]\n", i0, i1, i2, i3, i4, i5);
+        //printf("Pack28: idx=[%d, %d, %d, %d, %d, %d]\n", i0, i1, i2, i3, i4, i5);
         // This is a standard callsign
         int32_t n28 = i0;
         n28 = n28 * 36 + i1;
@@ -88,17 +93,17 @@ int32_t pack28(const char *callsign) {
         n28 = n28 * 27 + i3;
         n28 = n28 * 27 + i4;
         n28 = n28 * 27 + i5;
-        printf("Pack28: n28=%d (%04xh)\n", n28, n28);
+        //printf("Pack28: n28=%d (%04xh)\n", n28, n28);
         return NTOKENS + MAX22 + n28;
     }
 
-    //char c13[13];
+    //char text[13];
 
     //if (length > 13) return -1;
 
     // TODO:
     // Treat this as a nonstandard callsign: compute its 22-bit hash
-    // call save_hash_call(c13,n10,n12,n22)   !Save callsign in hash table
+    // call save_hash_call(text,n10,n12,n22)   !Save callsign in hash table
     // n28=NTOKENS + n22
 
     // n28=iand(n28,ishft(1,28)-1)
@@ -213,10 +218,6 @@ int pack77_1(const char *msg, uint8_t *b77) {
     // write(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
     // 1000 format(2(b28.28,b1),b1,b15.15,b3.3)  
 
-    // 00 00 00 27 b3 00 01 0b 27 8f b9 e0
-    // (00 00 00 2) 0 (f0 85 ab e) (0) 
-    // 7842D5F
-
     b77[0] = (n28a >> 21);
     b77[1] = (n28a >> 13);
     b77[2] = (n28a >> 5);
@@ -232,30 +233,43 @@ int pack77_1(const char *msg, uint8_t *b77) {
 }
 
 
-void packtext77(const char *c13, uint8_t *b71) {
-    // TODO: w=adjustr(c13)
+void packtext77(const char *text, uint8_t *b71) {
+    int length = strlen(text);
+
+    // Skip leading and trailing spaces
+    while (*text == ' ' && *text != 0) {
+        ++text;
+        --length;
+    }
+    while (length > 0 && text[length - 1] == ' ') {
+        --length;
+    }
 
     for (int i = 0; i < 9; ++i) {
         b71[i] = 0;
     }
 
     for (int j = 0; j < 13; ++j) {
-        int q = index(A0, c13[j]);
-
-        // Multiply b71 by 42
+        // Multiply the long integer in b71 by 42
         uint16_t x = 0;
         for (int i = 8; i >= 0; --i) {
             x += b71[i] * (uint16_t)42;
-            b71[i] = x;
+            b71[i] = (x & 0xFF);
             x >>= 8;
         }
 
         // Add index of the current char
-        x = (q > 0) ? q : 0;
+        if (j < length) {
+            int q = index(A0, text[j]);
+            x = (q > 0) ? q : 0;
+        }
+        else {
+            x = 0;
+        }
         for (int i = 8; i >= 0; --i) {
             if (x == 0) break;
             x += b71[i];
-            b71[i] = x;
+            b71[i] = (x & 0xFF);
             x >>= 8;
         }
     }

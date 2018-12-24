@@ -3,16 +3,12 @@
 #include <cstdio>
 #include <cmath>
 
-#include "common/wave.h"
-#include "ft8/pack.h"
-#include "ft8/encode.h"
-#include "ft8/pack_v2.h"
-#include "ft8/encode_v2.h"
-#include "ft8/unpack.h"
-
+#include "ft8/unpack_v2.h"
 #include "ft8/ldpc.h"
-#include "fft/kiss_fftr.h"
+#include "ft8/constants.h"
 
+#include "common/wave.h"
+#include "fft/kiss_fftr.h"
 
 void usage() {
     printf("Decode a 15-second WAV file.\n");
@@ -79,11 +75,11 @@ void heapify_up(Candidate * heap, int heap_size) {
 
 // Find top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
-void find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t *sync_map, int num_candidates, Candidate *heap) {
+int find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t *sync_map, int num_candidates, Candidate *heap) {
     int heap_size = 0;
 
     for (int alt = 0; alt < 4; ++alt) {
-        for (int time_offset = 0; time_offset < num_blocks - NN; ++time_offset) {
+        for (int time_offset = 0; time_offset < num_blocks - FT8_NN; ++time_offset) {
             for (int freq_offset = 0; freq_offset < num_bins - 8; ++freq_offset) {
                 int score = 0;
 
@@ -122,6 +118,8 @@ void find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t
             }
         }
     }
+
+    return heap_size;
 }
 
 
@@ -134,6 +132,9 @@ void extract_power(const float * signal, int num_blocks, int num_bins, uint8_t *
     for (int i = 0; i < nfft; ++i) {
         window[i] = hann_i(i, nfft);
     }
+    // for (int i = 0; i < nfft; ++i) {
+    //     window[i] = (i < block_size) ? 2 * hann_i(i, block_size) : 0.0f;
+    // }
 
     size_t  fft_work_size;
     kiss_fftr_alloc(nfft, 0, 0, &fft_work_size);
@@ -141,11 +142,12 @@ void extract_power(const float * signal, int num_blocks, int num_bins, uint8_t *
     printf("N_FFT = %d\n", nfft);
     printf("FFT work area = %lu\n", fft_work_size);
 
-    void *  fft_work = malloc(fft_work_size);
+    void *       fft_work = malloc(fft_work_size);
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
     int offset = 0;
     float fft_norm = 1.0f / nfft;
+    float max_mag = -100.0f;
     for (int i = 0; i < num_blocks; ++i) {
         // Loop over two possible time offsets (0 and block_size/2)
         for (int time_sub = 0; time_sub <= block_size/2; time_sub += block_size/2) {
@@ -162,8 +164,8 @@ void extract_power(const float * signal, int num_blocks, int num_bins, uint8_t *
 
             // Compute log magnitude in decibels
             for (int j = 0; j < nfft/2 + 1; ++j) {
-                float mag2 = fft_norm * (freqdata[j].i * freqdata[j].i + freqdata[j].r * freqdata[j].r);
-                mag_db[j] = 10.0f * log10f(1.0E-10f + mag2);
+                float mag2 = (freqdata[j].i * freqdata[j].i + freqdata[j].r * freqdata[j].r);
+                mag_db[j] = 10.0f * log10f(1.0E-10f + mag2 * fft_norm);
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
@@ -173,14 +175,18 @@ void extract_power(const float * signal, int num_blocks, int num_bins, uint8_t *
                     float db2 = mag_db[j * 2 + freq_sub + 1];
                     float db = (db1 + db2) / 2;
 
-                    // Scale decibels to unsigned 8-bit range
+                    // Scale decibels to unsigned 8-bit range and clamp the value
                     int scaled = (int)(2 * (db + 100));
                     power[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
                     ++offset;
+
+                    if (db > max_mag) max_mag = db;
                 }
             }
         }
     }
+
+    printf("Max magnitude: %.1f dB\n", max_mag);
 
     free(fft_work);
 }
@@ -203,7 +209,7 @@ void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & ca
 
     int k = 0;
     // Go over FSK tones and skip Costas sync symbols
-    for (int i = 7; i < NN - 7; ++i) {
+    for (int i = 7; i < FT8_NN - 7; ++i) {
         if (i == 36) i += 7;
 
         // Pointer to 8 bins of the current symbol
@@ -222,14 +228,15 @@ void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & ca
         // printf("%d %d %d %d %d %d %d %d : %.0f %.0f %.0f\n", 
         //         ps[0], ps[1], ps[2], ps[3], ps[4], ps[5], ps[6], ps[7], 
         //         log174[k + 0], log174[k + 1], log174[k + 2]);
+
         k += 3;
     }
 
     // Compute the variance of log174
     float sum   = 0;
     float sum2  = 0;
-    float inv_n = 1.0f / (3 * ND);
-    for (int i = 0; i < 3 * ND; ++i) {
+    float inv_n = 1.0f / (3 * FT8_ND);
+    for (int i = 0; i < 3 * FT8_ND; ++i) {
         sum  += log174[i];
         sum2 += log174[i] * log174[i];
     }
@@ -238,11 +245,40 @@ void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & ca
     // Normalize log174 such that sigma = 2.83 (Why? It's in WSJT-X)
     float norm_factor = 2.83f / sqrtf(variance);
 
-    for (int i = 0; i < 3 * ND; ++i) {
+    for (int i = 0; i < 3 * FT8_ND; ++i) {
         log174[i] *= norm_factor;
         //printf("%.1f ", log174[i]);
     }
     //printf("\n");
+}
+
+
+void test_tones(float *log174) {
+    for (int i = 0; i < FT8_ND; ++i) {
+        const uint8_t inv_map[8] = {0, 1, 3, 2, 6, 4, 5, 7};
+        uint8_t tone = ("0000000011721762454112705354533170166234757420515470163426"[i]) - '0';
+        uint8_t b3 = inv_map[tone];
+        log174[3 * i]     = (b3 & 4) ? +1.0 : -1.0;
+        log174[3 * i + 1] = (b3 & 2) ? +1.0 : -1.0;
+        log174[3 * i + 2] = (b3 & 1) ? +1.0 : -1.0;
+    }    
+    // 3140652 00000000117217624541127053545 3140652 33170166234757420515470163426 3140652
+    // 0000000011721762454112705354533170166234757420515470163426
+    // 0000000011721762454112705454544170166344757430515470073537
+    // 0000000011711761444111704343433170166233747320414370072427
+    // 0000000011711761454111705353533170166233757320515370072527
+}
+
+
+void print_tones(const uint8_t *code_map, const float *log174) {
+    for (int k = 0; k < 3 * FT8_ND; k += 3) {
+        uint8_t max = 0;
+        if (log174[k + 0] > 0) max |= 4;
+        if (log174[k + 1] > 0) max |= 2;
+        if (log174[k + 2] > 0) max |= 1;
+        printf("%d", code_map[max]);
+    }
+    printf("\n");
 }
 
 
@@ -264,13 +300,6 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    // Costas 7x7 tone pattern
-    const uint8_t kCostas_map_v1[] = { 2,5,6,0,4,1,3 };
-    const uint8_t kCostas_map_v2[] = { 3,1,4,0,6,5,2 };
-    // Gray maps (used only in v2)
-    const uint8_t kGray_map_v1[8] = { 0,1,2,3,4,5,6,7 };    // identity map
-    const uint8_t kGray_map_v2[8] = { 0,1,3,2,5,6,4,7 };
-
     const float fsk_dev = 6.25f;
 
     const int num_bins = (int)(sample_rate / (2 * fsk_dev));
@@ -282,41 +311,45 @@ int main(int argc, char ** argv) {
 
     extract_power(signal, num_blocks, num_bins, power);
 
-    int num_candidates = 250;
+    int num_candidates = 100;
     Candidate heap[num_candidates];
 
-    find_sync(power, num_blocks, num_bins, kCostas_map_v1, num_candidates, heap);
+    find_sync(power, num_blocks, num_bins, kCostas_map, num_candidates, heap);
 
     for (int idx = 0; idx < num_candidates; ++idx) {
         Candidate &cand = heap[idx];
 
-        float log174[3 * ND];
-        extract_likelihood(power, num_bins, cand, kGray_map_v1, log174);
+        float log174[3 * FT8_ND];
+        extract_likelihood(power, num_bins, cand, kGray_map, log174);
 
-        const int num_iters = 20;
-        int plain[3 * ND];
-        int ok = 0;
+        const int num_iters = 25;
+        uint8_t plain[3 * FT8_ND];
+        int n_errors = 0;
 
-        bp_decode(log174, num_iters, plain, &ok);
-        //ldpc_decode(log174, num_iters, plain, &ok);
-        //printf("ldpc_decode() = %d\n", ok);
-
-        if (ok == 87) {
             float freq_hz  = (cand.freq_offset + cand.freq_sub / 2.0f) * fsk_dev;
             float time_sec = (cand.time_offset + cand.time_sub / 2.0f) / fsk_dev;
-            //printf("%03d: score = %d freq = %.1f time = %.2f\n", idx, 
-            //        cand.score, freq_hz, time_sec);
 
-            uint8_t a87[11];
+            printf("%03d: score = %d freq = %.1f time = %.2f\n", idx, 
+                    cand.score, freq_hz, time_sec);
+
+        bp_decode(log174, num_iters, plain, &n_errors);
+        //ldpc_decode(log174, num_iters, plain, &n_errors);
+        printf("ldpc_decode() = %d\n", n_errors);
+
+        if (n_errors == 0) {
+
+            //print_tones(kGray_map, log174);
+            
+            // Extract payload + CRC
+            uint8_t a91[12];
             uint8_t mask = 0x80;
             uint8_t position = 0;
-            for (int i = 0; i < 11; ++i) {
-                a87[i] = 0;
+            for (int i = 0; i < 12; ++i) {
+                a91[i] = 0;
             }
-            // Extract payload + CRC (last 87 bits)
-            for (int i = 174 - 87; i < 174; ++i) {
+            for (int i = 0; i < FT8_K; ++i) {
                 if (plain[i]) {
-                    a87[position] |= mask;
+                    a91[position] |= mask;
                 }
                 mask >>= 1;
                 if (!mask) {
@@ -325,14 +358,17 @@ int main(int argc, char ** argv) {
                 }
             }
 
-            for (int i = 0; i < 11; ++i) {
-                //printf("%02x ", a87[i]);
-            }
-            //printf("\n");
+            // TODO: check CRC
+
+            // for (int i = 0; i < 12; ++i) {
+            //     printf("%02x ", a91[i]);
+            // }
+            // printf("\n");
 
             char message[20];
-            unpack(a87, message);
+            unpack77(a91, message);
 
+            // Fake WSJT-X-like output for now
             printf("000000   0 %4.1f %4d ~  %s\n", time_sec, (int)(freq_hz + 0.5f), message);
         }
     }

@@ -2,7 +2,7 @@
 #include <cstdio>
 
 #include "pack.h"
-#include "text.h"
+#include "../text.h"
 
 constexpr int32_t NBASE = 37*36*10*27*27*27L;
 constexpr int32_t NGBASE = 180*180L;

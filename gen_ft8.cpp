@@ -84,15 +84,17 @@ int main(int argc, char **argv) {
     printf("\n");
 
     // Third, convert the FSK tones into an audio signal
-    const int num_samples = (int)(0.5 + FT8_NN / 6.25 * 12000);
-    const int num_silence = (15 * 12000 - num_samples) / 2;
+    const int sample_rate = 12000;
+    const float symbol_rate = 6.25f;
+    const int num_samples = (int)(0.5f + FT8_NN / symbol_rate * sample_rate);
+    const int num_silence = (15 * sample_rate - num_samples) / 2;
     float signal[num_silence + num_samples + num_silence];
     for (int i = 0; i < num_silence + num_samples + num_silence; i++) {
         signal[i] = 0;
     }
 
-    synth_fsk(tones, FT8_NN, 1000, 6.25, 6.25, 12000, signal + num_silence);
-    save_wav(signal, num_silence + num_samples + num_silence, 12000, wav_path);
+    synth_fsk(tones, FT8_NN, 1000, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
+    save_wav(signal, num_silence + num_samples + num_silence, sample_rate, wav_path);
 
     return 0;
 }
