@@ -50,21 +50,17 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
             }
         }
 
-        uint8_t cw[FT8_N];
         for (int i = 0; i < FT8_N; i++) {
             float l = codeword[i];
             for (int j = 0; j < 3; j++)
                 l += e[kMn[i][j] - 1][i];
-            cw[i] = (l > 0) ? 1 : 0;
+            plain[i] = (l > 0) ? 1 : 0;
         }
 
-        int errors = ldpc_check(cw);
+        int errors = ldpc_check(plain);
 
         if (errors < min_errors) {
             // Update the current best result
-            for (int i = 0; i < FT8_N; i++) {
-                plain[i] = cw[i];
-            }
             min_errors = errors;
 
             if (errors == 0) {
@@ -137,25 +133,21 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
 
     for (int iter = 0; iter < max_iters; ++iter) {
         float   zn[FT8_N];
-        uint8_t cw[FT8_N];
 
         // Update bit log likelihood ratios (tov=0 in iter 0)
         for (int i = 0; i < FT8_N; ++i) {
             zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
-            cw[i] = (zn[i] > 0) ? 1 : 0;
+            plain[i] = (zn[i] > 0) ? 1 : 0;
         }
 
         // Check to see if we have a codeword (check before we do any iter)
-        int errors = ldpc_check(cw);
+        int errors = ldpc_check(plain);
 
         if (errors < min_errors) {
             // we have a better guess - update the result
-            for (int i = 0; i < FT8_N; i++) {
-                plain[i] = cw[i];
-            }
             min_errors = errors;
 
-            if (errors == FT8_M) {
+            if (errors == 0) {
                 break;  // Found a perfect answer
             }
         }
