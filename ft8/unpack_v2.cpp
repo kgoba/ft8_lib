@@ -38,7 +38,7 @@ char charn(int c, int table_idx) {
 
 // n28 is a 28-bit integer, e.g. n28a or n28b, containing all the
 // call sign bits from a packed message.
-int unpack28(uint32_t n28, char *result) {
+int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
     // Check for special tokens DE, QRZ, CQ, CQ_nnn, CQ_aaaa
     if (n28 < NTOKENS) {
         if (n28 <= 2) {
@@ -117,8 +117,17 @@ int unpack28(uint32_t n28, char *result) {
     while (callsign[ws_len] == ' ') {
         ws_len++;
     }
-
     strcpy(result, callsign + ws_len);
+
+    // Check if we should append /R or /P suffix
+    if (ip) {
+        if (i3 == 1) {
+            strcat(result, "/R");
+        }
+        else if (i3 == 2) {
+            strcat(result, "/P");
+        }
+    }
     return 0;   // Success
 }
 
@@ -148,10 +157,10 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *message) {
     // Unpack both callsigns
     char field_1[14];
     char field_2[14];
-    if (unpack28(n28a >> 1, field_1) < 0) {
+    if (unpack28(n28a >> 1, n28a & 0x01, i3, field_1) < 0) {
         return -1;
     }
-    if (unpack28(n28b >> 1, field_2) < 0) {
+    if (unpack28(n28b >> 1, n28b & 0x01, i3, field_2) < 0) {
         return -2;
     }
     // Fix "CQ_" to "CQ " -> already done in unpack28()
@@ -164,19 +173,13 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *message) {
     strcat(message, " ");
     strcat(message, field_2);
 
-    // TODO: add /P and /R suffixes
-    //  if(index(field_1,'<').le.0) then
-    //     ws_len=index(field_1,' ')
-    //     if(ws_len.ge.4 .and. ipa.eq.1 .and. i3.eq.1) field_1(ws_len:ws_len+1)='/R'
-    //     if(ws_len.ge.4 .and. ipa.eq.1 .and. i3.eq.2) field_1(ws_len:ws_len+1)='/P'
-    //     if(ws_len.ge.4) call add_call_to_recent_calls(field_1)
-    //  endif
-    //  if(index(field_2,'<').le.0) then
-    //     ws_len=index(field_2,' ')
-    //     if(ws_len.ge.4 .and. ipb.eq.1 .and. i3.eq.1) field_2(ws_len:ws_len+1)='/R'
-    //     if(ws_len.ge.4 .and. ipb.eq.1 .and. i3.eq.2) field_2(ws_len:ws_len+1)='/P'
-    //     if(ws_len.ge.4) call add_call_to_recent_calls(field_2)
-    //  endif
+    // TODO: add to recent calls
+    if (field_1[0] != '<' && strlen(field_1) >= 4) {
+        // add_call_to_recent_calls(field_1)
+    }
+    if (field_2[0] != '<' && strlen(field_2) >= 4) {
+        // add_call_to_recent_calls(field_2)
+    }
 
     char field_3[5];
     if (igrid4 <= MAXGRID4) {
@@ -287,16 +290,16 @@ int unpack77(const uint8_t *a77, char *message) {
         // 0.0  Free text
         return unpack_text(a77, message);
     }
-    else if (i3 == 0 && n3 == 1) {
-        // 0.1  K1ABC RR73; W9XYZ <KH1/KH7Z> -11   28 28 10 5       71   DXpedition Mode
-    }
-    else if (i3 == 0 && n3 == 2) {
-        // 0.2  PA3XYZ/P R 590003 IO91NP           28 1 1 3 12 25   70   EU VHF contest
-    }
-    else if (i3 == 0 && (n3 == 3 || n3 == 4)) {
-        // 0.3   WA9XYZ KA1ABC R 16A EMA            28 28 1 4 3 7    71   ARRL Field Day
-        // 0.4   WA9XYZ KA1ABC R 32A EMA            28 28 1 4 3 7    71   ARRL Field Day
-    }
+    // else if (i3 == 0 && n3 == 1) {
+    //     // 0.1  K1ABC RR73; W9XYZ <KH1/KH7Z> -11   28 28 10 5       71   DXpedition Mode
+    // }
+    // else if (i3 == 0 && n3 == 2) {
+    //     // 0.2  PA3XYZ/P R 590003 IO91NP           28 1 1 3 12 25   70   EU VHF contest
+    // }
+    // else if (i3 == 0 && (n3 == 3 || n3 == 4)) {
+    //     // 0.3   WA9XYZ KA1ABC R 16A EMA            28 28 1 4 3 7    71   ARRL Field Day
+    //     // 0.4   WA9XYZ KA1ABC R 32A EMA            28 28 1 4 3 7    71   ARRL Field Day
+    // }
     else if (i3 == 0 && n3 == 5) {
         // 0.5   0123456789abcdef01                 71               71   Telemetry (18 hex)
         return unpack_telemetry(a77, message);
@@ -305,17 +308,21 @@ int unpack77(const uint8_t *a77, char *message) {
         // Type 1 (standard message) or Type 2 ("/P" form for EU VHF contest)
         return unpack_type1(a77, i3, message);
     }
-    else if (i3 == 3) {
-        // Type 3: ARRL RTTY Contest
-    }
-    else if (i3 == 4) {
-        // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
-        // One hashed call or "CQ"; one compound or nonstandard call with up
-        // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
+    // else if (i3 == 3) {
+    //     // Type 3: ARRL RTTY Contest
+    // }
+    // else if (i3 == 4) {
+    //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
+    //     // One hashed call or "CQ"; one compound or nonstandard call with up
+    //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
 
-        // TODO: implement
-        // read(c77,1050) n12,n58,iflip,nrpt,icq
-        // 1050 format(b12,b58,b1,b2,b1)
+    //     // TODO: implement
+    //     // read(c77,1050) n12,n58,iflip,nrpt,icq
+    //     // 1050 format(b12,b58,b1,b2,b1)
+    // }
+    else {
+        // unknown type
+        message[0] = '\0';
     }
 
     return 0;

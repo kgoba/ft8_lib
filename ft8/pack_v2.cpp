@@ -16,16 +16,6 @@ const char A3[] = "0123456789";
 const char A4[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 
-int index(const char *string, char c) {
-    for (int i = 0; *string; ++i, ++string) {
-        if (c == *string) {
-            return i;
-        }
-    }
-    return -1;  // Not found
-}
-
-
 // Pack a special token, a 22-bit hash code, or a valid base call 
 // into a 28-bit integer.
 int32_t pack28(const char *callsign) {
@@ -81,9 +71,9 @@ int32_t pack28(const char *callsign) {
 
     // Check for standard callsign
     int i0, i1, i2, i3, i4, i5;
-    if ((i0 = index(A1, c6[0])) >= 0 && (i1 = index(A2, c6[1])) >= 0 &&
-        (i2 = index(A3, c6[2])) >= 0 && (i3 = index(A4, c6[3])) >= 0 &&
-        (i4 = index(A4, c6[4])) >= 0 && (i5 = index(A4, c6[5])) >= 0) 
+    if ((i0 = char_index(A1, c6[0])) >= 0 && (i1 = char_index(A2, c6[1])) >= 0 &&
+        (i2 = char_index(A3, c6[2])) >= 0 && (i3 = char_index(A4, c6[3])) >= 0 &&
+        (i4 = char_index(A4, c6[4])) >= 0 && (i5 = char_index(A4, c6[5])) >= 0) 
     {
         //printf("Pack28: idx=[%d, %d, %d, %d, %d, %d]\n", i0, i1, i2, i3, i4, i5);
         // This is a standard callsign
@@ -125,7 +115,7 @@ bool chkcall(const char *call, char *bc) {
 
     // TODO: implement suffix parsing (or rework?)
   //bc=w(1:6)
-  //i0=index(w,'/')
+  //i0=char_index(w,'/')
   //if(max(i0-1,n1-i0).gt.6) go to 100      !Base call must be < 7 characters
   //if(i0.ge.2 .and. i0.le.n1-1) then       !Extract base call from compound call
   //   if(i0-1.le.n1-i0) bc=w(i0+1:n1)//'   '
@@ -206,9 +196,9 @@ int pack77_1(const char *msg, uint8_t *b77) {
     uint8_t i3 = 1; // No suffix or /R
     
     // TODO: check for suffixes
-    // if(index(w(1),'/P').ge.4 .or. index(w(2),'/P').ge.4) i3=2  !Type 2, with "/P"
-    // if(index(w(1),'/P').ge.4 .or. index(w(1),'/R').ge.4) ipa=1
-    // if(index(w(2),'/P').ge.4 .or. index(w(2),'/R').ge.4) ipb=1
+    // if(char_index(w(1),'/P').ge.4 .or. char_index(w(2),'/P').ge.4) i3=2  !Type 2, with "/P"
+    // if(char_index(w(1),'/P').ge.4 .or. char_index(w(1),'/R').ge.4) ipa=1
+    // if(char_index(w(2),'/P').ge.4 .or. char_index(w(2),'/R').ge.4) ipb=1
 
     // Shift in ipa and ipb bits into n28a and n28b
     n28a <<= 1; // ipa = 0
@@ -260,7 +250,7 @@ void packtext77(const char *text, uint8_t *b71) {
 
         // Add index of the current char
         if (j < length) {
-            int q = index(A0, text[j]);
+            int q = char_index(A0, text[j]);
             x = (q > 0) ? q : 0;
         }
         else {

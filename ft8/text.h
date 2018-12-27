@@ -8,6 +8,8 @@ bool in_range(char c, char min, char max);
 bool starts_with(const char *string, const char *prefix);
 bool equals(const char *string1, const char *string2);
 
+int char_index(const char *string, char c);
+
 // Text message formatting: 
 //   - replaces lowercase letters with uppercase
 //   - merges consecutive spaces into single space

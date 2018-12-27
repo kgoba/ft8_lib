@@ -19,6 +19,29 @@ float fast_tanh(float x);
 float fast_atanh(float x);
 
 
+// Packs a string of bits each represented as a zero/non-zero byte in plain[], 
+// as a string of packed bits starting from the MSB of the first byte of packed[]
+void pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[]) {
+    int num_bytes = (num_bits + 7) / 8;
+    for (int i = 0; i < num_bytes; ++i) {
+        packed[i] = 0;
+    }
+
+    uint8_t mask = 0x80;
+    int     byte_idx = 0;
+    for (int i = 0; i < num_bits; ++i) {
+        if (plain[i]) {
+            packed[byte_idx] |= mask;
+        }
+        mask >>= 1;
+        if (!mask) {
+            mask = 0x80;
+            ++byte_idx;
+        }
+    }
+}
+
+
 // codeword is 174 log-likelihoods.
 // plain is a return value, 174 ints, to be 0 or 1.
 // max_iters is how hard to try.
@@ -95,11 +118,10 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
 int ldpc_check(uint8_t codeword[]) {
     int errors = 0;
 
-    // kNm[87][7]
     for (int j = 0; j < FT8_M; ++j) {
         uint8_t x = 0;
-        for (int ii1 = 0; ii1 < kNrw[j]; ++ii1) {
-            x ^= codeword[kNm[j][ii1] - 1];
+        for (int i = 0; i < kNrw[j]; ++i) {
+            x ^= codeword[kNm[j][i] - 1];
         }
         if (x != 0) {
             ++errors;

@@ -9,6 +9,7 @@
 #include "ft8/v1/encode.h"
 #include "ft8/pack_v2.h"
 #include "ft8/encode_v2.h"
+#include "ft8/constants.h"
 
 #include "common/debug.h"
 
@@ -92,6 +93,19 @@ void test3() {
     uint8_t test_in2[10] = { 0x11, 0x00, 0x00, 0x00, 0x00, 0x0E, 0x10, 0x04, 0x01, 0x00 };
     uint16_t crc1 = ft8_crc(test_in2, 76);  // Calculate CRC of 76 bits only
     LOG(LOG_INFO, "CRC: %04x\n", crc1);            // should be 0x0708
+}
+
+
+void test_tones(float *log174) {
+    // Just a test case
+    for (int i = 0; i < FT8_ND; ++i) {
+        const uint8_t inv_map[8] = {0, 1, 3, 2, 6, 4, 5, 7};
+        uint8_t tone = ("0000000011721762454112705354533170166234757420515470163426"[i]) - '0';
+        uint8_t b3 = inv_map[tone];
+        log174[3 * i]     = (b3 & 4) ? +1.0 : -1.0;
+        log174[3 * i + 1] = (b3 & 2) ? +1.0 : -1.0;
+        log174[3 * i + 2] = (b3 & 1) ? +1.0 : -1.0;
+    }
 }
 
 

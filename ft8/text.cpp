@@ -33,6 +33,16 @@ bool equals(const char *string1, const char *string2) {
 }
 
 
+int char_index(const char *string, char c) {
+    for (int i = 0; *string; ++i, ++string) {
+        if (c == *string) {
+            return i;
+        }
+    }
+    return -1;  // Not found
+}
+
+
 // Text message formatting: 
 //   - replaces lowercase letters with uppercase
 //   - merges consecutive spaces into single space
