@@ -9,7 +9,10 @@
 #include "ft8/constants.h"
 
 #include "common/wave.h"
+#include "common/debug.h"
 #include "fft/kiss_fftr.h"
+
+#define LOG_LEVEL   LOG_INFO
 
 const int kMax_candidates = 100;
 const int kLDPC_iterations = 20;
@@ -17,8 +20,9 @@ const int kLDPC_iterations = 20;
 const int kMax_decoded_messages = 50;
 const int kMax_message_length = 20;
 
+
 void usage() {
-    printf("Decode a 15-second WAV file.\n");
+    fprintf(stderr, "Decode a 15-second WAV file.\n");
 }
 
 
@@ -55,6 +59,7 @@ float blackman_i(int i, int N) {
 void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t power[]) {
     const int block_size = 2 * num_bins;      // Average over 2 bins per FSK tone
     const int nfft = 2 * block_size;          // We take FFT of two blocks, advancing by one
+    const float fft_norm = 2.0f / nfft;
 
     float   window[nfft];
     for (int i = 0; i < nfft; ++i) {
@@ -64,15 +69,13 @@ void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t p
     size_t  fft_work_size;
     kiss_fftr_alloc(nfft, 0, 0, &fft_work_size);
 
-    printf("N_FFT = %d\n", nfft);
-    printf("FFT work area = %lu\n", fft_work_size);
+    LOG(LOG_INFO, "N_FFT = %d\n", nfft);
+    LOG(LOG_INFO, "FFT work area = %lu\n", fft_work_size);
 
     void        *fft_work = malloc(fft_work_size);
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
-    // Currently bit unsure about the scaling factor of kiss FFT
     int offset = 0;
-    float fft_norm = 1.0f / nfft / sqrtf(nfft);
     float max_mag = -100.0f;
     for (int i = 0; i < num_blocks; ++i) {
         // Loop over two possible time offsets (0 and block_size/2)
@@ -90,8 +93,8 @@ void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t p
 
             // Compute log magnitude in decibels
             for (int j = 0; j < nfft/2 + 1; ++j) {
-                float mag2 = fft_norm * (freqdata[j].i * freqdata[j].i + freqdata[j].r * freqdata[j].r);
-                mag_db[j] = 10.0f * log10f(1E-10f + mag2);
+                float mag2 = (freqdata[j].i * freqdata[j].i + freqdata[j].r * freqdata[j].r);
+                mag_db[j] = 10.0f * log10f(1E-10f + mag2 * fft_norm * fft_norm);
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
@@ -102,7 +105,7 @@ void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t p
                     float db = (db1 + db2) / 2;
 
                     // Scale decibels to unsigned 8-bit range and clamp the value
-                    int scaled = (int)(2 * (db + 100));
+                    int scaled = (int)(2 * (db + 120));
                     power[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
                     ++offset;
 
@@ -112,8 +115,22 @@ void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t p
         }
     }
 
-    printf("Max magnitude: %.1f dB\n", max_mag);
+    LOG(LOG_INFO, "Max magnitude: %.1f dB\n", max_mag);
     free(fft_work);
+}
+
+
+void normalize_signal(float *signal, int num_samples) {
+    float max_amp = 1E-5f;
+    for (int i = 0; i < num_samples; ++i) {
+        float amp = fabsf(signal[i]);
+        if (amp > max_amp) {
+            max_amp = amp;
+        }
+    }
+    for (int i = 0; i < num_samples; ++i) {
+        signal[i] /= max_amp;
+    }    
 }
 
 
@@ -123,9 +140,9 @@ void print_tones(const uint8_t *code_map, const float *log174) {
         if (log174[k + 0] > 0) max |= 4;
         if (log174[k + 1] > 0) max |= 2;
         if (log174[k + 2] > 0) max |= 1;
-        printf("%d", code_map[max]);
+        LOG(LOG_DEBUG, "%d", code_map[max]);
     }
-    printf("\n");
+    LOG(LOG_DEBUG, "\n");
 }
 
 
@@ -146,6 +163,7 @@ int main(int argc, char **argv) {
     if (rc < 0) {
         return -1;
     }
+    normalize_signal(signal, num_samples);
 
     const float fsk_dev = 6.25f;    // tone deviation in Hz and symbol rate
 
@@ -154,7 +172,7 @@ int main(int argc, char **argv) {
     const int block_size = 2 * num_bins;
     const int num_blocks = (num_samples - (block_size/2) - block_size) / block_size;
 
-    printf("%d blocks, %d bins\n", num_blocks, num_bins);
+    LOG(LOG_INFO, "%d blocks, %d bins\n", num_blocks, num_bins);
 
     // Compute FFT over the whole signal and store it
     uint8_t power[num_blocks * 4 * num_bins];
@@ -220,10 +238,10 @@ int main(int argc, char **argv) {
 
             // Fake WSJT-X-like output for now
             int snr = 0;    // TODO: compute SNR
-            printf("000000 %3d %4.1f %4d ~  %s\n", idx, time_sec, (int)(freq_hz + 0.5f), message);
+            printf("000000 %3d %4.1f %4d ~  %s\n", cand.score, time_sec, (int)(freq_hz + 0.5f), message);
         }
     }
-    printf("Decoded %d messages\n", num_decoded);
+    LOG(LOG_INFO, "Decoded %d messages\n", num_decoded);
 
     return 0;
 }
