@@ -7,6 +7,7 @@
 #include "ft8/ldpc.h"
 #include "ft8/decode.h"
 #include "ft8/constants.h"
+#include "ft8/encode_v2.h"
 
 #include "common/wave.h"
 #include "common/debug.h"
@@ -202,23 +203,24 @@ int main(int argc, char **argv) {
         //ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
 
         if (n_errors > 0) {
-            //printf("ldpc_decode() = %d\n", n_errors);
+            LOG(LOG_DEBUG, "ldpc_decode() = %d (%.0f Hz)\n", n_errors, freq_hz);
             continue;
         }
         
         // Extract payload + CRC (first FT8_K bits)
-        uint8_t a91[12];
+        uint8_t a91[FT8_K_BYTES];
         pack_bits(plain, FT8_K, a91);
 
-        // TODO: check CRC
-
-        // printf("%03d: score = %d freq = %.1f time = %.2f\n", idx, 
-        //         cand.score, freq_hz, time_sec);
-        // print_tones(kGray_map, log174);
-        // for (int i = 0; i < 12; ++i) {
-        //     printf("%02x ", a91[i]);
-        // }
-        // printf("\n");
+        // Extract CRC and check it
+        uint16_t chksum = ((a91[9] & 0x07) << 11) | (a91[10] << 3) | (a91[11] >> 5);
+        a91[9] &= 0xF8;
+        a91[10] = 0;
+        a91[11] = 0;
+        uint16_t chksum2 = ft8_v2::ft8_crc(a91, 96 - 14);
+        if (chksum != chksum2) {
+            LOG(LOG_DEBUG, "Checksum: message = %04x, CRC = %04x\n", chksum, chksum2);
+            continue;
+        }
 
         char message[kMax_message_length];
         unpack77(a91, message);
