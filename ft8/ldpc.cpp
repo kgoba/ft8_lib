@@ -14,9 +14,11 @@
 #include <stdlib.h>
 #include "constants.h"
 
-int ldpc_check(uint8_t codeword[]);
-float fast_tanh(float x);
-float fast_atanh(float x);
+namespace ft8 {
+
+static int ldpc_check(uint8_t codeword[]);
+static float fast_tanh(float x);
+static float fast_atanh(float x);
 
 
 // Packs a string of bits each represented as a zero/non-zero byte in plain[], 
@@ -47,19 +49,19 @@ void pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[]) {
 // max_iters is how hard to try.
 // ok == 87 means success.
 void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
-    float m[FT8_M][FT8_N];       // ~60 kB
-    float e[FT8_M][FT8_N];       // ~60 kB
-    int min_errors = FT8_M;
+    float m[ft8::M][ft8::N];       // ~60 kB
+    float e[ft8::M][ft8::N];       // ~60 kB
+    int min_errors = ft8::M;
 
-    for (int j = 0; j < FT8_M; j++) {
-        for (int i = 0; i < FT8_N; i++) {
+    for (int j = 0; j < ft8::M; j++) {
+        for (int i = 0; i < ft8::N; i++) {
             m[j][i] = codeword[i];
             e[j][i] = 0.0f;
         }
     }
 
     for (int iter = 0; iter < max_iters; iter++) {
-        for (int j = 0; j < FT8_M; j++) {
+        for (int j = 0; j < ft8::M; j++) {
             for (int ii1 = 0; ii1 < kNrw[j]; ii1++) {
                 int i1 = kNm[j][ii1] - 1;
                 float a = 1.0f;
@@ -73,7 +75,7 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
             }
         }
 
-        for (int i = 0; i < FT8_N; i++) {
+        for (int i = 0; i < ft8::N; i++) {
             float l = codeword[i];
             for (int j = 0; j < 3; j++)
                 l += e[kMn[i][j] - 1][i];
@@ -91,7 +93,7 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
             }
         }
 
-        for (int i = 0; i < FT8_N; i++) {
+        for (int i = 0; i < ft8::N; i++) {
             for (int ji1 = 0; ji1 < 3; ji1++) {
                 int j1 = kMn[i][ji1] - 1;
                 float l = codeword[i];
@@ -115,10 +117,10 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
 // returns the number of parity errors.
 // 0 means total success.
 //
-int ldpc_check(uint8_t codeword[]) {
+static int ldpc_check(uint8_t codeword[]) {
     int errors = 0;
 
-    for (int j = 0; j < FT8_M; ++j) {
+    for (int j = 0; j < ft8::M; ++j) {
         uint8_t x = 0;
         for (int i = 0; i < kNrw[j]; ++i) {
             x ^= codeword[kNm[j][i] - 1];
@@ -132,32 +134,32 @@ int ldpc_check(uint8_t codeword[]) {
 
 
 void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
-    float tov[FT8_N][3];
-    float toc[FT8_M][7];
+    float tov[ft8::N][3];
+    float toc[ft8::M][7];
 
-    int min_errors = FT8_M;
+    int min_errors = ft8::M;
 
     int nclast = 0;
     int ncnt = 0;
 
     // initialize messages to checks
-    for (int i = 0; i < FT8_M; ++i) {
+    for (int i = 0; i < ft8::M; ++i) {
         for (int j = 0; j < kNrw[i]; ++j) {
             toc[i][j] = codeword[kNm[i][j] - 1];
         }
     }
 
-    for (int i = 0; i < FT8_N; ++i) {
+    for (int i = 0; i < ft8::N; ++i) {
         for (int j = 0; j < 3; ++j) {
             tov[i][j] = 0;
         }
     }
 
     for (int iter = 0; iter < max_iters; ++iter) {
-        float   zn[FT8_N];
+        float   zn[ft8::N];
 
         // Update bit log likelihood ratios (tov=0 in iter 0)
-        for (int i = 0; i < FT8_N; ++i) {
+        for (int i = 0; i < ft8::N; ++i) {
             zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
             plain[i] = (zn[i] > 0) ? 1 : 0;
         }
@@ -175,7 +177,7 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
         }
 
         // Send messages from bits to check nodes 
-        for (int i = 0; i < FT8_M; ++i) {
+        for (int i = 0; i < ft8::M; ++i) {
             for (int j = 0; j < kNrw[i]; ++j) {
                 int ibj = kNm[i][j] - 1;
                 toc[i][j] = zn[ibj];
@@ -189,13 +191,13 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
         }
         
         // send messages from check nodes to variable nodes
-        for (int i = 0; i < FT8_M; ++i) {
+        for (int i = 0; i < ft8::M; ++i) {
             for (int j = 0; j < kNrw[i]; ++j) {
                 toc[i][j] = fast_tanh(-toc[i][j] / 2);
             }
         }
 
-        for (int i = 0; i < FT8_N; ++i) {
+        for (int i = 0; i < ft8::N; ++i) {
             for (int j = 0; j < 3; ++j) {
                 int ichk = kMn[i][j] - 1; // kMn(:,j) are the checks that include bit j
                 float Tmn = 1.0f;
@@ -219,7 +221,7 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
 
 // thank you Douglas Bagnall
 // https://math.stackexchange.com/a/446411
-float fast_tanh(float x) {
+static float fast_tanh(float x) {
     if (x < -4.97f) {
         return -1.0f;
     }
@@ -237,7 +239,7 @@ float fast_tanh(float x) {
 }
 
 
-float fast_atanh(float x) {
+static float fast_atanh(float x) {
     float x2 = x * x;
     //float a = x * (-15015.0f + x2 * (19250.0f + x2 * (-5943.0f + x2 * 256.0f)));
     //float b = (-15015.0f + x2 * (24255.0f + x2 * (-11025.0f + x2 * 1225.0f)));
@@ -249,7 +251,7 @@ float fast_atanh(float x) {
 }
 
 
-float pltanh(float x) {
+static float pltanh(float x) {
     float isign = +1;
     if (x < 0) {
         isign = -1;
@@ -271,7 +273,7 @@ float pltanh(float x) {
 }
 
 
-float platanh(float x) {
+static float platanh(float x) {
     float isign = +1;
     if (x < 0) {
         isign = -1;
@@ -291,3 +293,5 @@ float platanh(float x) {
     }
     return isign * 7.0f;
 }
+
+} // namespace

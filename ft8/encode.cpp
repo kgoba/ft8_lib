@@ -1,9 +1,9 @@
-#include "encode_v2.h"
+#include "encode.h"
 #include "constants.h"
 
 #include <stdio.h>
 
-namespace ft8_v2 {
+namespace ft8 {
 
 
 // Returns 1 if an odd number of bits are set in x, zero otherwise
@@ -31,26 +31,26 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     // codeword(K+1:N)=pchecks
 
     // printf("Encode ");
-    // for (int i = 0; i < FT8_K_BYTES; ++i) {
+    // for (int i = 0; i < ft8::K_BYTES; ++i) {
     //     printf("%02x ", message[i]);
     // }
     // printf("\n");
 
     // Fill the codeword with message and zeros, as we will only update binary ones later
-    for (int j = 0; j < (7 + FT8_N) / 8; ++j) {
-        codeword[j] = (j < FT8_K_BYTES) ? message[j] : 0;
+    for (int j = 0; j < (7 + ft8::N) / 8; ++j) {
+        codeword[j] = (j < ft8::K_BYTES) ? message[j] : 0;
     }
 
-    uint8_t col_mask = (0x80 >> (FT8_K % 8));   // bitmask of current byte
-    uint8_t col_idx = FT8_K_BYTES - 1;          // index into byte array
+    uint8_t col_mask = (0x80 >> (ft8::K % 8));   // bitmask of current byte
+    uint8_t col_idx = ft8::K_BYTES - 1;          // index into byte array
 
-    // Compute the first part of itmp (1:FT8_M) and store the result in codeword
-    for (int i = 0; i < FT8_M; ++i) { // do i=1,FT8_M
+    // Compute the first part of itmp (1:ft8::M) and store the result in codeword
+    for (int i = 0; i < ft8::M; ++i) { // do i=1,ft8::M
         // Fast implementation of bitwise multiplication and parity checking
         // Normally nsum would contain the result of dot product between message and kGenerator[i], 
         // but we only compute the sum modulo 2.
         uint8_t nsum = 0;
-        for (int j = 0; j < FT8_K_BYTES; ++j) {
+        for (int j = 0; j < ft8::K_BYTES; ++j) {
             uint8_t bits = message[j] & kGenerator[i][j];    // bitwise AND (bitwise multiplication)
             nsum ^= parity8(bits);                  // bitwise XOR (addition modulo 2)
         }
@@ -67,7 +67,7 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
     }
 
     // printf("Result ");
-    // for (int i = 0; i < (FT8_N + 7) / 8; ++i) {
+    // for (int i = 0; i < (ft8::N + 7) / 8; ++i) {
     //     printf("%02x ", codeword[i]);
     // }
     // printf("\n");
@@ -77,7 +77,7 @@ void encode174(const uint8_t *message, uint8_t *codeword) {
 // Compute 14-bit CRC for a sequence of given number of bits
 // [IN] message  - byte sequence (MSB first)
 // [IN] num_bits - number of bits in the sequence
-uint16_t ft8_crc(uint8_t *message, int num_bits) {
+uint16_t crc(uint8_t *message, int num_bits) {
     // Adapted from https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
     constexpr uint16_t  TOPBIT = (1 << (CRC_WIDTH - 1));
 
@@ -127,7 +127,7 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
     a91[11] = 0;
 
     // Calculate CRC of 12 bytes = 96 bits, see WSJT-X code
-    uint16_t checksum = ft8_crc(a91, 96 - 14);
+    uint16_t checksum = ft8::crc(a91, 96 - 14);
 
     // Store the CRC at the end of 77 bit message
     a91[9] |= (uint8_t)(checksum >> 11);
@@ -149,7 +149,7 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
 
     uint8_t mask = 0x80;
     int i_byte = 0;
-    for (int j = 0; j < FT8_ND; ++j) { // do j=1,FT8_ND
+    for (int j = 0; j < ft8::ND; ++j) { // do j=1,ft8::ND
         if (j == 29) {
             k += 7;     // Skip over the second set of Costas symbols
         }
@@ -169,4 +169,4 @@ void genft8(const uint8_t *payload, uint8_t *itone) {
     }
 }
 
-};  // ft8_v2
+}  // namespace

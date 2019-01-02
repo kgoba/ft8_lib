@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-namespace ft8_v2 {
+namespace ft8 {
 
     // Generate FT8 tone sequence from payload data
     // [IN] payload - 9 byte array consisting of 72 bit payload
@@ -25,5 +25,5 @@ namespace ft8_v2 {
     // Compute 14-bit CRC for a sequence of given number of bits
     // [IN] message  - byte sequence (MSB first)
     // [IN] num_bits - number of bits in the sequence
-    uint16_t ft8_crc(uint8_t *message, int num_bits);
+    uint16_t crc(uint8_t *message, int num_bits);
 };

@@ -3,11 +3,11 @@
 #include <cstdio>
 #include <cmath>
 
-#include "ft8/unpack_v2.h"
+#include "ft8/unpack.h"
 #include "ft8/ldpc.h"
 #include "ft8/decode.h"
 #include "ft8/constants.h"
-#include "ft8/encode_v2.h"
+#include "ft8/encode.h"
 
 #include "common/wave.h"
 #include "common/debug.h"
@@ -136,7 +136,7 @@ void normalize_signal(float *signal, int num_samples) {
 
 
 void print_tones(const uint8_t *code_map, const float *log174) {
-    for (int k = 0; k < 3 * FT8_ND; k += 3) {
+    for (int k = 0; k < ft8::N; k += 3) {
         uint8_t max = 0;
         if (log174[k + 0] > 0) max |= 4;
         if (log174[k + 1] > 0) max |= 2;
@@ -180,8 +180,8 @@ int main(int argc, char **argv) {
     extract_power(signal, num_blocks, num_bins, power);
 
     // Find top candidates by Costas sync score and localize them in time and frequency
-    Candidate candidate_list[kMax_candidates];
-    int num_candidates = find_sync(power, num_blocks, num_bins, kCostas_map, kMax_candidates, candidate_list);
+    ft8::Candidate candidate_list[kMax_candidates];
+    int num_candidates = ft8::find_sync(power, num_blocks, num_bins, ft8::kCostas_map, kMax_candidates, candidate_list);
 
     // TODO: sort the candidates by strongest sync first?
 
@@ -189,17 +189,17 @@ int main(int argc, char **argv) {
     char    decoded[kMax_decoded_messages][kMax_message_length];
     int     num_decoded = 0;
     for (int idx = 0; idx < num_candidates; ++idx) {
-        Candidate &cand = candidate_list[idx];
+        ft8::Candidate &cand = candidate_list[idx];
         float freq_hz  = (cand.freq_offset + cand.freq_sub / 2.0f) * fsk_dev;
         float time_sec = (cand.time_offset + cand.time_sub / 2.0f) / fsk_dev;
 
-        float   log174[FT8_N];
-        extract_likelihood(power, num_bins, cand, kGray_map, log174);
+        float   log174[ft8::N];
+        ft8::extract_likelihood(power, num_bins, cand, ft8::kGray_map, log174);
 
         // bp_decode() produces better decodes, uses way less memory
-        uint8_t plain[FT8_N];
+        uint8_t plain[ft8::N];
         int     n_errors = 0;
-        bp_decode(log174, kLDPC_iterations, plain, &n_errors);
+        ft8::bp_decode(log174, kLDPC_iterations, plain, &n_errors);
         //ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
 
         if (n_errors > 0) {
@@ -207,23 +207,23 @@ int main(int argc, char **argv) {
             continue;
         }
         
-        // Extract payload + CRC (first FT8_K bits)
-        uint8_t a91[FT8_K_BYTES];
-        pack_bits(plain, FT8_K, a91);
+        // Extract payload + CRC (first ft8::K bits)
+        uint8_t a91[ft8::K_BYTES];
+        ft8::pack_bits(plain, ft8::K, a91);
 
         // Extract CRC and check it
         uint16_t chksum = ((a91[9] & 0x07) << 11) | (a91[10] << 3) | (a91[11] >> 5);
         a91[9] &= 0xF8;
         a91[10] = 0;
         a91[11] = 0;
-        uint16_t chksum2 = ft8_v2::ft8_crc(a91, 96 - 14);
+        uint16_t chksum2 = ft8::crc(a91, 96 - 14);
         if (chksum != chksum2) {
             LOG(LOG_DEBUG, "Checksum: message = %04x, CRC = %04x\n", chksum, chksum2);
             continue;
         }
 
         char message[kMax_message_length];
-        unpack77(a91, message);
+        ft8::unpack77(a91, message);
 
         // Check for duplicate messages (TODO: use hashing)
         bool found = false;

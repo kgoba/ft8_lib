@@ -1,4 +1,4 @@
-#include "pack_v2.h"
+#include "pack.h"
 
 #include "text.h"
 
@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 
-namespace ft8_v2 {
+namespace ft8 {
 
 // TODO: This is wasteful, should figure out something more elegant
 const char A0[] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";

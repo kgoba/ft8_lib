@@ -1,7 +1,9 @@
-#include "unpack_v2.h"
+#include "unpack.h"
 #include "text.h"
 
 #include <string.h>
+
+namespace ft8 {
 
 //const uint32_t NBASE = 37L*36L*10L*27L*27L*27L;
 const uint32_t MAX22    = 4194304L;
@@ -327,3 +329,5 @@ int unpack77(const uint8_t *a77, char *message) {
 
     return 0;
 }
+
+} // namespace

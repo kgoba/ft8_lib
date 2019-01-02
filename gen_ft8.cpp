@@ -6,8 +6,8 @@
 #include "common/wave.h"
 //#include "ft8/v1/pack.h"
 //#include "ft8/v1/encode.h"
-#include "ft8/pack_v2.h"
-#include "ft8/encode_v2.h"
+#include "ft8/pack.h"
+#include "ft8/encode.h"
 #include "ft8/constants.h"
 
 // Convert a sequence of symbols (tones) into a sinewave of continuous phase (FSK).
@@ -57,9 +57,9 @@ int main(int argc, char **argv) {
     const char *wav_path = argv[2];
 
     // First, pack the text data into binary message
-    uint8_t packed[10];
+    uint8_t packed[ft8::K_BYTES];
     //int rc = packmsg(message, packed);
-    int rc = ft8_v2::pack77(message, packed);
+    int rc = ft8::pack77(message, packed);
     if (rc < 0) {
         printf("Cannot parse message!\n");
         printf("RC = %d\n", rc);
@@ -73,12 +73,12 @@ int main(int argc, char **argv) {
     printf("\n");
 
     // Second, encode the binary message as a sequence of FSK tones
-    uint8_t tones[FT8_NN];          // FT8_NN = 79, lack of better name at the moment
+    uint8_t tones[ft8::NN];          // FT8_NN = 79, lack of better name at the moment
     //genft8(packed, 0, tones);
-    ft8_v2::genft8(packed, tones);
+    ft8::genft8(packed, tones);
 
     printf("FSK tones: ");
-    for (int j = 0; j < FT8_NN; ++j) {
+    for (int j = 0; j < ft8::NN; ++j) {
         printf("%d", tones[j]);
     }
     printf("\n");
@@ -86,14 +86,14 @@ int main(int argc, char **argv) {
     // Third, convert the FSK tones into an audio signal
     const int sample_rate = 12000;
     const float symbol_rate = 6.25f;
-    const int num_samples = (int)(0.5f + FT8_NN / symbol_rate * sample_rate);
+    const int num_samples = (int)(0.5f + ft8::NN / symbol_rate * sample_rate);
     const int num_silence = (15 * sample_rate - num_samples) / 2;
     float signal[num_silence + num_samples + num_silence];
     for (int i = 0; i < num_silence + num_samples + num_silence; i++) {
         signal[i] = 0;
     }
 
-    synth_fsk(tones, FT8_NN, 1000, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
+    synth_fsk(tones, ft8::NN, 1000, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
     save_wav(signal, num_silence + num_samples + num_silence, sample_rate, wav_path);
 
     return 0;

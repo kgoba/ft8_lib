@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+namespace ft8 {
+
 // Utility functions for characters and strings
 
 char to_upper(char c) {
@@ -115,3 +117,5 @@ void int_to_dd(char *str, int value, int width, bool full_sign) {
     }
     *str = 0;   // Add zero terminator
 }
+
+} // namespace

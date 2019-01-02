@@ -4,13 +4,14 @@
 
 #include "constants.h"
 
+namespace ft8 {
+
 static float max2(float a, float b);
 static float max4(float a, float b, float c, float d);
 static void heapify_down(Candidate *heap, int heap_size);
 static void heapify_up(Candidate *heap, int heap_size);
 static void decode_symbol(const uint8_t *power, const uint8_t *code_map, int bit_idx, float *log174);
 static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms, const uint8_t *code_map, int bit_idx, float *log174);
-
 
 // Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
@@ -21,7 +22,7 @@ int find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t 
     // I.e. we can afford to skip the first 7 or the last 7 Costas symbols, as long as we track how many
     // sync symbols we included in the score, so the score is averaged.
     for (int alt = 0; alt < 4; ++alt) {
-        for (int time_offset = -7; time_offset < num_blocks - FT8_NN + 7; ++time_offset) {
+        for (int time_offset = -7; time_offset < num_blocks - ft8::NN + 7; ++time_offset) {
             for (int freq_offset = 0; freq_offset < num_bins - 8; ++freq_offset) {
                 int score = 0;
 
@@ -89,8 +90,8 @@ void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & ca
     const int n_syms = 1;
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);
-    for (int k = 0; k < FT8_ND; k += n_syms) {
-        int sym_idx = (k < FT8_ND / 2) ? (k + 7) : (k + 14);
+    for (int k = 0; k < ft8::ND; k += n_syms) {
+        int sym_idx = (k < ft8::ND / 2) ? (k + 7) : (k + 14);
         int bit_idx = 3 * k;
 
         // Pointer to 8 bins of the current symbol
@@ -102,8 +103,8 @@ void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & ca
     // Compute the variance of log174
     float sum   = 0;
     float sum2  = 0;
-    float inv_n = 1.0f / FT8_N;
-    for (int i = 0; i < FT8_N; ++i) {
+    float inv_n = 1.0f / ft8::N;
+    for (int i = 0; i < ft8::N; ++i) {
         sum  += log174[i];
         sum2 += log174[i] * log174[i];
     }
@@ -112,7 +113,7 @@ void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & ca
     // Normalize log174 such that sigma = 2.83 (Why? It's in WSJT-X, ft8b.f90)
     // Seems to be 2.83 = sqrt(8). Experimentally sqrt(16) works better.
     float norm_factor = sqrtf(16.0f / variance);
-    for (int i = 0; i < FT8_N; ++i) {
+    for (int i = 0; i < ft8::N; ++i) {
         log174[i] *= norm_factor;
     }
 }
@@ -222,7 +223,7 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
     // Extract bit significance (and convert them to float)
     // 8 FSK tones = 3 bits
     for (int i = 0; i < n_bits; ++i) {
-        if (bit_idx + i >= FT8_N) {
+        if (bit_idx + i >= ft8::N) {
             // Respect array size
             break;
         }
@@ -241,3 +242,5 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
         log174[bit_idx + i] = max_one - max_zero;
     }    
 }
+
+} // namespace
