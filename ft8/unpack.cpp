@@ -285,7 +285,8 @@ int unpack_telemetry(const uint8_t *a71, char *telemetry) {
 int unpack77(const uint8_t *a77, char *message) {
     uint8_t  n3, i3;
 
-    n3 = (a77[9] >> 6) & 0x07;
+    // Extract n3 (bits 71..73) and i3 (bits 74..76)
+    n3 = ((a77[8] << 2) & 0x04) | ((a77[9] >> 6) & 0x03);
     i3 = (a77[9] >> 3) & 0x07;
 
     if (i3 == 0 && n3 == 0) {

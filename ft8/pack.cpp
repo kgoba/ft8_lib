@@ -223,7 +223,7 @@ int pack77_1(const char *msg, uint8_t *b77) {
 }
 
 
-void packtext77(const char *text, uint8_t *b71) {
+void packtext77(const char *text, uint8_t *b77) {
     int length = strlen(text);
 
     // Skip leading and trailing spaces
@@ -235,20 +235,23 @@ void packtext77(const char *text, uint8_t *b71) {
         --length;
     }
 
+    // Clear the first 72 bits representing a long number
     for (int i = 0; i < 9; ++i) {
-        b71[i] = 0;
+        b77[i] = 0;
     }
 
+    // Now express the text as base-42 number stored 
+    // in the first 72 bits of b77
     for (int j = 0; j < 13; ++j) {
-        // Multiply the long integer in b71 by 42
+        // Multiply the long integer in b77 by 42
         uint16_t x = 0;
         for (int i = 8; i >= 0; --i) {
-            x += b71[i] * (uint16_t)42;
-            b71[i] = (x & 0xFF);
+            x += b77[i] * (uint16_t)42;
+            b77[i] = (x & 0xFF);
             x >>= 8;
         }
 
-        // Add index of the current char
+        // Get the index of the current char
         if (j < length) {
             int q = char_index(A0, text[j]);
             x = (q > 0) ? q : 0;
@@ -256,21 +259,30 @@ void packtext77(const char *text, uint8_t *b71) {
         else {
             x = 0;
         }
+        // Here we double each added number in order to have the result multiplied
+        // by two as well, so that it's a 71 bit number left-aligned in 72 bits (9 bytes)
+        x <<= 1;
+
+        // Now add the number to our long number
         for (int i = 8; i >= 0; --i) {
             if (x == 0) break;
-            x += b71[i];
-            b71[i] = (x & 0xFF);
+            x += b77[i];
+            b77[i] = (x & 0xFF);
             x >>= 8;
         }
     }
+
+    // Set n3=0 (bits 71..73) and i3=0 (bits 74..76)
+    b77[8] &= 0xFE;
+    b77[9] &= 0x00;
 }
 
 
 int pack77(const char *msg, uint8_t *c77) {
     // Check Type 1 (Standard 77-bit message) or Type 2, with optional "/P"
-    //if (starts_with(msg, "CQ ")) {
-    return pack77_1(msg, c77);
-    //}
+    if (0 == pack77_1(msg, c77)) {
+        return 0;
+    }
 
     // TODO:
     // Check 0.5 (telemetry)
@@ -281,8 +293,8 @@ int pack77(const char *msg, uint8_t *c77) {
 
     // Default to free text
     // i3=0 n3=0
-    // packtext77(msg(1:13),c77(1:71))
-    // write(c77(72:77),'(2b3.3)') n3,i3
+    packtext77(msg, c77);
+    return 0;
 }
 
 };  // namespace
