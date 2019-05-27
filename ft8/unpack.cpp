@@ -2,6 +2,7 @@
 #include "text.h"
 
 #include <string.h>
+#include "ft8/hashcall.h"
 
 namespace ft8 {
 
@@ -335,23 +336,23 @@ int unpack_nonestandard(const uint8_t *a77, uint8_t i3, char *message)
 	n58 /= 38;
 	c11[0] = charn(n58 % 38, 0);
 
-	//StrTrim(c11);
+	StrTrim(c11);
 
 	char call_3[15];
 	char *call_1, *call_2;
-	//hash12(n12, call_3);
+	hash12(n12, call_3);
 
 	if (iflip == 0)
 	{
 		call_1 = call_3;
 		call_2 = c11;
-		//save_hash_call(call_2);
+		save_hash_call(call_2);
 	}
 	else
 	{
 		call_1 = c11;
 		call_2 = call_3;
-		//save_hash_call(call_1);
+		save_hash_call(call_1);
 	}
 
 	if (icq == 0)
