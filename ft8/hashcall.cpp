@@ -34,11 +34,9 @@ uint32_t ihashcall(char *c0, int m)
     {
         int j = char_index(A0, c0[i]);
         n8 = 38 * n8 + j;
-	//printf("n8: %lld \n", n8);
     }
 
     uint64_t rst = (uint64_t(47055833459ll * n8) >> (64-m));
-    //printf("result: %lld \n", rst);
     return rst;
 }
 
@@ -108,17 +106,12 @@ void save_hash_call(char *c13)
             break;
         else 
             cw[writeIndex++] = c13[i];
-        //printf("writeIndex : %d \n", writeIndex);
     }	//end of for
 
     while (writeIndex < 13)
         cw[writeIndex++] = ' ';
 
-    //cw[12] = 0;
-    //printf("CW : %s \n", cw);
-
     uint32_t n10 = ihashcall(cw, 10);
-    printf("N10: %u \n", n10);
     if(n10 >= 1 && n10 <= 1024 && (strcmp(cw,mycall13) != 0))
     {
     	//strcpy(calls10[n10], cw);
@@ -141,7 +134,7 @@ void save_hash_call(char *c13)
 	if (CALL10_Cnt < CALL10_MAX)
 		CALL10_Cnt++;
 
-        printf("Saved 10; %d, %d \n", CALL10_Cnt, n10);
+        //printf("Saved 10; %d, %d \n", CALL10_Cnt, n10);
     }	// end of if
 
     uint32_t n12 = ihashcall(cw, 12);
@@ -166,7 +159,7 @@ void save_hash_call(char *c13)
 	if (CALL12_Cnt < CALL12_MAX)
 		CALL12_Cnt++;
 
-        printf("Saved 12; %d, %d \n", CALL12_Cnt, n12);
+        //printf("Saved 12; %d, %d \n", CALL12_Cnt, n12);
     }	// end of if
 
 
@@ -192,7 +185,7 @@ void save_hash_call(char *c13)
 	if (CALL22_Cnt < CALL22_MAX)
 		CALL22_Cnt++;
 
-        printf("Saved 22; %d, %u \n", CALL22_Cnt, n22);
+        //printf("Saved 22; %d, %u \n", CALL22_Cnt, n22);
     }	// end of if
 }
 
@@ -247,15 +240,7 @@ void hash12(uint32_t n12, char * c13)
         StrTrim(tmpCallsign);
 	strcat(c13, tmpCallsign);
 	strcat(c13, ">");
-    }
-    /*
-    if (strlen(calls12[n12]) > 0)
-    {
-        strcpy(c13, "<");
-	strcat(c13, calls12[n12]);
-	strcat(c13, ">");
-    }
-    */
+    } 
 }
 
 
@@ -273,5 +258,4 @@ void hash22(uint32_t n22, char * c13)
 	strcat(c13, ">");
     }
 }
-
 
