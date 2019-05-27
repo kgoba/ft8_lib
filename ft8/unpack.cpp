@@ -282,6 +282,100 @@ int unpack_telemetry(const uint8_t *a71, char *telemetry) {
 }
 
 
+//none standard for wsjt-x 2.0
+//by KD8CEC
+int unpack_nonestandard(const uint8_t *a77, uint8_t i3, char *message) 
+{
+/*
+	wsjt-x 2.1.0 rc5
+     	read(c77,1050) n12,n58,iflip,nrpt,icq
+	1050 format(b12,b58,b1,b2,b1)
+*/
+	uint32_t n12, iflip, nrpt, icq;
+	uint64_t n58;
+	n12 = (a77[0] << 4);   //11 ~4  : 8
+	n12 |= (a77[1] >> 4);  //3~0 : 12
+
+	n58 = ((uint64_t)(a77[1] & 0x0F) << 54); //57 ~ 54 : 4
+	n58 |= ((uint64_t)a77[2] << 46); //53 ~ 46 : 12
+	n58 |= ((uint64_t)a77[3] << 38); //45 ~ 38 : 12
+	n58 |= ((uint64_t)a77[4] << 30); //37 ~ 30 : 12
+	n58 |= ((uint64_t)a77[5] << 22); //29 ~ 22 : 12
+	n58 |= ((uint64_t)a77[6] << 14); //21 ~ 14 : 12
+	n58 |= ((uint64_t)a77[7] << 6);  //13 ~ 6 : 12
+	n58 |= ((uint64_t)a77[8] >> 2);  //5 ~ 0 : 765432 10
+
+	iflip = (a77[8] >> 1) & 0x01;	//76543210
+	nrpt  = ((a77[8] & 0x01) << 1);
+	nrpt  |= (a77[9] >> 7);	//76543210
+	icq   = ((a77[9] >> 6) & 0x01);
+
+	char c11[12];
+	c11[11] = '\0';
+
+	c11[10] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[9] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[8] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[7] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[6] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[5] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[4] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[3] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[2] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[1] = charn(n58 % 38, 0);
+	n58 /= 38;
+	c11[0] = charn(n58 % 38, 0);
+
+	//StrTrim(c11);
+
+	char call_3[15];
+	char *call_1, *call_2;
+	//hash12(n12, call_3);
+
+	if (iflip == 0)
+	{
+		call_1 = call_3;
+		call_2 = c11;
+		//save_hash_call(call_2);
+	}
+	else
+	{
+		call_1 = c11;
+		call_2 = call_3;
+		//save_hash_call(call_1);
+	}
+
+	if (icq == 0)
+	{
+		strcpy(message, call_1);
+		strcat(message, " ");
+		strcat(message, call_1);
+		if (nrpt == 1)
+			strcat(message, " RRR");
+		else if (nrpt == 2)
+			strcat(message, " RR73");
+		else if (nrpt == 3)
+			strcat(message, " 73");
+
+	}
+	else
+	{
+		strcpy(message, "CQ ");
+		strcat(message, c11);
+	}
+
+    return 0;
+}
+
 int unpack77(const uint8_t *a77, char *message) {
     uint8_t  n3, i3;
 
@@ -314,15 +408,12 @@ int unpack77(const uint8_t *a77, char *message) {
     // else if (i3 == 3) {
     //     // Type 3: ARRL RTTY Contest
     // }
-    // else if (i3 == 4) {
+    else if (i3 == 4) {
     //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
     //     // One hashed call or "CQ"; one compound or nonstandard call with up
     //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
-
-    //     // TODO: implement
-    //     // read(c77,1050) n12,n58,iflip,nrpt,icq
-    //     // 1050 format(b12,b58,b1,b2,b1)
-    // }
+	return unpack_nonestandard(a77, i3, message);
+    }
     else {
         // unknown type
         message[0] = '\0';
