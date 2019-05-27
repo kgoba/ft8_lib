@@ -11,14 +11,6 @@ const uint32_t MAX22    = 4194304L;
 const uint32_t NTOKENS  = 2063592L;
 const uint16_t MAXGRID4 = 32400L;
 
-
-// convert integer index to ASCII character according to one of 5 tables:
-// table 0: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?"
-// table 1: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 2: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 3: "0123456789"
-// table 4: " ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 5: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
 // convert integer index to ASCII character according to one of 5 tables:
 // table 0: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?"
 // table 1: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
