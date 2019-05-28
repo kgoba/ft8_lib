@@ -2,6 +2,7 @@
 #include "text.h"
 
 #include <string.h>
+#include "ft8/hashcall.h"
 
 namespace ft8 {
 
@@ -10,15 +11,15 @@ const uint32_t MAX22    = 4194304L;
 const uint32_t NTOKENS  = 2063592L;
 const uint16_t MAXGRID4 = 32400L;
 
-
 // convert integer index to ASCII character according to one of 5 tables:
 // table 0: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?"
 // table 1: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 // table 2: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 // table 3: "0123456789"
 // table 4: " ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// table 5: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
 char charn(int c, int table_idx) {
-    if (table_idx == 0 || table_idx == 1 || table_idx == 4) {
+    if (table_idx == 0 || table_idx == 1 || table_idx == 4 || table_idx == 5 ) {
         if (c == 0) return ' ';
         c -= 1;
     }
@@ -32,6 +33,9 @@ char charn(int c, int table_idx) {
     }
     if (table_idx == 0) {
         if (c < 5) return "+-./?" [c];
+    }
+    else if (table_idx == 5 && c == 0) {
+        return '/';
     }
 
     return '_'; // unknown character, should never get here
@@ -86,10 +90,10 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
     n28 = n28 - NTOKENS;
     if (n28 < MAX22) {
         // This is a 22-bit hash of a result
-        //n22=n28
-        //call hash22(n22,c13)     !Retrieve result from hash table
-        // TODO: implement
-        return -2;
+      	int n22 = n28;
+      	hash22(n22, result);	//     !Retrieve result from hash table
+        //printf("N22 %d, RESULT : %s", n22, result);
+        return 0;
     }
 
     // Standard callsign
@@ -335,30 +339,30 @@ int unpack_nonestandard(const uint8_t *a77, uint8_t i3, char *message)
 	n58 /= 38;
 	c11[0] = charn(n58 % 38, 0);
 
-	//StrTrim(c11);
+	StrTrim(c11);
 
 	char call_3[15];
 	char *call_1, *call_2;
-	//hash12(n12, call_3);
+	hash12(n12, call_3);
 
 	if (iflip == 0)
 	{
 		call_1 = call_3;
 		call_2 = c11;
-		//save_hash_call(call_2);
+		save_hash_call(call_2);
 	}
 	else
 	{
 		call_1 = c11;
 		call_2 = call_3;
-		//save_hash_call(call_1);
+		save_hash_call(call_1);
 	}
 
 	if (icq == 0)
 	{
 		strcpy(message, call_1);
 		strcat(message, " ");
-		strcat(message, call_1);
+		strcat(message, call_2);
 		if (nrpt == 1)
 			strcat(message, " RRR");
 		else if (nrpt == 2)
