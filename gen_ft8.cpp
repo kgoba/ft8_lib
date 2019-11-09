@@ -55,9 +55,9 @@ int main(int argc, char **argv) {
 
     const char *message = argv[1];
     const char *wav_path = argv[2];
-    int frequency = 1000;
+    float frequency = 1000.0;
     if (argc > 3) {
-       frequency = atoi(argv[3]);
+       frequency = atof(argv[3]);
     }
 
     // First, pack the text data into binary message
