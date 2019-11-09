@@ -11,33 +11,6 @@ const uint32_t NTOKENS  = 2063592L;
 const uint16_t MAXGRID4 = 32400L;
 
 
-// convert integer index to ASCII character according to one of 5 tables:
-// table 0: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?"
-// table 1: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 2: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 3: "0123456789"
-// table 4: " ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-char charn(int c, int table_idx) {
-    if (table_idx == 0 || table_idx == 1 || table_idx == 4) {
-        if (c == 0) return ' ';
-        c -= 1;
-    }
-    if (table_idx != 4) {
-        if (c < 10) return '0' + c;
-        c -= 10;
-    }
-    if (table_idx != 3) {
-        if (c < 26) return 'A' + c;
-        c -= 26;
-    }
-    if (table_idx == 0) {
-        if (c < 5) return "+-./?" [c];
-    }
-
-    return '_'; // unknown character, should never get here
-}
-
-
 // n28 is a 28-bit integer, e.g. n28a or n28b, containing all the
 // call sign bits from a packed message.
 int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
@@ -61,22 +34,14 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
             char aaaa[5];
 
             aaaa[4] = '\0';
-            aaaa[3] = charn(n % 27, 4);
-            n /= 27;
-            aaaa[2] = charn(n % 27, 4);
-            n /= 27;
-            aaaa[1] = charn(n % 27, 4);
-            n /= 27;
-            aaaa[0] = charn(n % 27, 4);
-
-            // Skip leading whitespace
-            int ws_len = 0;
-            while (aaaa[ws_len] == ' ') {
-                ws_len++;
+            for (int i = 3; /* */; --i) {
+                aaaa[i] = charn(n % 27, 4);
+                if (i == 0) break;
+                n /= 27;
             }
 
             strcpy(result, "CQ ");
-            strcat(result, aaaa + ws_len);
+            strcat(result, trim_front(aaaa));
             return 0;   // Success
         }
         // ? TODO: unspecified in the WSJT-X code
@@ -110,16 +75,7 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
     callsign[0] = charn(n % 37, 1);
 
     // Skip trailing and leading whitespace in case of a short callsign
-    int ws_len = 0;
-    while (ws_len <= 5 && callsign[5 - ws_len] == ' ') {
-        callsign[5 - ws_len] = '\0';
-        ws_len++;
-    }
-    ws_len = 0;
-    while (callsign[ws_len] == ' ') {
-        ws_len++;
-    }
-    strcpy(result, callsign + ws_len);
+    strcpy(result, trim(callsign));
 
     // Check if we should append /R or /P suffix
     if (ip) {
@@ -176,12 +132,12 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *message) {
     strcat(message, field_2);
 
     // TODO: add to recent calls
-    if (field_1[0] != '<' && strlen(field_1) >= 4) {
-        // add_call_to_recent_calls(field_1)
-    }
-    if (field_2[0] != '<' && strlen(field_2) >= 4) {
-        // add_call_to_recent_calls(field_2)
-    }
+    // if (field_1[0] != '<' && strlen(field_1) >= 4) {
+    //     save_hash_call(field_1)
+    // }
+    // if (field_2[0] != '<' && strlen(field_2) >= 4) {
+    //     save_hash_call(field_2)
+    // }
 
     char field_3[5];
     if (igrid4 <= MAXGRID4) {
@@ -237,14 +193,16 @@ int unpack_text(const uint8_t *a71, char *text) {
     // TODO: test
     uint8_t b71[9];
 
+    uint8_t carry = 0;
     for (int i = 0; i < 9; ++i) {
-        b71[i] = a71[i];
+        b71[i] = carry | (a71[i] >> 1);
+        carry = (a71[i] & 1) ? 0x80 : 0;
     }
 
-    for (int idx = 0; idx < 13; ++idx) {
+    for (int idx = 12; idx >= 0; --idx) {
         // Divide the long integer in b71 by 42
         uint16_t rem = 0;
-        for (int i = 8; i >= 0; --i) {
+        for (int i = 0; i < 9; ++i) {
             rem = (rem << 8) | b71[i];
             b71[i] = rem / 42;
             rem    = rem % 42;
@@ -284,7 +242,7 @@ int unpack_telemetry(const uint8_t *a71, char *telemetry) {
 
 //none standard for wsjt-x 2.0
 //by KD8CEC
-int unpack_nonestandard(const uint8_t *a77, uint8_t i3, char *message) 
+int unpack_nonstandard(const uint8_t *a77, char *message) 
 {
 /*
 	wsjt-x 2.1.0 rc5
@@ -313,52 +271,26 @@ int unpack_nonestandard(const uint8_t *a77, uint8_t i3, char *message)
 	char c11[12];
 	c11[11] = '\0';
 
-	c11[10] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[9] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[8] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[7] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[6] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[5] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[4] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[3] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[2] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[1] = charn(n58 % 38, 0);
-	n58 /= 38;
-	c11[0] = charn(n58 % 38, 0);
-
-	//StrTrim(c11);
+    for (int i = 10; /* no condition */ ; --i) {
+    	c11[i] = charn(n58 % 38, 5);
+        if (i == 0) break;
+    	n58 /= 38;        
+    }
 
 	char call_3[15];
-	char *call_1, *call_2;
+    call_3[0] = '<';
+    call_3[1] = '>';
+    call_3[2] = '\0';
 	//hash12(n12, call_3);
 
-	if (iflip == 0)
-	{
-		call_1 = call_3;
-		call_2 = c11;
-		//save_hash_call(call_2);
-	}
-	else
-	{
-		call_1 = c11;
-		call_2 = call_3;
-		//save_hash_call(call_1);
-	}
+	char * call_1 = (iflip) ? c11 : call_3;
+    char * call_2 = (iflip) ? call_3 : c11;
+	//save_hash_call(c11_trimmed);
 
-	if (icq == 0)
-	{
-		strcpy(message, call_1);
+	if (icq == 0) {
+		strcpy(message, trim(call_1));
 		strcat(message, " ");
-		strcat(message, call_1);
+		strcat(message, trim(call_2));
 		if (nrpt == 1)
 			strcat(message, " RRR");
 		else if (nrpt == 2)
@@ -366,11 +298,9 @@ int unpack_nonestandard(const uint8_t *a77, uint8_t i3, char *message)
 		else if (nrpt == 3)
 			strcat(message, " 73");
 
-	}
-	else
-	{
+	} else {
 		strcpy(message, "CQ ");
-		strcat(message, c11);
+		strcat(message, trim(call_2));
 	}
 
     return 0;
@@ -412,13 +342,14 @@ int unpack77(const uint8_t *a77, char *message) {
     //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
     //     // One hashed call or "CQ"; one compound or nonstandard call with up
     //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
-	return unpack_nonestandard(a77, i3, message);
+	    return unpack_nonstandard(a77, message);
     }
-    else {
-        // unknown type
-        message[0] = '\0';
-    }
+    // else if (i3 == 5) {
+    //     // Type 5: TU; W9XYZ K1ABC R-09 FN             1 28 28 1 7 9       74   WWROF contest
+    // }
 
+    // unknown type, should never get here
+    message[0] = '\0';
     return 0;
 }
 

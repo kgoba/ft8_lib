@@ -1,6 +1,11 @@
 #pragma once
 
 namespace ft8 {
+    // Utility functions for characters and strings
+
+    const char * trim_front(const char *str);
+    void trim_back(char *str);
+    char * trim(char *str);
 
     char to_upper(char c);
     bool is_digit(char c);
@@ -23,4 +28,6 @@ namespace ft8 {
     // Convert a 2 digit integer to string
     void int_to_dd(char *str, int value, int width, bool full_sign = false);
 
+    char charn(int c, int table_idx);
+    int nchar(char c, int table_idx);
 }
