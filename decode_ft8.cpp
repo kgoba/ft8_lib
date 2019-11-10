@@ -19,7 +19,10 @@ const int kMax_candidates = 100;
 const int kLDPC_iterations = 20;
 
 const int kMax_decoded_messages = 50;
-const int kMax_message_length = 20;
+const int kMax_message_length = 25;
+
+const int kFreq_osr = 2;
+const int kTime_osr = 2;
 
 
 void usage() {
@@ -55,21 +58,27 @@ float blackman_i(int i, int N) {
     return a0 - a1*x1 + a2*x2;
 }
 
+static float max2(float a, float b) {
+    return (a >= b) ? a : b;
+}
 
 // Compute FFT magnitudes (log power) for each timeslot in the signal
-void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t power[]) {
-    const int block_size = 2 * num_bins;      // Average over 2 bins per FSK tone
-    const int nfft = 2 * block_size;          // We take FFT of two blocks, advancing by one
+void extract_power(const float signal[], ft8::MagArray * power) {
+    const int block_size = 2 * power->num_bins; // Average over 2 bins per FSK tone
+    const int subblock_size = block_size / power->time_osr;
+    const int nfft = block_size * power->freq_osr; // We take FFT of two blocks, advancing by one
     const float fft_norm = 2.0f / nfft;
 
     float   window[nfft];
     for (int i = 0; i < nfft; ++i) {
-        window[i] = blackman_i(i, nfft);
+        window[i] = hann_i(i, nfft);
     }
 
     size_t  fft_work_size;
     kiss_fftr_alloc(nfft, 0, 0, &fft_work_size);
 
+    LOG(LOG_INFO, "Block size = %d\n", block_size);
+    LOG(LOG_INFO, "Subblock size = %d\n", subblock_size);
     LOG(LOG_INFO, "N_FFT = %d\n", nfft);
     LOG(LOG_INFO, "FFT work area = %lu\n", fft_work_size);
 
@@ -78,16 +87,16 @@ void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t p
 
     int offset = 0;
     float max_mag = -100.0f;
-    for (int i = 0; i < num_blocks; ++i) {
+    for (int i = 0; i < power->num_blocks; ++i) {
         // Loop over two possible time offsets (0 and block_size/2)
-        for (int time_sub = 0; time_sub <= block_size/2; time_sub += block_size/2) {
+        for (int time_sub = 0; time_sub < power->time_osr; ++time_sub) {
             kiss_fft_scalar timedata[nfft];
             kiss_fft_cpx    freqdata[nfft/2 + 1];
             float           mag_db[nfft/2 + 1];
 
             // Extract windowed signal block
             for (int j = 0; j < nfft; ++j) {
-                timedata[j] = window[j] * signal[(i * block_size) + (j + time_sub)];
+                timedata[j] = window[j] * signal[(i * block_size) + (j + time_sub * subblock_size)];
             }
 
             kiss_fftr(fft_cfg, timedata, freqdata);
@@ -99,15 +108,17 @@ void extract_power(const float signal[], int num_blocks, int num_bins, uint8_t p
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
-            for (int freq_sub = 0; freq_sub < 2; ++freq_sub) {                
-                for (int j = 0; j < num_bins; ++j) {
-                    float db1 = mag_db[j * 2 + freq_sub];
-                    float db2 = mag_db[j * 2 + freq_sub + 1];
-                    float db = (db1 + db2) / 2;
+            for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub) {                
+                for (int j = 0; j < power->num_bins; ++j) {
+                    float db1 = mag_db[j * power->freq_osr + freq_sub];
+                    //float db2 = mag_db[j * 2 + freq_sub + 1];
+                    //float db = (db1 + db2) / 2;
+                    float db = db1;
+                    //float db = sqrtf(db1 * db2);
 
                     // Scale decibels to unsigned 8-bit range and clamp the value
                     int scaled = (int)(2 * (db + 120));
-                    power[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
+                    power->mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
                     ++offset;
 
                     if (db > max_mag) max_mag = db;
@@ -171,17 +182,26 @@ int main(int argc, char **argv) {
     // Compute DSP parameters that depend on the sample rate
     const int num_bins = (int)(sample_rate / (2 * fsk_dev));
     const int block_size = 2 * num_bins;
-    const int num_blocks = (num_samples - (block_size/2) - block_size) / block_size;
+    const int subblock_size = block_size / kTime_osr;
+    const int nfft = block_size * kFreq_osr;
+    const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
 
-    LOG(LOG_INFO, "%d blocks, %d bins\n", num_blocks, num_bins);
+    LOG(LOG_INFO, "Sample rate %d Hz, %d blocks, %d bins\n", sample_rate, num_blocks, num_bins);
 
     // Compute FFT over the whole signal and store it
-    uint8_t power[num_blocks * 4 * num_bins];
-    extract_power(signal, num_blocks, num_bins, power);
+    uint8_t mag_power[num_blocks * kFreq_osr * kTime_osr * num_bins];
+    ft8::MagArray power = { 
+        .num_blocks = num_blocks, 
+        .num_bins = num_bins,
+        .time_osr = kTime_osr,
+        .freq_osr = kFreq_osr,
+        .mag = mag_power
+    };
+    extract_power(signal, &power);
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     ft8::Candidate candidate_list[kMax_candidates];
-    int num_candidates = ft8::find_sync(power, num_blocks, num_bins, ft8::kCostas_map, kMax_candidates, candidate_list);
+    int num_candidates = ft8::find_sync(&power, ft8::kCostas_map, kMax_candidates, candidate_list);
 
     // TODO: sort the candidates by strongest sync first?
 
@@ -190,20 +210,29 @@ int main(int argc, char **argv) {
     int     num_decoded = 0;
     for (int idx = 0; idx < num_candidates; ++idx) {
         ft8::Candidate &cand = candidate_list[idx];
-        float freq_hz  = (cand.freq_offset + cand.freq_sub / 2.0f) * fsk_dev;
-        float time_sec = (cand.time_offset + cand.time_sub / 2.0f) / fsk_dev;
+        float freq_hz  = (cand.freq_offset + (float)cand.freq_sub / kFreq_osr) * fsk_dev;
+        float time_sec = (cand.time_offset + (float)cand.time_sub / kTime_osr) / fsk_dev;
 
         float   log174[ft8::N];
-        ft8::extract_likelihood(power, num_bins, cand, ft8::kGray_map, log174);
+        ft8::extract_likelihood(&power, cand, ft8::kGray_map, log174);
 
         // bp_decode() produces better decodes, uses way less memory
         uint8_t plain[ft8::N];
         int     n_errors = 0;
         ft8::bp_decode(log174, kLDPC_iterations, plain, &n_errors);
-        //ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
+        //ft8::ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
 
         if (n_errors > 0) {
             LOG(LOG_DEBUG, "ldpc_decode() = %d (%.0f Hz)\n", n_errors, freq_hz);
+            continue;
+        }
+        
+        int sum_plain = 0;
+        for (int i = 0; i < ft8::N; ++i) {
+            sum_plain += plain[i];
+        }
+        if (sum_plain == 0) {
+            // All zeroes message
             continue;
         }
         

@@ -13,65 +13,87 @@ static void heapify_up(Candidate *heap, int heap_size);
 static void decode_symbol(const uint8_t *power, const uint8_t *code_map, int bit_idx, float *log174);
 static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms, const uint8_t *code_map, int bit_idx, float *log174);
 
+static int get_index(const MagArray *power, int block, int time_sub, int freq_sub, int bin) {
+    return ((((block * power->time_osr) + time_sub) * power->freq_osr + freq_sub) * power->num_bins) + bin; 
+}
+
 // Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
-int find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t *sync_map, int num_candidates, Candidate *heap) {
+int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates, Candidate *heap) {
     int heap_size = 0;
+    int num_alt = power->time_osr * power->freq_osr;
 
     // Here we allow time offsets that exceed signal boundaries, as long as we still have all data bits.
     // I.e. we can afford to skip the first 7 or the last 7 Costas symbols, as long as we track how many
     // sync symbols we included in the score, so the score is averaged.
-    for (int alt = 0; alt < 4; ++alt) {
-        for (int time_offset = -7; time_offset < num_blocks - ft8::NN + 7; ++time_offset) {
-            for (int freq_offset = 0; freq_offset < num_bins - 8; ++freq_offset) {
-                int score = 0;
+    for (int time_sub = 0; time_sub < power->time_osr; ++time_sub) {
+        for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub) {
+            for (int time_offset = -7; time_offset < power->num_blocks - ft8::NN + 7; ++time_offset) {
+                for (int freq_offset = 0; freq_offset < power->num_bins - 8; ++freq_offset) {
+                    int score = 0;
 
-                // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
-                int num_symbols = 0;
-                for (int m = 0; m <= 72; m += 36) {
-                    for (int k = 0; k < 7; ++k) {
-                        // Check for time boundaries
-                        if (time_offset + k + m < 0) continue;
-                        if (time_offset + k + m >= num_blocks) break;
+                    // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
+                    int num_symbols = 0;
+                    for (int m = 0; m <= 72; m += 36) {
+                        for (int k = 0; k < 7; ++k) {
+                            // Check for time boundaries
+                            if (time_offset + k + m < 0) continue;
+                            if (time_offset + k + m >= power->num_blocks) break;
 
-                        int offset = ((time_offset + k + m) * 4 + alt) * num_bins + freq_offset;
-                        const uint8_t *p8 = power + offset;
+                            // int offset = ((time_offset + k + m) * num_alt + alt) * power->num_bins + freq_offset;
+                            int offset = get_index(power, time_offset + k + m, time_sub, freq_sub, freq_offset);
+                            const uint8_t *p8 = power->mag + offset;
 
-                        score += 8 * p8[sync_map[k]] -
-                                     p8[0] - p8[1] - p8[2] - p8[3] - 
-                                     p8[4] - p8[5] - p8[6] - p8[7];
+                            // Weighted difference between the expected and all other symbols
+                            // Does not work as well as the alternative score below
+                            // score += 8 * p8[sync_map[k]] -
+                            //              p8[0] - p8[1] - p8[2] - p8[3] -
+                            //              p8[4] - p8[5] - p8[6] - p8[7];
+
+                            // Check only the neighbors of the expected symbol frequency- and time-wise
+                            int sm = sync_map[k];   // Index of the expected bin
+                            if (sm > 0) {
+                                // look at one frequency bin lower
+                                score += p8[sm] - p8[sm - 1];
+                            }
+                            if (sm < 7) {
+                                // look at one frequency bin higher
+                                score += p8[sm] - p8[sm + 1];
+                            }
+                            if (k > 0) {
+                                // look one symbol back in time
+                                score += p8[sm] - p8[sm - num_alt * power->num_bins];
+                            }
+                            if (k < 6) {
+                                // look one symbol forward in time
+                                score += p8[sm] - p8[sm + num_alt * power->num_bins];
+                            }
                         
-                        // int sm = sync_map[k];
-                        // score += 4 * (int)p8[sm];
-                        // if (sm > 0) score -= p8[sm - 1];
-                        // if (sm < 7) score -= p8[sm + 1];
-                        // if (k > 0) score -= p8[sm - 4 * num_bins];
-                        // if (k < 6) score -= p8[sm + 4 * num_bins];
-                        
-                        ++num_symbols;
+                            ++num_symbols;
+                        }
                     }
-                }
-                score /= num_symbols;
+                    score /= num_symbols;
 
-                // If the heap is full AND the current candidate is better than 
-                // the worst in the heap, we remove the worst and make space
-                if (heap_size == num_candidates && score > heap[0].score) {
-                    heap[0] = heap[heap_size - 1];
-                    --heap_size;
+                    // If the heap is full AND the current candidate is better than 
+                    // the worst in the heap, we remove the worst and make space
+                    if (heap_size == num_candidates && score > heap[0].score) {
+                        heap[0] = heap[heap_size - 1];
+                        --heap_size;
 
-                    heapify_down(heap, heap_size);
-                }
+                        heapify_down(heap, heap_size);
+                    }
 
-                // If there's free space in the heap, we add the current candidate
-                if (heap_size < num_candidates) {
-                    heap[heap_size].score = score;
-                    heap[heap_size].time_offset = time_offset;
-                    heap[heap_size].freq_offset = freq_offset;
-                    heap[heap_size].time_sub = alt / 2;
-                    heap[heap_size].freq_sub = alt % 2;
-                    ++heap_size;
+                    // If there's free space in the heap, we add the current candidate
+                    if (heap_size < num_candidates) {
+                        heap[heap_size].score = score;
+                        heap[heap_size].time_offset = time_offset;
+                        heap[heap_size].freq_offset = freq_offset;
+                        heap[heap_size].time_sub = time_sub;
+                        heap[heap_size].freq_sub = freq_sub;
+                        ++heap_size;
 
-                    heapify_up(heap, heap_size);
+                        heapify_up(heap, heap_size);
+                    }
                 }
             }
         }
@@ -83,19 +105,22 @@ int find_sync(const uint8_t *power, int num_blocks, int num_bins, const uint8_t 
 
 // Compute log likelihood log(p(1) / p(0)) of 174 message bits 
 // for later use in soft-decision LDPC decoding
-void extract_likelihood(const uint8_t *power, int num_bins, const Candidate & cand, const uint8_t *code_map, float *log174) {
-    int offset = (cand.time_offset * 4 + cand.time_sub * 2 + cand.freq_sub) * num_bins + cand.freq_offset;
+void extract_likelihood(const MagArray *power, const Candidate & cand, const uint8_t *code_map, float *log174) {
+    int num_alt = power->time_osr * power->freq_osr;
+    // int offset = (cand.time_offset * num_alt + cand.time_sub * power->freq_osr + cand.freq_sub) * power->num_bins + cand.freq_offset;
+    int offset = get_index(power, cand.time_offset, cand.time_sub, cand.freq_sub, cand.freq_offset);
 
     // Go over FSK tones and skip Costas sync symbols
     const int n_syms = 1;
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);
     for (int k = 0; k < ft8::ND; k += n_syms) {
+        // Add either 7 or 14 extra symbols to account for sync
         int sym_idx = (k < ft8::ND / 2) ? (k + 7) : (k + 14);
         int bit_idx = 3 * k;
 
         // Pointer to 8 bins of the current symbol
-        const uint8_t *ps = power + (offset + sym_idx * 4 * num_bins);
+        const uint8_t *ps = power->mag + (offset + sym_idx * num_alt * power->num_bins);
 
         decode_symbol(ps, code_map, bit_idx, log174);
     }

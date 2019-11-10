@@ -199,6 +199,8 @@ int unpack_text(const uint8_t *a71, char *text) {
         carry = (a71[i] & 1) ? 0x80 : 0;
     }
 
+	char c14[14];
+	c14[13] = 0;
     for (int idx = 12; idx >= 0; --idx) {
         // Divide the long integer in b71 by 42
         uint16_t rem = 0;
@@ -207,10 +209,10 @@ int unpack_text(const uint8_t *a71, char *text) {
             b71[i] = rem / 42;
             rem    = rem % 42;
         }
-        text[idx] = charn(rem, 0);
+        c14[idx] = charn(rem, 0);
     }
 
-    text[13] = '\0';
+	strcpy(text, trim(c14));
     return 0;       // Success
 }
 
