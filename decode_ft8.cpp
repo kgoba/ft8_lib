@@ -15,8 +15,8 @@
 
 #define LOG_LEVEL   LOG_INFO
 
-const int kMax_candidates = 100;
-const int kLDPC_iterations = 20;
+const int kMax_candidates = 120;
+const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
 const int kMax_message_length = 25;
@@ -252,7 +252,9 @@ int main(int argc, char **argv) {
         }
 
         char message[kMax_message_length];
-        ft8::unpack77(a91, message);
+        if (ft8::unpack77(a91, message) < 0) {
+            continue;
+        }
 
         // Check for duplicate messages (TODO: use hashing)
         bool found = false;

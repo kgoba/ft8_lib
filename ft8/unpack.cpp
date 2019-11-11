@@ -54,7 +54,8 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
         //n22=n28
         //call hash22(n22,c13)     !Retrieve result from hash table
         // TODO: implement
-        return -2;
+        strcpy(result, "<...>");
+        return 0;
     }
 
     // Standard callsign
@@ -76,6 +77,7 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
 
     // Skip trailing and leading whitespace in case of a short callsign
     strcpy(result, trim(callsign));
+    if (strlen(result) == 0) return -1;
 
     // Check if we should append /R or /P suffix
     if (ip) {
@@ -280,10 +282,8 @@ int unpack_nonstandard(const uint8_t *a77, char *message)
     }
 
 	char call_3[15];
-    call_3[0] = '<';
-    call_3[1] = '>';
-    call_3[2] = '\0';
-	//hash12(n12, call_3);
+    // should replace with hash12(n12, call_3);
+    strcpy(call_3, "<...>");
 
 	char * call_1 = (iflip) ? c11 : call_3;
     char * call_2 = (iflip) ? call_3 : c11;

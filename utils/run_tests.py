@@ -19,6 +19,7 @@ n_extra = 0
 n_missed = 0
 n_total = 0
 for wav_file, txt_file in zip(wav_files, txt_files):
+    print(wav_file)
     result = subprocess.run(['./decode_ft8', wav_file], stdout=subprocess.PIPE)
     result = result.stdout.decode('utf-8').split('\n')
     result = [parse(x) for x in result if len(x) > 0]
@@ -35,7 +36,8 @@ for wav_file, txt_file in zip(wav_files, txt_files):
     print(len(result), '/', len(expected))
     if len(extra_decodes) > 0:
         print('Extra decodes: ', list(extra_decodes))
-    #print('Missed decodes: ', list(missed_decodes))
+    if len(missed_decodes) > 0:
+        print('Missed decodes: ', list(missed_decodes))
     
     n_total += len(expected)
     n_extra += len(extra_decodes)
