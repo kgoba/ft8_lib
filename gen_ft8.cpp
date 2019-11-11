@@ -40,7 +40,7 @@ void usage() {
     printf("Generate a 15-second WAV file encoding a given message.\n");
     printf("Usage:\n");
     printf("\n");
-    printf("gen_ft8 MESSAGE WAV_FILE\n");
+    printf("gen_ft8 MESSAGE WAV_FILE [FREQUENCY]\n");
     printf("\n");
     printf("(Note that you might have to enclose your message in quote marks if it contains spaces)\n");
 }
@@ -55,6 +55,10 @@ int main(int argc, char **argv) {
 
     const char *message = argv[1];
     const char *wav_path = argv[2];
+    float frequency = 1000.0;
+    if (argc > 3) {
+       frequency = atof(argv[3]);
+    }
 
     // First, pack the text data into binary message
     uint8_t packed[ft8::K_BYTES];
@@ -93,7 +97,7 @@ int main(int argc, char **argv) {
         signal[i] = 0;
     }
 
-    synth_fsk(tones, ft8::NN, 1000, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
+    synth_fsk(tones, ft8::NN, frequency, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
     save_wav(signal, num_silence + num_samples + num_silence, sample_rate, wav_path);
 
     return 0;
