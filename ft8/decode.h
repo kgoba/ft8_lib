@@ -23,7 +23,7 @@ struct Candidate {
 
 // Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
-int find_sync(const MagArray * power, const uint8_t *sync_map, int num_candidates, Candidate *heap);
+int find_sync(const MagArray * power, const uint8_t *sync_map, int num_candidates, Candidate *heap, int min_score = 0);
 
 
 // Compute log likelihood log(p(1) / p(0)) of 174 message bits 

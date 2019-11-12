@@ -19,7 +19,7 @@ static int get_index(const MagArray *power, int block, int time_sub, int freq_su
 
 // Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
-int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates, Candidate *heap) {
+int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates, Candidate *heap, int min_score) {
     int heap_size = 0;
     int num_alt = power->time_osr * power->freq_osr;
 
@@ -73,6 +73,8 @@ int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates
                         }
                     }
                     score /= num_symbols;
+
+                    if (score < min_score) continue;
 
                     // If the heap is full AND the current candidate is better than 
                     // the worst in the heap, we remove the worst and make space

@@ -15,6 +15,7 @@
 
 #define LOG_LEVEL   LOG_INFO
 
+const int kMin_score = 40;		// Minimum sync score threshold for candidates
 const int kMax_candidates = 120;
 const int kLDPC_iterations = 25;
 
