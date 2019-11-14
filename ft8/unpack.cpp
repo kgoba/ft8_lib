@@ -51,10 +51,13 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
     n28 = n28 - NTOKENS;
     if (n28 < MAX22) {
         // This is a 22-bit hash of a result
-        //n22=n28
         //call hash22(n22,c13)     !Retrieve result from hash table
         // TODO: implement
-        strcpy(result, "<...>");
+        // strcpy(result, "<...>");
+        result[0] = '<';
+        int_to_dd(result + 1, n28, 7);
+        result[8] = '>';
+        result[9] = '\0';
         return 0;
     }
 
@@ -88,11 +91,12 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
             strcat(result, "/P");
         }
     }
+    
     return 0;   // Success
 }
 
 
-int unpack_type1(const uint8_t *a77, uint8_t i3, char *message) {
+int unpack_type1(const uint8_t *a77, uint8_t i3, char *field1, char *field2, char *field3) {
     uint32_t n28a, n28b;
     uint16_t igrid4;
     uint8_t  ir;
@@ -115,76 +119,61 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *message) {
     igrid4 |= (a77[9] >> 6);
 
     // Unpack both callsigns
-    char field_1[14];
-    char field_2[14];
-    if (unpack28(n28a >> 1, n28a & 0x01, i3, field_1) < 0) {
+    if (unpack28(n28a >> 1, n28a & 0x01, i3, field1) < 0) {
         return -1;
     }
-    if (unpack28(n28b >> 1, n28b & 0x01, i3, field_2) < 0) {
+    if (unpack28(n28b >> 1, n28b & 0x01, i3, field2) < 0) {
         return -2;
     }
     // Fix "CQ_" to "CQ " -> already done in unpack28()
-    // if (starts_with(field_1, "CQ_")) {
-    //     field_1[2] = ' ';
-    // }
-
-    // Append first two fields to the result
-    strcpy(message, field_1);
-    strcat(message, " ");
-    strcat(message, field_2);
 
     // TODO: add to recent calls
-    // if (field_1[0] != '<' && strlen(field_1) >= 4) {
-    //     save_hash_call(field_1)
+    // if (field1[0] != '<' && strlen(field1) >= 4) {
+    //     save_hash_call(field1)
     // }
-    // if (field_2[0] != '<' && strlen(field_2) >= 4) {
-    //     save_hash_call(field_2)
+    // if (field2[0] != '<' && strlen(field2) >= 4) {
+    //     save_hash_call(field2)
     // }
 
-    char field_3[5];
     if (igrid4 <= MAXGRID4) {
         // Extract 4 symbol grid locator
-        field_3[4] = '\0';
-
+        char *dst = field3;
         uint16_t n = igrid4;
-        field_3[3] = '0' + (n % 10);
-        n /= 10;
-        field_3[2] = '0' + (n % 10);
-        n /= 10;
-        field_3[1] = 'A' + (n % 18);
-        n /= 18;
-        field_3[0] = 'A' + (n % 18);
-
-        if (ir != 0) {
-            // In case of ir=1 add an " R " before grid
-            strcat(message, " R ");
+        if (ir > 0) {
+            // In case of ir=1 add an "R" before grid
+            dst = stpcpy(dst, "R ");
         }
+
+        dst[4] = '\0';
+        dst[3] = '0' + (n % 10);
+        n /= 10;
+        dst[2] = '0' + (n % 10);
+        n /= 10;
+        dst[1] = 'A' + (n % 18);
+        n /= 18;
+        dst[0] = 'A' + (n % 18);
+        // if(msg(1:3).eq.'CQ ' .and. ir.eq.1) unpk77_success=.false.
+        // if (ir > 0 && strncmp(field1, "CQ", 2) == 0) return -1;
     }
     else {
         // Extract report
         int irpt = igrid4 - MAXGRID4;
 
         // Check special cases first
-        if (irpt == 1) field_3[0] = '\0';
-        else if (irpt == 2) strcpy(field_3, "RRR");
-        else if (irpt == 3) strcpy(field_3, "RR73");
-        else if (irpt == 4) strcpy(field_3, "73");
+        if (irpt == 1) field3[0] = '\0';
+        else if (irpt == 2) strcpy(field3, "RRR");
+        else if (irpt == 3) strcpy(field3, "RR73");
+        else if (irpt == 4) strcpy(field3, "73");
         else if (irpt >= 5) {
+            char *dst = field3;
             // Extract signal report as a two digit number with a + or - sign
-            if (ir == 0) {
-                int_to_dd(field_3, irpt - 35, 2, true);
+            if (ir > 0) {
+                *dst++ = 'R'; // Add "R" before report
             }
-            else {
-                field_3[0] = 'R';
-                int_to_dd(field_3 + 1, irpt - 35, 2, true);
-            }
+            int_to_dd(dst, irpt - 35, 2, true);
         }
-    }
-
-    // Append the last field to the result
-    if (strlen(field_3) > 0) {
-        strcat(message, " ");
-        strcat(message, field_3);
+        // if(msg(1:3).eq.'CQ ' .and. irpt.ge.2) unpk77_success=.false.
+        // if (irpt >= 2 && strncmp(field1, "CQ", 2) == 0) return -1;
     }
 
     return 0;       // Success
@@ -246,7 +235,7 @@ int unpack_telemetry(const uint8_t *a71, char *telemetry) {
 
 //none standard for wsjt-x 2.0
 //by KD8CEC
-int unpack_nonstandard(const uint8_t *a77, char *message) 
+int unpack_nonstandard(const uint8_t *a77, char *field1, char *field2, char *field3) 
 {
 /*
 	wsjt-x 2.1.0 rc5
@@ -283,41 +272,48 @@ int unpack_nonstandard(const uint8_t *a77, char *message)
 
 	char call_3[15];
     // should replace with hash12(n12, call_3);
-    strcpy(call_3, "<...>");
+    // strcpy(call_3, "<...>");
+    call_3[0] = '<';
+    int_to_dd(call_3 + 1, n12, 4);
+    call_3[5] = '>';
+    call_3[6] = '\0';
 
 	char * call_1 = (iflip) ? c11 : call_3;
     char * call_2 = (iflip) ? call_3 : c11;
 	//save_hash_call(c11_trimmed);
 
 	if (icq == 0) {
-		strcpy(message, trim(call_1));
-		strcat(message, " ");
-		strcat(message, trim(call_2));
+		strcpy(field1, trim(call_1));
 		if (nrpt == 1)
-			strcat(message, " RRR");
+			strcpy(field3, "RRR");
 		else if (nrpt == 2)
-			strcat(message, " RR73");
+			strcpy(field3, "RR73");
 		else if (nrpt == 3)
-			strcat(message, " 73");
-
+			strcpy(field3, "73");
+        else {
+            field3[0] = '\0';
+        }
 	} else {
-		strcpy(message, "CQ ");
-		strcat(message, trim(call_2));
+		strcpy(field1, "CQ");
+        field3[0] = '\0';
 	}
+    strcpy(field2, trim(call_2));
 
     return 0;
 }
 
-int unpack77(const uint8_t *a77, char *message) {
+int unpack77_fields(const uint8_t *a77, char *field1, char *field2, char *field3) {
     uint8_t  n3, i3;
 
     // Extract n3 (bits 71..73) and i3 (bits 74..76)
     n3 = ((a77[8] << 2) & 0x04) | ((a77[9] >> 6) & 0x03);
     i3 = (a77[9] >> 3) & 0x07;
 
+    field1[0] = field2[0] = field3[0] = '\0';
+
     if (i3 == 0 && n3 == 0) {
         // 0.0  Free text
-        return unpack_text(a77, message);
+        return unpack_text(a77, field1);
     }
     // else if (i3 == 0 && n3 == 1) {
     //     // 0.1  K1ABC RR73; W9XYZ <KH1/KH7Z> -11   28 28 10 5       71   DXpedition Mode
@@ -331,11 +327,11 @@ int unpack77(const uint8_t *a77, char *message) {
     // }
     else if (i3 == 0 && n3 == 5) {
         // 0.5   0123456789abcdef01                 71               71   Telemetry (18 hex)
-        return unpack_telemetry(a77, message);
+        return unpack_telemetry(a77, field1);
     }
     else if (i3 == 1 || i3 == 2) {
         // Type 1 (standard message) or Type 2 ("/P" form for EU VHF contest)
-        return unpack_type1(a77, i3, message);
+        return unpack_type1(a77, i3, field1, field2, field3);
     }
     // else if (i3 == 3) {
     //     // Type 3: ARRL RTTY Contest
@@ -344,14 +340,33 @@ int unpack77(const uint8_t *a77, char *message) {
     //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
     //     // One hashed call or "CQ"; one compound or nonstandard call with up
     //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
-	    return unpack_nonstandard(a77, message);
+	    return unpack_nonstandard(a77, field1, field2, field3);
     }
     // else if (i3 == 5) {
     //     // Type 5: TU; W9XYZ K1ABC R-09 FN             1 28 28 1 7 9       74   WWROF contest
     // }
 
     // unknown type, should never get here
-    message[0] = '\0';
+    return -1;
+}
+
+int unpack77(const uint8_t *a77, char *message) {
+    char field1[14];
+    char field2[14];
+    char field3[7];
+    int rc = unpack77_fields(a77, field1, field2, field3);
+    if (rc < 0) return rc;
+
+    char *dst = message;
+    // int msg_sz = strlen(field1) + strlen(field2) + strlen(field3) + 2;
+
+    dst = stpcpy(dst, field1);
+    *dst++ = ' ';
+    dst = stpcpy(dst, field2);
+    *dst++ = ' ';
+    dst = stpcpy(dst, field3);
+    *dst = '\0';
+
     return 0;
 }
 
