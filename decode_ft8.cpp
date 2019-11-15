@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     ft8::Candidate candidate_list[kMax_candidates];
-    int num_candidates = ft8::find_sync(&power, ft8::kCostas_map, kMax_candidates, candidate_list);
+    int num_candidates = ft8::find_sync(&power, ft8::kCostas_map, kMax_candidates, candidate_list, kMin_score);
 
     // TODO: sort the candidates by strongest sync first?
 

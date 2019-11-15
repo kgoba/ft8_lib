@@ -19,6 +19,7 @@ n_extra = 0
 n_missed = 0
 n_total = 0
 for wav_file, txt_file in zip(wav_files, txt_files):
+    if not os.path.isfile(txt_file): continue
     print(wav_file)
     result = subprocess.run(['./decode_ft8', wav_file], stdout=subprocess.PIPE)
     result = result.stdout.decode('utf-8').split('\n')
