@@ -8,11 +8,11 @@
 // from Sarah Johnson's Iterative Error Correction book.
 // codeword[i] = log ( P(x=0) / P(x=1) )
 //
+#include "ldpc.h"
 
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include "constants.h"
 
 namespace ft8 {
 
@@ -47,11 +47,13 @@ void pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[]) {
 // codeword is 174 log-likelihoods.
 // plain is a return value, 174 ints, to be 0 or 1.
 // max_iters is how hard to try.
-// ok == 87 means success.
-void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
+// n_errors == 87 means success.
+void ldpc_decode(const float codeword[], int max_iters, uint8_t plain[], int *n_errors) {
     float m[ft8::M][ft8::N];       // ~60 kB
     float e[ft8::M][ft8::N];       // ~60 kB
     int min_errors = ft8::M;
+    int n_err_last = 0;
+    int n_cnt = 0;
 
     for (int j = 0; j < ft8::M; j++) {
         for (int i = 0; i < ft8::N; i++) {
@@ -93,6 +95,22 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
             }
         }
 
+        // Early stopping criterion
+        if (iter > 0) {
+            int nd = errors - n_err_last;
+            if (nd < 0) {
+                n_cnt = 0;
+            }
+            else {
+                ++n_cnt;
+            }
+            if (n_cnt >= 5 && iter >= 10 && errors >= 15) {
+                *n_errors = errors;
+                return;
+            }
+        }
+        n_err_last = errors;
+
         for (int i = 0; i < ft8::N; i++) {
             for (int ji1 = 0; ji1 < 3; ji1++) {
                 int j1 = kMn[i][ji1] - 1;
@@ -108,7 +126,7 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
         }
     }
 
-    *ok = min_errors;
+    *n_errors = min_errors;
 }
 
 
@@ -133,85 +151,102 @@ static int ldpc_check(uint8_t codeword[]) {
 }
 
 
-void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok) {
-    float tov[ft8::N][3];
-    float toc[ft8::M][7];
-
-    int min_errors = ft8::M;
-
-    int nclast = 0;
-    int ncnt = 0;
-
+void BPDecoderState::reset() {
     // initialize messages to checks
-    for (int i = 0; i < ft8::M; ++i) {
-        for (int j = 0; j < kNrw[i]; ++j) {
-            toc[i][j] = codeword[kNm[i][j] - 1];
-        }
-    }
-
     for (int i = 0; i < ft8::N; ++i) {
         for (int j = 0; j < 3; ++j) {
             tov[i][j] = 0;
         }
     }
+}
 
-    for (int iter = 0; iter < max_iters; ++iter) {
-        float   zn[ft8::N];
 
-        // Update bit log likelihood ratios (tov=0 in iter 0)
-        for (int i = 0; i < ft8::N; ++i) {
-            zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
-            plain[i] = (zn[i] > 0) ? 1 : 0;
-        }
+int BPDecoderState::iterate(const float codeword[], uint8_t plain[]) {
+    // Update bit log likelihood ratios (tov=0 in iter 0)
+    float   zn[ft8::N];
+    for (int i = 0; i < ft8::N; ++i) {
+        zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
+        plain[i] = (zn[i] > 0) ? 1 : 0;
+    }
 
-        // Check to see if we have a codeword (check before we do any iter)
-        int errors = ldpc_check(plain);
+    // Check to see if we have a codeword (check before we do any iter)
+    int errors = ldpc_check(plain);
 
-        if (errors < min_errors) {
-            // we have a better guess - update the result
-            min_errors = errors;
+    if (errors == 0) {
+        return 0;   // Found a perfect answer
+    }
 
-            if (errors == 0) {
-                break;  // Found a perfect answer
-            }
-        }
-
-        // Send messages from bits to check nodes 
-        for (int i = 0; i < ft8::M; ++i) {
-            for (int j = 0; j < kNrw[i]; ++j) {
-                int ibj = kNm[i][j] - 1;
-                toc[i][j] = zn[ibj];
-                for (int kk = 0; kk < 3; ++kk) { 
-                    // subtract off what the bit had received from the check
-                    if (kMn[ibj][kk] - 1 == i) {
-                        toc[i][j] -= tov[ibj][kk];
-                    }
+    // Send messages from bits to check nodes 
+    for (int i = 0; i < ft8::M; ++i) {
+        for (int j = 0; j < kNrw[i]; ++j) {
+            int ibj = kNm[i][j] - 1;
+            toc[i][j] = zn[ibj];
+            for (int kk = 0; kk < 3; ++kk) { 
+                // subtract off what the bit had received from the check
+                if (kMn[ibj][kk] - 1 == i) {
+                    toc[i][j] -= tov[ibj][kk];
                 }
-            }
-        }
-        
-        // send messages from check nodes to variable nodes
-        for (int i = 0; i < ft8::M; ++i) {
-            for (int j = 0; j < kNrw[i]; ++j) {
-                toc[i][j] = fast_tanh(-toc[i][j] / 2);
-            }
-        }
-
-        for (int i = 0; i < ft8::N; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                int ichk = kMn[i][j] - 1; // kMn(:,j) are the checks that include bit j
-                float Tmn = 1.0f;
-                for (int k = 0; k < kNrw[ichk]; ++k) {
-                    if (kNm[ichk][k] - 1 != i) {
-                        Tmn *= toc[ichk][k];
-                    }
-                }
-                tov[i][j] = 2 * fast_atanh(-Tmn);
             }
         }
     }
+    
+    // send messages from check nodes to variable nodes
+    for (int i = 0; i < ft8::M; ++i) {
+        for (int j = 0; j < kNrw[i]; ++j) {
+            toc[i][j] = fast_tanh(-toc[i][j] / 2);
+        }
+    }
 
-    *ok = min_errors;
+    for (int i = 0; i < ft8::N; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            int ichk = kMn[i][j] - 1; // kMn(:,j) are the checks that include bit j
+            float Tmn = 1.0f;
+            for (int k = 0; k < kNrw[ichk]; ++k) {
+                if (kNm[ichk][k] - 1 != i) {
+                    Tmn *= toc[ichk][k];
+                }
+            }
+            tov[i][j] = 2 * fast_atanh(-Tmn);
+        }
+    }
+
+    return errors;
+}
+
+
+
+void bp_decode(const float codeword[], int max_iters, uint8_t plain[], int *n_errors) {
+    BPDecoderState state;
+    
+    int n_err_last = 0;
+    int n_cnt = 0;
+
+    state.reset();
+    *n_errors = ft8::M;
+
+    for (int iter = 0; iter < max_iters; ++iter) {
+        int errors = state.iterate(codeword, plain);
+        if (errors < *n_errors) {
+            *n_errors = errors;
+        }
+        if (errors == 0) return;
+
+        // Early stopping criterion
+        if (iter > 0) {
+            int nd = errors - n_err_last;
+            if (nd < 0) {
+                n_cnt = 0;
+            }
+            else {
+                ++n_cnt;
+            }
+            if (n_cnt >= 5 && iter >= 10 && errors >= 15) {
+                *n_errors = errors;
+                return;
+            }
+        }
+        n_err_last = errors;
+    }
 }
 
 // https://varietyofsound.wordpress.com/2011/02/14/efficient-tanh-computation-using-lamberts-continued-fraction/

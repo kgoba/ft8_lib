@@ -15,17 +15,15 @@
 
 #define LOG_LEVEL   LOG_INFO
 
+const int kFreq_osr = 2;
+const int kTime_osr = 2;
+
 const int kMin_score = 40;		// Minimum sync score threshold for candidates
 const int kMax_candidates = 120;
 const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
 const int kMax_message_length = 25;
-
-const int kFreq_osr = 2;
-const int kTime_osr = 2;
-
-const float kFSK_dev = 6.25f;    // tone deviation in Hz and symbol rate
 
 void usage() {
     fprintf(stderr, "Decode a 15-second WAV file.\n");
@@ -60,9 +58,62 @@ float blackman_i(int i, int N) {
     return a0 - a1*x1 + a2*x2;
 }
 
-static float max2(float a, float b) {
-    return (a >= b) ? a : b;
+class Monitor : public ft8::Monitor1Base {
+public:
+    Monitor(float sample_rate);
+protected:
+    virtual void fft_forward(const float *in, std::complex<float> *out) override;
+private:
+    kiss_fftr_cfg fft_cfg;
+};
+
+Monitor::Monitor(float sample_rate) : Monitor1Base(sample_rate)
+{
+    window_fn = new float[nfft];   // [nfft]
+    fft_frame = new float[nfft];   // [nfft]
+    last_frame = new float[nfft * 3/4];  // [nfft * 3/4]
+    freqdata = new std::complex<float>[nfft/2 + 1]; // [nfft/2 + 1]
+
+    fft_cfg = kiss_fftr_alloc(nfft, 0, NULL, NULL);
 }
+
+void Monitor::fft_forward(const float *in, std::complex<float> *out) {
+    kiss_fftr(fft_cfg, 
+        reinterpret_cast<const kiss_fft_scalar *>(in), 
+        reinterpret_cast<kiss_fft_cpx *>(out));
+}
+
+// #include <complex>
+
+// class FFT_r2c {
+// public:
+//     // [N] real --> [N/2 + 1] complex
+//     virtual void forward(const float *in, std::complex<float> *out) = 0;
+// };
+
+// class KissFFT_r2c : public FFT_r2c {
+// public:
+//     KissFFT_r2c(int N) {
+//         LOG(LOG_INFO, "N_FFT = %d\n", N);
+//         // size_t  fft_work_size;
+//         // kiss_fftr_alloc(N, 0, 0, &fft_work_size);
+//         // LOG(LOG_INFO, "FFT work area = %lu\n", fft_work_size);
+//         // fft_work = malloc(fft_work_size);
+//         // fft_cfg = kiss_fftr_alloc(N, 0, fft_work, &fft_work_size);
+//         fft_cfg = kiss_fftr_alloc(N, 0, NULL, NULL);
+//     }
+//     ~KissFFT_r2c() {
+//         // free(fft_work);
+//         kiss_fftr_free(fft_cfg);
+//     }
+//     virtual void forward(const float *in, std::complex<float> *out) override {
+//         kiss_fftr(fft_cfg, in, reinterpret_cast<kiss_fft_cpx *>(out));
+//     }
+
+// private:
+//     void        *fft_work;
+//     kiss_fftr_cfg fft_cfg;
+// };
 
 // Compute FFT magnitudes (log power) for each timeslot in the signal
 void extract_power(const float signal[], ft8::MagArray * power) {
@@ -106,17 +157,16 @@ void extract_power(const float signal[], ft8::MagArray * power) {
             // Compute log magnitude in decibels
             for (int j = 0; j < nfft/2 + 1; ++j) {
                 float mag2 = (freqdata[j].i * freqdata[j].i + freqdata[j].r * freqdata[j].r);
-                mag_db[j] = 10.0f * log10f(1E-10f + mag2 * fft_norm * fft_norm);
+                mag_db[j] = 10.0f * log10f(1E-12f + mag2 * fft_norm * fft_norm);
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
             for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub) {                
                 for (int j = 0; j < power->num_bins; ++j) {
-                    float db1 = mag_db[j * power->freq_osr + freq_sub];
+                    //float db1 = mag_db[j * power->freq_osr + freq_sub];
                     //float db2 = mag_db[j * 2 + freq_sub + 1];
                     //float db = (db1 + db2) / 2;
-                    float db = db1;
-                    //float db = sqrtf(db1 * db2);
+                    float db = mag_db[j * power->freq_osr + freq_sub];
 
                     // Scale decibels to unsigned 8-bit range and clamp the value
                     int scaled = (int)(2 * (db + 120));
@@ -180,7 +230,7 @@ int main(int argc, char **argv) {
     normalize_signal(signal, num_samples);
 
     // Compute DSP parameters that depend on the sample rate
-    const int num_bins = (int)(sample_rate / (2 * kFSK_dev));
+    const int num_bins = (int)(sample_rate / (2 * ft8::FSK_dev));
     const int block_size = 2 * num_bins;
     const int subblock_size = block_size / kTime_osr;
     const int nfft = block_size * kFreq_osr;
@@ -212,8 +262,8 @@ int main(int argc, char **argv) {
         ft8::Candidate &cand = candidate_list[idx];
         if (cand.score < kMin_score) continue;
 
-        float freq_hz  = (cand.freq_offset + (float)cand.freq_sub / kFreq_osr) * kFSK_dev;
-        float time_sec = (cand.time_offset + (float)cand.time_sub / kTime_osr) / kFSK_dev;
+        float freq_hz  = (cand.freq_offset + (float)cand.freq_sub / kFreq_osr) * ft8::FSK_dev;
+        float time_sec = (cand.time_offset + (float)cand.time_sub / kTime_osr) / ft8::FSK_dev;
 
         float   log174[ft8::N];
         ft8::extract_likelihood(&power, cand, ft8::kGray_map, log174);
@@ -222,7 +272,9 @@ int main(int argc, char **argv) {
         uint8_t plain[ft8::N];
         int     n_errors = 0;
         ft8::bp_decode(log174, kLDPC_iterations, plain, &n_errors);
-        //ft8::ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
+        if (n_errors > 0) {
+            // ft8::ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
+        }
 
         if (n_errors > 0) {
             LOG(LOG_DEBUG, "ldpc_decode() = %d (%.0f Hz)\n", n_errors, freq_hz);

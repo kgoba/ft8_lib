@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 namespace ft8 {
+    constexpr float FSK_dev = 6.25f;    // tone deviation in Hz and symbol rate
 
     // Define FT8 symbol counts
     constexpr int ND = 58;      // Data symbols

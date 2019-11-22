@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <complex>
 
 namespace ft8 {
 
@@ -20,6 +21,28 @@ struct Candidate {
     uint8_t      freq_sub;
 };
 
+class Monitor1Base {
+public:
+    Monitor1Base(float sample_rate, int time_osr = 2, int freq_osr = 2, float fmin = 300, float fmax = 3000);
+
+    void feed(const float *frame);
+    void search();
+    void reset();
+protected:
+    float *window_fn;   // [nfft]
+    float *fft_frame;   // [nfft]
+    float *last_frame;  // [nfft * 3/4]
+    std::complex<float> *freqdata; // [nfft/2 + 1]
+    int nfft;
+
+    int offset;
+    int time_sub;
+    ft8::MagArray power;
+
+    // [N] real --> [N/2 + 1] log magnitudes (decibels)
+    // virtual void fft_forward_mag_db(const float *frame, uint8_t *mag_db) = 0;
+    virtual void fft_forward(const float *in, std::complex<float> *out) = 0;
+};
 
 // Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).

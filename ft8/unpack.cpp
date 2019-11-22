@@ -53,11 +53,11 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result) {
         // This is a 22-bit hash of a result
         //call hash22(n22,c13)     !Retrieve result from hash table
         // TODO: implement
-        // strcpy(result, "<...>");
-        result[0] = '<';
-        int_to_dd(result + 1, n28, 7);
-        result[8] = '>';
-        result[9] = '\0';
+        strcpy(result, "<...>");
+        // result[0] = '<';
+        // int_to_dd(result + 1, n28, 7);
+        // result[8] = '>';
+        // result[9] = '\0';
         return 0;
     }
 
@@ -181,7 +181,6 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *field1, char *field2, cha
 
 
 int unpack_text(const uint8_t *a71, char *text) {
-    // TODO: test
     uint8_t b71[9];
 
     uint8_t carry = 0;
@@ -272,11 +271,11 @@ int unpack_nonstandard(const uint8_t *a77, char *field1, char *field2, char *fie
 
 	char call_3[15];
     // should replace with hash12(n12, call_3);
-    // strcpy(call_3, "<...>");
-    call_3[0] = '<';
-    int_to_dd(call_3 + 1, n12, 4);
-    call_3[5] = '>';
-    call_3[6] = '\0';
+    strcpy(call_3, "<...>");
+    // call_3[0] = '<';
+    // int_to_dd(call_3 + 1, n12, 4);
+    // call_3[5] = '>';
+    // call_3[6] = '\0';
 
 	char * call_1 = (iflip) ? c11 : call_3;
     char * call_2 = (iflip) ? call_3 : c11;
@@ -370,4 +369,4 @@ int unpack77(const uint8_t *a77, char *message) {
     return 0;
 }
 
-} // namespace
+} // namespace ft8

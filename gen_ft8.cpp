@@ -4,11 +4,73 @@
 #include <cmath>
 
 #include "common/wave.h"
+#include "common/debug.h"
 //#include "ft8/v1/pack.h"
 //#include "ft8/v1/encode.h"
 #include "ft8/pack.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"
+
+#define LOG_LEVEL   LOG_INFO
+
+void gfsk_pulse(int n_spsym, float b, float *pulse) {
+    const float c = M_PI * sqrtf(2 / logf(2));
+
+    for (int i = 0; i < 3*n_spsym; ++i) {
+        float t = i/(float)n_spsym - 1.5f;
+        pulse[i] = (erff(c * b * (t + 0.5f)) - erff(c * b * (t - 0.5f))) / 2;
+    }
+}
+
+// Same as synth_fsk, but uses GFSK phase shaping
+void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, int n_spsym, int signal_rate, float *signal) 
+{
+    LOG(LOG_DEBUG, "n_spsym = %d\n", n_spsym);
+    int n_wave = n_sym * n_spsym;
+    float hmod = 1.0f;
+
+    // Compute the smoothed frequency waveform.
+    // Length = (nsym+2)*nsps samples, first and last symbols extended 
+    float dphi_peak = 2 * M_PI * hmod / n_spsym;
+    float dphi[n_wave + 2*n_spsym];
+
+    // Shift frequency up by f0
+    for (int i = 0; i < n_wave + 2*n_spsym; ++i) {    
+        dphi[i] = 2 * M_PI * f0 / signal_rate;
+    }
+
+    float pulse[3 * n_spsym];
+    gfsk_pulse(n_spsym, 2.0f, pulse);
+
+    for (int i = 0; i < n_sym; ++i) {
+        int ib = i * n_spsym;
+        for (int j = 0; j < 3*n_spsym; ++j) {
+            dphi[j + ib] += dphi_peak*symbols[i]*pulse[j];
+        }
+    }
+
+    // Add dummy symbols at beginning and end with tone values equal to 1st and last symbol, respectively
+    for (int j = 0; j < 2*n_spsym; ++j) {
+        dphi[j] += dphi_peak*pulse[j + n_spsym]*symbols[0];
+        dphi[j + n_sym * n_spsym] += dphi_peak*pulse[j]*symbols[n_sym - 1];
+    }
+
+    // Calculate and insert the audio waveform
+    float phi = 0;
+    for (int k = 0; k < n_wave; ++k) { // Don't include dummy symbols
+        signal[k] = sinf(phi);
+        phi = fmodf(phi + dphi[k + n_spsym], 2*M_PI);
+    }
+
+    // Apply envelope shaping to the first and last symbols
+    int n_ramp = n_spsym / 8;
+    for (int i = 0; i < n_ramp; ++i) {
+        float env = (1 - cosf(2 * M_PI * i / (2 * n_ramp))) / 2;
+        signal[i] *= env;
+        signal[n_wave - 1 - i] *= env;
+    }
+}
+
 
 // Convert a sequence of symbols (tones) into a sinewave of continuous phase (FSK).
 // Symbol 0 gets encoded as a sine of frequency f0, the others are spaced in increasing
@@ -23,8 +85,8 @@ void synth_fsk(const uint8_t *symbols, int num_symbols, float f0, float spacing,
     int i = 0;
     while (j < num_symbols) {
         float f = f0 + symbols[j] * spacing;
-        phase += 2 * M_PI * f / signal_rate;
-        signal[i] = sin(phase);
+        phase = fmodf(phase + 2 * M_PI * f / signal_rate, 2 * M_PI);
+        signal[i] = sinf(phase);
         t += dt;
         if (t >= dt_sym) {
             // Move to the next symbol
@@ -97,7 +159,8 @@ int main(int argc, char **argv) {
         signal[i] = 0;
     }
 
-    synth_fsk(tones, ft8::NN, frequency, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
+    // synth_fsk(tones, ft8::NN, frequency, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
+    synth_gfsk(tones, ft8::NN, frequency, sample_rate / symbol_rate, sample_rate, signal + num_silence); 
     save_wav(signal, num_silence + num_samples + num_silence, sample_rate, wav_path);
 
     return 0;

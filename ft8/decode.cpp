@@ -17,6 +17,57 @@ static int get_index(const MagArray *power, int block, int time_sub, int freq_su
     return ((((block * power->time_osr) + time_sub) * power->freq_osr + freq_sub) * power->num_bins) + bin; 
 }
 
+Monitor1Base::Monitor1Base(float sample_rate, int time_osr, int freq_osr, float fmin, float fmax) {
+    int block_size = (int)(0.5f + sample_rate / ft8::FSK_dev); // Samples per FSK tone
+    nfft = block_size * freq_osr; // FFT over symbols with frequency oversampling
+    int bin1 = (block_size * fmin) / sample_rate;
+    int bin2 = (block_size * fmax) / sample_rate;
+
+    power.time_osr = time_osr;
+    power.freq_osr = freq_osr;
+    power.num_bins = bin2 - bin1;
+    power.num_blocks = 0;
+}
+
+void Monitor1Base::feed(const float *frame) {
+    // Fill the first 3/4 of analysis frame
+    for (int i = 0; i < 3 * nfft / 4; ++i) {
+        fft_frame[i] = window_fn[i] * last_frame[i];
+    }
+
+    // Shift the frame history
+    for (int i = 0; i < nfft / 2; ++i) {
+        last_frame[i] = last_frame[i + nfft / 4];
+    }
+
+    // Now fill the last_frame array
+    for (int i = 0; i < nfft / 4; ++i) {
+        last_frame[i + nfft / 2] = frame[i];
+    }
+
+    // Fill the last 1/4 of analysis frame
+    for (int i = 3 * nfft / 4, j = nfft / 2; i < nfft; ++i, ++j) {
+        fft_frame[i] = window_fn[i] * last_frame[j];
+    }
+
+    fft_forward(fft_frame, freqdata);
+
+    for (int freq_sub = 0; freq_sub < power.freq_osr; ++freq_sub) {
+        for (int i = 0; i < power.num_bins; i += power.freq_osr) {
+            float mag2 = std::norm(freqdata[i]);    // re^2 + im^2
+            float mag_db = 10.0f * log10f(1E-12f + mag2);
+            int scaled = (int)(2 * (mag_db + 120));
+            power.mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
+            ++offset;
+        }
+    }
+
+    if (++time_sub >= power.time_osr) {
+        time_sub = 0;
+        ++power.num_blocks;
+    }
+}
+
 // Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
 // We treat and organize the candidate list as a min-heap (empty initially).
 int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates, Candidate *heap, int min_score) {
@@ -35,13 +86,14 @@ int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates
                     // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
                     int num_symbols = 0;
                     for (int m = 0; m <= 72; m += 36) {
+                        // Iterate over 7 Costas synchronisation symbols
                         for (int k = 0; k < 7; ++k) {
+                            int n = time_offset + k + m;
                             // Check for time boundaries
-                            if (time_offset + k + m < 0) continue;
-                            if (time_offset + k + m >= power->num_blocks) break;
+                            if (n < 0) continue;
+                            if (n >= power->num_blocks) break;
 
-                            // int offset = ((time_offset + k + m) * num_alt + alt) * power->num_bins + freq_offset;
-                            int offset = get_index(power, time_offset + k + m, time_sub, freq_sub, freq_offset);
+                            int offset = get_index(power, n, time_sub, freq_sub, freq_offset);
                             const uint8_t *p8 = power->mag + offset;
 
                             // Weighted difference between the expected and all other symbols
@@ -60,19 +112,19 @@ int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates
                                 // look at one frequency bin higher
                                 score += p8[sm] - p8[sm + 1];
                             }
-                            if (k > 0) {
+                            if (k > 0 && n - 1 >= 0) {
                                 // look one symbol back in time
                                 score += p8[sm] - p8[sm - num_alt * power->num_bins];
                             }
-                            if (k < 6) {
+                            if (k < 6 && n + 1 < power->num_blocks) {
                                 // look one symbol forward in time
                                 score += p8[sm] - p8[sm + num_alt * power->num_bins];
                             }
-                        
-                            ++num_symbols;
+                            ++num_symbols;                        
                         }
                     }
-                    score /= num_symbols;
+                    if (num_symbols > 0)
+                        score /= num_symbols;
 
                     if (score < min_score) continue;
 
@@ -121,10 +173,11 @@ void extract_likelihood(const MagArray *power, const Candidate & cand, const uin
         int sym_idx = (k < ft8::ND / 2) ? (k + 7) : (k + 14);
         int bit_idx = 3 * k;
 
-        // Pointer to 8 bins of the current symbol
-        const uint8_t *ps = power->mag + (offset + sym_idx * num_alt * power->num_bins);
+        // Index of the 8 bins of the current symbol
+        int sym_offset = offset + sym_idx * num_alt * power->num_bins;
 
-        decode_symbol(ps, code_map, bit_idx, log174);
+        decode_symbol(power->mag + sym_offset, code_map, bit_idx, log174);
+        // decode_multi_symbols(power->mag + sym_offset, power->num_bins, n_syms, code_map, bit_idx, log174);
     }
 
     // Compute the variance of log174
