@@ -21,3 +21,6 @@ decode_ft8: decode_ft8.o fft/kiss_fftr.o fft/kiss_fft.o ft8/decode.o ft8/encode.
 
 clean:
 	rm -f *.o ft8/*.o common/*.o fft/*.o $(TARGETS)
+install:
+	$(AR) rc libft8.a ft8/constants.o ft8/encode.o ft8/pack.o ft8/text.o common/wave.o 
+	install libft8.a /usr/lib/libft8.a
