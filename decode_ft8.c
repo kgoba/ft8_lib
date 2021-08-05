@@ -221,7 +221,7 @@ int main(int argc, char **argv)
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     Candidate candidate_list[kMax_candidates];
-    int num_candidates = find_sync(&power, kCostas_map, kMax_candidates, candidate_list, kMin_score);
+    int num_candidates = find_sync(&power, kFT8_Costas_pattern, kMax_candidates, candidate_list, kMin_score);
 
     // TODO: sort the candidates by strongest sync first?
 
@@ -238,7 +238,7 @@ int main(int argc, char **argv)
         float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) / kFSK_dev;
 
         float log174[FT8_N];
-        extract_likelihood(&power, cand, kGray_map, log174);
+        extract_likelihood(&power, cand, kFT8_Gray_map, log174);
 
         for (int k = 100; k < 174; ++k)
         {

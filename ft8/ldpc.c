@@ -70,13 +70,13 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     {
         for (int j = 0; j < FT8_M; j++)
         {
-            for (int ii1 = 0; ii1 < kNrw[j]; ii1++)
+            for (int ii1 = 0; ii1 < kFT8_LDPC_num_rows[j]; ii1++)
             {
-                int i1 = kNm[j][ii1] - 1;
+                int i1 = kFT8_LDPC_Nm[j][ii1] - 1;
                 float a = 1.0f;
-                for (int ii2 = 0; ii2 < kNrw[j]; ii2++)
+                for (int ii2 = 0; ii2 < kFT8_LDPC_num_rows[j]; ii2++)
                 {
-                    int i2 = kNm[j][ii2] - 1;
+                    int i2 = kFT8_LDPC_Nm[j][ii2] - 1;
                     if (i2 != i1)
                     {
                         a *= fast_tanh(-m[j][i2] / 2.0f);
@@ -90,7 +90,7 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         {
             float l = codeword[i];
             for (int j = 0; j < 3; j++)
-                l += e[kMn[i][j] - 1][i];
+                l += e[kFT8_LDPC_Mn[i][j] - 1][i];
             plain[i] = (l > 0) ? 1 : 0;
         }
 
@@ -111,13 +111,13 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         {
             for (int ji1 = 0; ji1 < 3; ji1++)
             {
-                int j1 = kMn[i][ji1] - 1;
+                int j1 = kFT8_LDPC_Mn[i][ji1] - 1;
                 float l = codeword[i];
                 for (int ji2 = 0; ji2 < 3; ji2++)
                 {
                     if (ji1 != ji2)
                     {
-                        int j2 = kMn[i][ji2] - 1;
+                        int j2 = kFT8_LDPC_Mn[i][ji2] - 1;
                         l += e[j2][i];
                     }
                 }
@@ -141,9 +141,9 @@ static int ldpc_check(uint8_t codeword[])
     for (int j = 0; j < FT8_M; ++j)
     {
         uint8_t x = 0;
-        for (int i = 0; i < kNrw[j]; ++i)
+        for (int i = 0; i < kFT8_LDPC_num_rows[j]; ++i)
         {
-            x ^= codeword[kNm[j][i] - 1];
+            x ^= codeword[kFT8_LDPC_Nm[j][i] - 1];
         }
         if (x != 0)
         {
@@ -166,9 +166,9 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     // initialize messages to checks
     for (int i = 0; i < FT8_M; ++i)
     {
-        for (int j = 0; j < kNrw[i]; ++j)
+        for (int j = 0; j < kFT8_LDPC_num_rows[i]; ++j)
         {
-            toc[i][j] = codeword[kNm[i][j] - 1];
+            toc[i][j] = codeword[kFT8_LDPC_Nm[i][j] - 1];
         }
     }
 
@@ -208,14 +208,14 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         // Send messages from bits to check nodes
         for (int i = 0; i < FT8_M; ++i)
         {
-            for (int j = 0; j < kNrw[i]; ++j)
+            for (int j = 0; j < kFT8_LDPC_num_rows[i]; ++j)
             {
-                int ibj = kNm[i][j] - 1;
+                int ibj = kFT8_LDPC_Nm[i][j] - 1;
                 toc[i][j] = zn[ibj];
                 for (int kk = 0; kk < 3; ++kk)
                 {
                     // subtract off what the bit had received from the check
-                    if (kMn[ibj][kk] - 1 == i)
+                    if (kFT8_LDPC_Mn[ibj][kk] - 1 == i)
                     {
                         toc[i][j] -= tov[ibj][kk];
                         break;
@@ -227,7 +227,7 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         // send messages from check nodes to variable nodes
         for (int i = 0; i < FT8_M; ++i)
         {
-            for (int j = 0; j < kNrw[i]; ++j)
+            for (int j = 0; j < kFT8_LDPC_num_rows[i]; ++j)
             {
                 toc[i][j] = fast_tanh(-toc[i][j] / 2);
             }
@@ -237,11 +237,11 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         {
             for (int j = 0; j < 3; ++j)
             {
-                int ichk = kMn[i][j] - 1; // kMn(:,j) are the checks that include bit j
+                int ichk = kFT8_LDPC_Mn[i][j] - 1; // kFT8_LDPC_Mn(:,j) are the checks that include bit j
                 float Tmn = 1.0f;
-                for (int k = 0; k < kNrw[ichk]; ++k)
+                for (int k = 0; k < kFT8_LDPC_num_rows[ichk]; ++k)
                 {
-                    if (kNm[ichk][k] - 1 != i)
+                    if (kFT8_LDPC_Nm[ichk][k] - 1 != i)
                     {
                         Tmn *= toc[ichk][k];
                     }

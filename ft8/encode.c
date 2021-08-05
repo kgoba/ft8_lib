@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define TOPBIT (1 << (CRC_WIDTH - 1))
+#define TOPBIT (1 << (FT8_CRC_WIDTH - 1))
 
 // Returns 1 if an odd number of bits are set in x, zero otherwise
 uint8_t parity8(uint8_t x)
@@ -24,7 +24,7 @@ uint8_t parity8(uint8_t x)
 void encode174(const uint8_t *message, uint8_t *codeword)
 {
     // Here we don't generate the generator bit matrix as in WSJT-X implementation
-    // Instead we access the generator bits straight from the binary representation in kGenerator
+    // Instead we access the generator bits straight from the binary representation in kFT8_LDPC_generator
 
     // For reference:
     // codeword(1:K)=message
@@ -49,13 +49,13 @@ void encode174(const uint8_t *message, uint8_t *codeword)
     for (int i = 0; i < FT8_M; ++i)
     { // do i=1,FT8_M
         // Fast implementation of bitwise multiplication and parity checking
-        // Normally nsum would contain the result of dot product between message and kGenerator[i],
+        // Normally nsum would contain the result of dot product between message and kFT8_LDPC_generator[i],
         // but we only compute the sum modulo 2.
         uint8_t nsum = 0;
         for (int j = 0; j < FT8_K_BYTES; ++j)
         {
-            uint8_t bits = message[j] & kGenerator[i][j]; // bitwise AND (bitwise multiplication)
-            nsum ^= parity8(bits);                        // bitwise XOR (addition modulo 2)
+            uint8_t bits = message[j] & kFT8_LDPC_generator[i][j]; // bitwise AND (bitwise multiplication)
+            nsum ^= parity8(bits);                                 // bitwise XOR (addition modulo 2)
         }
         // Check if we need to set a bit in codeword
         if (nsum % 2)
@@ -93,14 +93,14 @@ uint16_t ft8_crc(uint8_t *message, int num_bits)
         if (idx_bit % 8 == 0)
         {
             // Bring the next byte into the remainder.
-            remainder ^= (message[idx_byte] << (CRC_WIDTH - 8));
+            remainder ^= (message[idx_byte] << (FT8_CRC_WIDTH - 8));
             ++idx_byte;
         }
 
         // Try to divide the current data bit.
         if (remainder & TOPBIT)
         {
-            remainder = (remainder << 1) ^ CRC_POLYNOMIAL;
+            remainder = (remainder << 1) ^ FT8_CRC_POLYNOMIAL;
         }
         else
         {
@@ -108,7 +108,7 @@ uint16_t ft8_crc(uint8_t *message, int num_bits)
         }
     }
 
-    return remainder & ((1 << CRC_WIDTH) - 1);
+    return remainder & ((1 << FT8_CRC_WIDTH) - 1);
 }
 
 // Generate FT8 tone sequence from payload data
@@ -142,9 +142,9 @@ void genft8(const uint8_t *payload, uint8_t *itone)
     // Message structure: S7 D29 S7 D29 S7
     for (int i = 0; i < 7; ++i)
     {
-        itone[i] = kCostas_map[i];
-        itone[36 + i] = kCostas_map[i];
-        itone[72 + i] = kCostas_map[i];
+        itone[i] = kFT8_Costas_pattern[i];
+        itone[36 + i] = kFT8_Costas_pattern[i];
+        itone[72 + i] = kFT8_Costas_pattern[i];
     }
 
     int k = 7; // Skip over the first set of Costas symbols
@@ -183,7 +183,7 @@ void genft8(const uint8_t *payload, uint8_t *itone)
             i_byte++;
         }
 
-        itone[k] = kGray_map[bits3];
+        itone[k] = kFT8_Gray_map[bits3];
         ++k;
     }
 }

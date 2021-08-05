@@ -1,4 +1,5 @@
-CXXFLAGS = -std=c++14 -I.
+CFLAGS = -O3
+CPPFLAGS = -std=c11 -I.
 LDFLAGS = -lm
 
 TARGETS = gen_ft8 decode_ft8 test
