@@ -33,7 +33,7 @@ void save_wav(const float *signal, int num_samples, int sample_rate, const char 
             x = 1.0;
         else if (x < -1.0)
             x = -1.0;
-        raw_data[i] = int(0.5 + (x * 32767.0));
+        raw_data[i] = (int)(0.5 + (x * 32767.0));
     }
 
     FILE *f = fopen(path, "wb");

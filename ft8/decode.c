@@ -1,6 +1,7 @@
 #include "decode.h"
 #include "constants.h"
 
+#include <stdbool.h>
 #include <math.h>
 
 static float max2(float a, float b);
