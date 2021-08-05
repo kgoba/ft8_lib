@@ -29,7 +29,7 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
         {
             // CQ_nnn with 3 digits
             strcpy(result, "CQ ");
-            int_to_dd(result + 3, n28 - 3, 3);
+            int_to_dd(result + 3, n28 - 3, 3, false);
             return 0; // Success
         }
         if (n28 <= 532443L)
@@ -63,7 +63,7 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
         // TODO: implement
         // strcpy(result, "<...>");
         result[0] = '<';
-        int_to_dd(result + 1, n28, 7);
+        int_to_dd(result + 1, n28, 7, false);
         result[8] = '>';
         result[9] = '\0';
         return 0;
@@ -303,7 +303,7 @@ int unpack_nonstandard(const uint8_t *a77, char *field1, char *field2, char *fie
     // should replace with hash12(n12, call_3);
     // strcpy(call_3, "<...>");
     call_3[0] = '<';
-    int_to_dd(call_3 + 1, n12, 4);
+    int_to_dd(call_3 + 1, n12, 4, false);
     call_3[5] = '>';
     call_3[6] = '\0';
 

@@ -1,7 +1,8 @@
-#include <cstdlib>
-#include <cstring>
-#include <cstdio>
-#include <cmath>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+#include <stdbool.h>
 
 #include "ft8/unpack.h"
 #include "ft8/ldpc.h"
@@ -192,7 +193,7 @@ int main(int argc, char **argv)
     int num_samples = 15 * sample_rate;
     float signal[num_samples];
 
-    int rc = load_wav(signal, num_samples, sample_rate, wav_path);
+    int rc = load_wav(signal, &num_samples, &sample_rate, wav_path);
     if (rc < 0)
     {
         return -1;
@@ -229,12 +230,12 @@ int main(int argc, char **argv)
     int num_decoded = 0;
     for (int idx = 0; idx < num_candidates; ++idx)
     {
-        Candidate &cand = candidate_list[idx];
-        if (cand.score < kMin_score)
+        const Candidate *cand = &candidate_list[idx];
+        if (cand->score < kMin_score)
             continue;
 
-        float freq_hz = (cand.freq_offset + (float)cand.freq_sub / kFreq_osr) * kFSK_dev;
-        float time_sec = (cand.time_offset + (float)cand.time_sub / kTime_osr) / kFSK_dev;
+        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) * kFSK_dev;
+        float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) / kFSK_dev;
 
         float log174[FT8_N];
         extract_likelihood(&power, cand, kGray_map, log174);
@@ -313,7 +314,7 @@ int main(int argc, char **argv)
 
                 // Fake WSJT-X-like output for now
                 int snr = 0; // TODO: compute SNR
-                printf("000000 %3d [%2d] %4.1f %4d ~  %s\n", cand.score, k, time_sec, (int)(freq_hz + 0.5f), message);
+                printf("000000 %3d [%2d] %4.1f %4d ~  %s\n", cand->score, k, time_sec, (int)(freq_hz + 0.5f), message);
                 continue;
             }
         }

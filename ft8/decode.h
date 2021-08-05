@@ -27,6 +27,6 @@ int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates
 
 // Compute log likelihood log(p(1) / p(0)) of 174 message bits
 // for later use in soft-decision LDPC decoding
-void extract_likelihood(const MagArray *power, const Candidate &cand, const uint8_t *code_map, float *log174);
+void extract_likelihood(const MagArray *power, const Candidate *cand, const uint8_t *code_map, float *log174);
 
 #endif // _INCLUDE_DECODE_H_

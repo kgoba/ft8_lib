@@ -120,11 +120,10 @@ int find_sync(const MagArray *power, const uint8_t *sync_map, int num_candidates
 
 // Compute log likelihood log(p(1) / p(0)) of 174 message bits
 // for later use in soft-decision LDPC decoding
-void extract_likelihood(const MagArray *power, const Candidate &cand, const uint8_t *code_map, float *log174)
+void extract_likelihood(const MagArray *power, const Candidate *cand, const uint8_t *code_map, float *log174)
 {
     int num_alt = power->time_osr * power->freq_osr;
-    // int offset = (cand.time_offset * num_alt + cand.time_sub * power->freq_osr + cand.freq_sub) * power->num_bins + cand.freq_offset;
-    int offset = get_index(power, cand.time_offset, cand.time_sub, cand.freq_sub, cand.freq_offset);
+    int offset = get_index(power, cand->time_offset, cand->time_sub, cand->freq_sub, cand->freq_offset);
 
     // Go over FSK tones and skip Costas sync symbols
     const int n_syms = 1;

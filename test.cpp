@@ -1,12 +1,10 @@
-#include <cstdlib>
-#include <cstring>
-#include <cstdio>
-#include <cmath>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+#include <stdbool.h>
 
 #include "ft8/text.h"
-//#include "ft8/v1/pack.h"
-//#include "ft8/v1/unpack.h"
-//#include "ft8/v1/encode.h"
 #include "ft8/pack.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"
