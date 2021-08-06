@@ -3,15 +3,15 @@
 
 #include <stdio.h>
 
-#define TOPBIT (1 << (FT8_CRC_WIDTH - 1))
+#define TOPBIT (1u << (FT8_CRC_WIDTH - 1))
 
 // Returns 1 if an odd number of bits are set in x, zero otherwise
 uint8_t parity8(uint8_t x)
 {
-    x ^= x >> 4; // a b c d ae bf cg dh
-    x ^= x >> 2; // a b ac bd cae dbf aecg bfdh
-    x ^= x >> 1; // a ab bac acbd bdcae caedbf aecgbfdh
-    return (x)&1;
+    x ^= x >> 4;  // a b c d ae bf cg dh
+    x ^= x >> 2;  // a b ac bd cae dbf aecg bfdh
+    x ^= x >> 1;  // a ab bac acbd bdcae caedbf aecgbfdh
+    return x % 2; // modulo 2
 }
 
 // Encode a 91-bit message and return a 174-bit codeword.
@@ -37,17 +37,18 @@ void encode174(const uint8_t *message, uint8_t *codeword)
     // printf("\n");
 
     // Fill the codeword with message and zeros, as we will only update binary ones later
-    for (int j = 0; j < (7 + FT8_N) / 8; ++j)
+    for (int j = 0; j < FT8_N_BYTES; ++j)
     {
         codeword[j] = (j < FT8_K_BYTES) ? message[j] : 0;
     }
 
-    uint8_t col_mask = (0x80 >> (FT8_K % 8)); // bitmask of current byte
-    uint8_t col_idx = FT8_K_BYTES - 1;        // index into byte array
+    // Compute the byte index and bit mask for the first checksum bit
+    uint8_t col_mask = (0x80u >> (FT8_K % 8u)); // bitmask of current byte
+    uint8_t col_idx = FT8_K_BYTES - 1;          // index into byte array
 
-    // Compute the first part of itmp (1:FT8_M) and store the result in codeword
+    // Compute the LDPC checksum bits and store them in codeword
     for (int i = 0; i < FT8_M; ++i)
-    { // do i=1,FT8_M
+    {
         // Fast implementation of bitwise multiplication and parity checking
         // Normally nsum would contain the result of dot product between message and kFT8_LDPC_generator[i],
         // but we only compute the sum modulo 2.
@@ -57,25 +58,21 @@ void encode174(const uint8_t *message, uint8_t *codeword)
             uint8_t bits = message[j] & kFT8_LDPC_generator[i][j]; // bitwise AND (bitwise multiplication)
             nsum ^= parity8(bits);                                 // bitwise XOR (addition modulo 2)
         }
-        // Check if we need to set a bit in codeword
+
+        // Set the current checksum bit in codeword if nsum is odd
         if (nsum % 2)
-        { // pchecks(i)=mod(nsum,2)
+        {
             codeword[col_idx] |= col_mask;
         }
 
+        // Update the byte index and bit mask for the next checksum bit
         col_mask >>= 1;
         if (col_mask == 0)
         {
-            col_mask = 0x80;
+            col_mask = 0x80u;
             ++col_idx;
         }
     }
-
-    // printf("Result ");
-    // for (int i = 0; i < (FT8_N + 7) / 8; ++i) {
-    //     printf("%02x ", codeword[i]);
-    // }
-    // printf("\n");
 }
 
 // Compute 14-bit CRC for a sequence of given number of bits
@@ -108,7 +105,7 @@ uint16_t ft8_crc(uint8_t *message, int num_bits)
         }
     }
 
-    return remainder & ((1 << FT8_CRC_WIDTH) - 1);
+    return remainder & ((TOPBIT << 1) - 1u);
 }
 
 // Generate FT8 tone sequence from payload data
@@ -123,7 +120,7 @@ void genft8(const uint8_t *payload, uint8_t *itone)
         a91[i] = payload[i];
 
     // Clear 3 bits after the payload to make 80 bits
-    a91[9] &= 0xF8;
+    a91[9] &= 0xF8u;
     a91[10] = 0;
     a91[11] = 0;
 
@@ -149,10 +146,10 @@ void genft8(const uint8_t *payload, uint8_t *itone)
 
     int k = 7; // Skip over the first set of Costas symbols
 
-    uint8_t mask = 0x80;
+    uint8_t mask = 0x80u;
     int i_byte = 0;
     for (int j = 0; j < FT8_ND; ++j)
-    { // do j=1,FT8_ND
+    {
         if (j == 29)
         {
             k += 7; // Skip over the second set of Costas symbols

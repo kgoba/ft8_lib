@@ -393,6 +393,7 @@ int unpack77(const uint8_t *a77, char *message)
     char field1[14];
     char field2[14];
     char field3[7];
+
     int rc = unpack77_fields(a77, field1, field2, field3);
     if (rc < 0)
         return rc;
