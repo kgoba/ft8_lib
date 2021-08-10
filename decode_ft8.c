@@ -114,7 +114,7 @@ void extract_power(const float signal[], MagArray *power)
             // Compute log magnitude in decibels
             for (int j = 0; j < nfft / 2 + 1; ++j)
             {
-                float mag2 = (freqdata[j].i * freqdata[j].i + freqdata[j].r * freqdata[j].r);
+                float mag2 = (freqdata[j].i * freqdata[j].i) + (freqdata[j].r * freqdata[j].r);
                 mag_db[j] = 10.0f * log10f(1E-10f + mag2 * fft_norm * fft_norm);
             }
 
@@ -123,14 +123,10 @@ void extract_power(const float signal[], MagArray *power)
             {
                 for (int j = 0; j < power->num_bins; ++j)
                 {
-                    float db1 = mag_db[j * power->freq_osr + freq_sub];
-                    //float db2 = mag_db[j * 2 + freq_sub + 1];
-                    //float db = (db1 + db2) / 2;
-                    float db = db1;
-                    //float db = sqrtf(db1 * db2);
-
+                    float db = mag_db[j * power->freq_osr + freq_sub];
                     // Scale decibels to unsigned 8-bit range and clamp the value
                     int scaled = (int)(2 * (db + 120));
+
                     power->mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
                     ++offset;
 
@@ -240,22 +236,22 @@ int main(int argc, char **argv)
         float log174[FT8_N];
         extract_likelihood(&power, cand, log174);
 
-        for (int k = 100; k < 174; ++k)
+        // Try partial decodes with truncated end of message
+        // (to check if successful decoding can be done prior to receiving the whole message)
+        for (int bits_received = 100; bits_received < 174; ++bits_received)
         {
             // bp_decode() produces better decodes, uses way less memory
             uint8_t plain[FT8_N];
-            float log174_zeroed[FT8_N];
+            float log174_masked[FT8_N];
             int n_errors = 0;
 
+            // mask trailing bits with 0 likelihood (p(1)=p(0)=0.5)
             for (int m = 0; m < 174; ++m)
             {
-                if (m < k)
-                    log174_zeroed[m] = log174[m];
-                else
-                    log174_zeroed[m] = 0;
+                log174_masked[m] = (m < bits_received) ? log174[m] : 0;
             }
-            bp_decode(log174_zeroed, kLDPC_iterations, plain, &n_errors);
-            // ldpc_decode(log174, kLDPC_iterations, plain, &n_errors);
+            bp_decode(log174_masked, kLDPC_iterations, plain, &n_errors);
+            // ldpc_decode(log174_masked, kLDPC_iterations, plain, &n_errors);
 
             if (n_errors > 0)
             {
@@ -314,7 +310,7 @@ int main(int argc, char **argv)
 
                 // Fake WSJT-X-like output for now
                 int snr = 0; // TODO: compute SNR
-                printf("000000 %3d [%2d] %4.1f %4d ~  %s\n", cand->score, k, time_sec, (int)(freq_hz + 0.5f), message);
+                printf("000000 %3d [%2d] %4.1f %4d ~  %s\n", cand->score, bits_received, time_sec, (int)(freq_hz + 0.5f), message);
                 continue;
             }
         }
