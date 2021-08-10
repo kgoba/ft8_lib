@@ -1,12 +1,12 @@
 # FT8 library 
 
-A C++ implementation of FT8 protocol, mostly intended for experimental use on microcontrollers.
+C implementation of FT8 protocol decoder and encoder, mostly intended for experimental use on microcontrollers.
 
 The intent of this library is to foster experimentation with e.g. automated beacons. For example, FT8 supports free-text messages and raw telemetry data (71 bits).
 
 The encoding process is relatively light on resources, and an Arduino should be perfectly capable of running this code.
 
-Decoding is is still work in progress. So far a 15-second WAV file can be decoded on a desktop machine or SBC, and the routines are somewhat ready for a fast microcontroller, perhaps with some tradeoffs. One definite limitation is the necessity to store the whole 15-second window in some representation (either waveform or DFT spectrum) for decoding at the end of the time slot. The current implementation uses about 200 KB of RAM for that purpose. 
+The decoder is designed with memory and computing efficiency in mind, in order to be usable with a fast enough microcontroller. It is shown to be working on STM32F7 boards fast enough for real work, but the embedded application itself is beyond this repository. This repository provides an example decoder which can decode a 15-second WAV file on a desktop machine or SBC. The decoder needs to access the whole 15-second window in spectral magnitude representation (the window can be also shorter, and messages can have varying starting time within the window). The example decoder uses slightly less than 200 KB of RAM. 
 
 # What works
 
@@ -24,19 +24,25 @@ There is historical code that supports the same set of FT8 version 1 (75-bit) me
 
 I'm currently working on decoding, which still needs refactoring. The code is not yet really a library, rather a collection of routines and example code.
 
+Incremental decoding (processing during the 15 second window) is something that I would like to explore, but haven't started.
+
+FT4 is not supported, but I would like to add it one day soon.
+
 These features are low on my priority list:
 * Contest modes
 * Compound callsigns with country prefixes and special callsigns
 
 # What to do with it
 
-You can generate 15-second WAV files with your own messages as a proof of concept or for testing purposes. They can either be played back or opened directly from WSJT-X. To do that, run ```make``` and build ```gen_ft8```. Then run it. Currently messages are modulated at 1000-1050 Hz.
+You can generate 15-second WAV files with your own messages as a proof of concept or for testing purposes. They can either be played back or opened directly from WSJT-X. To do that, run ```make```. Then run ```gen_ft8```. Currently messages are modulated at 1000-1050 Hz.
+
+You can decode 15-second (or shorter) WAV files with ```decode_ft8```. This is only an example application and does not support live processing/recording, for that you could use third party code (PortAudio, for example).
 
 # References and credits
 
 Thanks to Robert Morris, AB1HL, whose Python code (https://github.com/rtmrtmrtmrtm/weakmon) inspired this and helped to test various parts of the code.
 
-This would not of course be possible without the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html). I believe that is the only 'documentation' of the FT8 protocol available, and the source code was used as such in this project.
+This would not of course be possible without the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html).
 
 Thanks to Mark Borgerding for his FFT implementation (https://github.com/mborgerding/kissfft). I have included a portion of his code.
 
