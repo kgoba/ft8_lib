@@ -92,25 +92,9 @@ const uint8_t kFT8_LDPC_generator[FT8_M][FT8_K_BYTES] = {
     {0x26, 0x44, 0xeb, 0xad, 0xeb, 0x44, 0xb9, 0x46, 0x7d, 0x1f, 0x42, 0xc0},
     {0x60, 0x8c, 0xc8, 0x57, 0x59, 0x4b, 0xfb, 0xb5, 0x5d, 0x69, 0x60, 0x00}};
 
-// Column order (permutation) in which the bits in codeword are stored
-// (Not really used in FT8 v2 - instead the Nm, Mn and generator matrices are already permuted)
-const uint8_t kFT8_LDPC_column_order[FT8_N] = {
-    0, 1, 2, 3, 28, 4, 5, 6, 7, 8, 9, 10, 11, 34, 12, 32, 13, 14, 15, 16,
-    17, 18, 36, 29, 43, 19, 20, 42, 21, 40, 30, 37, 22, 47, 61, 45, 44, 23, 41, 39,
-    49, 24, 46, 50, 48, 26, 31, 33, 51, 38, 52, 59, 55, 66, 57, 27, 60, 35, 54, 58,
-    25, 56, 62, 64, 67, 69, 63, 68, 70, 72, 65, 73, 75, 74, 71, 77, 78, 76, 79, 80,
-    53, 81, 83, 82, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
-    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119,
-    120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139,
-    140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
-    160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173};
-
-// this is the LDPC(174,91) parity check matrix.
-// 83 rows.
-// each row describes one parity check.
-// each number is an index into the codeword (1-origin).
-// the codeword bits mentioned in each row must xor to zero.
-// From WSJT-X's ldpc_174_91_c_reordered_parity.f90.
+// Each row describes one LDPC parity check.
+// Each number is an index into the codeword (1-origin).
+// The codeword bits mentioned in each row must XOR to zero.
 const uint8_t kFT8_LDPC_Nm[FT8_M][7] = {
     {4, 31, 59, 91, 92, 96, 153},
     {5, 32, 60, 93, 115, 146, 0},
@@ -196,10 +180,8 @@ const uint8_t kFT8_LDPC_Nm[FT8_M][7] = {
     {25, 38, 65, 99, 122, 160, 0},
     {17, 42, 75, 129, 170, 172, 0}};
 
-// Mn from WSJT-X's bpdecode174.f90.
-// each row corresponds to a codeword bit.
-// the numbers indicate which three parity
-// checks (rows in Nm) refer to the codeword bit.
+// Each row corresponds to a codeword bit.
+// The numbers indicate which three LDPC parity checks (rows in Nm) refer to the codeword bit.
 // 1-origin.
 const uint8_t kFT8_LDPC_Mn[FT8_N][3] = {
     {16, 45, 73},

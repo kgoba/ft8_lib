@@ -20,8 +20,6 @@
 static int ldpc_check(uint8_t codeword[]);
 static float fast_tanh(float x);
 static float fast_atanh(float x);
-static float pltanh(float x);
-static float platanh(float x);
 
 // Packs a string of bits each represented as a zero/non-zero byte in plain[],
 // as a string of packed bits starting from the MSB of the first byte of packed[]
@@ -286,58 +284,4 @@ static float fast_atanh(float x)
     float a = x * (945.0f + x2 * (-735.0f + x2 * 64.0f));
     float b = (945.0f + x2 * (-1050.0f + x2 * 225.0f));
     return a / b;
-}
-
-static float pltanh(float x)
-{
-    float isign = +1;
-    if (x < 0)
-    {
-        isign = -1;
-        x = -x;
-    }
-    if (x < 0.8f)
-    {
-        return isign * 0.83 * x;
-    }
-    if (x < 1.6f)
-    {
-        return isign * (0.322f * x + 0.4064f);
-    }
-    if (x < 3.0f)
-    {
-        return isign * (0.0524f * x + 0.8378f);
-    }
-    if (x < 7.0f)
-    {
-        return isign * (0.0012f * x + 0.9914f);
-    }
-    return isign * 0.9998f;
-}
-
-static float platanh(float x)
-{
-    float isign = +1;
-    if (x < 0)
-    {
-        isign = -1;
-        x = -x;
-    }
-    if (x < 0.664f)
-    {
-        return isign * x / 0.83f;
-    }
-    if (x < 0.9217f)
-    {
-        return isign * (x - 0.4064f) / 0.322f;
-    }
-    if (x < 0.9951f)
-    {
-        return isign * (x - 0.8378f) / 0.0524f;
-    }
-    if (x < 0.9998f)
-    {
-        return isign * (x - 0.9914f) / 0.0012f;
-    }
-    return isign * 7.0f;
 }

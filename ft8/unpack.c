@@ -3,7 +3,6 @@
 
 #include <string.h>
 
-//#define NBASE (uint32_t)(37L*36L*10L*27L*27L*27L)
 #define MAX22 ((uint32_t)4194304L)
 #define NTOKENS ((uint32_t)2063592L)
 #define MAXGRID4 ((uint16_t)32400L)
@@ -59,13 +58,12 @@ int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
     if (n28 < MAX22)
     {
         // This is a 22-bit hash of a result
-        //call hash22(n22,c13)     !Retrieve result from hash table
         // TODO: implement
-        // strcpy(result, "<...>");
-        result[0] = '<';
-        int_to_dd(result + 1, n28, 7, false);
-        result[8] = '>';
-        result[9] = '\0';
+        strcpy(result, "<...>");
+        // result[0] = '<';
+        // int_to_dd(result + 1, n28, 7, false);
+        // result[8] = '>';
+        // result[9] = '\0';
         return 0;
     }
 
@@ -114,8 +112,6 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *field1, char *field2, cha
     uint8_t ir;
 
     // Extract packed fields
-    // read(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
-    // 1000 format(2(b28,b1),b1,b15,b3)
     n28a = (a77[0] << 21);
     n28a |= (a77[1] << 13);
     n28a |= (a77[2] << 5);
@@ -168,7 +164,6 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *field1, char *field2, cha
         dst[1] = 'A' + (n % 18);
         n /= 18;
         dst[0] = 'A' + (n % 18);
-        // if(msg(1:3).eq.'CQ ' .and. ir.eq.1) unpk77_success=.false.
         // if (ir > 0 && strncmp(field1, "CQ", 2) == 0) return -1;
     }
     else
@@ -195,7 +190,6 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *field1, char *field2, cha
             }
             int_to_dd(dst, irpt - 35, 2, true);
         }
-        // if(msg(1:3).eq.'CQ ' .and. irpt.ge.2) unpk77_success=.false.
         // if (irpt >= 2 && strncmp(field1, "CQ", 2) == 0) return -1;
     }
 
@@ -264,11 +258,6 @@ int unpack_telemetry(const uint8_t *a71, char *telemetry)
 //by KD8CEC
 int unpack_nonstandard(const uint8_t *a77, char *field1, char *field2, char *field3)
 {
-    /*
-	wsjt-x 2.1.0 rc5
-     	read(c77,1050) n12,n58,iflip,nrpt,icq
-	1050 format(b12,b58,b1,b2,b1)
-*/
     uint32_t n12, iflip, nrpt, icq;
     uint64_t n58;
     n12 = (a77[0] << 4);  //11 ~4  : 8

@@ -15,25 +15,13 @@ uint8_t parity8(uint8_t x)
 
 // Encode a 91-bit message and return a 174-bit codeword.
 // The generator matrix has dimensions (87,87).
-// The code is a (174,91) regular ldpc code with column weight 3.
-// The code was generated using the PEG algorithm.
+// The code is a (174,91) regular LDPC code with column weight 3.
 // Arguments:
 // [IN] message   - array of 91 bits stored as 12 bytes (MSB first)
 // [OUT] codeword - array of 174 bits stored as 22 bytes (MSB first)
 void encode174(const uint8_t *message, uint8_t *codeword)
 {
-    // Here we don't generate the generator bit matrix as in WSJT-X implementation
-    // Instead we access the generator bits straight from the binary representation in kFT8_LDPC_generator
-
-    // For reference:
-    // codeword(1:K)=message
-    // codeword(K+1:N)=pchecks
-
-    // printf("Encode ");
-    // for (int i = 0; i < FT8_K_BYTES; ++i) {
-    //     printf("%02x ", message[i]);
-    // }
-    // printf("\n");
+    // This implementation accesses the generator bits straight from the packed binary representation in kFT8_LDPC_generator
 
     // Fill the codeword with message and zeros, as we will only update binary ones later
     for (int j = 0; j < FT8_N_BYTES; ++j)

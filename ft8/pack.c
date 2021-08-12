@@ -34,14 +34,9 @@ int32_t pack28(const char *callsign)
         int nnum = 0, nlet = 0;
 
         // TODO:
-        // if(nnum.eq.3 .and. nlet.eq.0) then n28=3+nqsy
-        // if(nlet.ge.1 .and. nlet.le.4 .and. nnum.eq.0) then n28=3+1000+m
     }
 
     // TODO: Check for <...> callsign
-    // if(text(1:1).eq.'<')then
-    //   call save_hash_call(text,n10,n12,n22)   !Save callsign in hash table
-    //   n28=NTOKENS + n22
 
     char c6[6] = {' ', ' ', ' ', ' ', ' ', ' '};
 
@@ -84,7 +79,6 @@ int32_t pack28(const char *callsign)
         (i2 = char_index(A3, c6[2])) >= 0 && (i3 = char_index(A4, c6[3])) >= 0 &&
         (i4 = char_index(A4, c6[4])) >= 0 && (i5 = char_index(A4, c6[5])) >= 0)
     {
-        //printf("Pack28: idx=[%d, %d, %d, %d, %d, %d]\n", i0, i1, i2, i3, i4, i5);
         // This is a standard callsign
         int32_t n28 = i0;
         n28 = n28 * 36 + i1;
@@ -92,20 +86,14 @@ int32_t pack28(const char *callsign)
         n28 = n28 * 27 + i3;
         n28 = n28 * 27 + i4;
         n28 = n28 * 27 + i5;
-        //printf("Pack28: n28=%d (%04xh)\n", n28, n28);
         return NTOKENS + MAX22 + n28;
     }
 
     //char text[13];
-
     //if (length > 13) return -1;
 
     // TODO:
     // Treat this as a nonstandard callsign: compute its 22-bit hash
-    // call save_hash_call(text,n10,n12,n22)   !Save callsign in hash table
-    // n28=NTOKENS + n22
-
-    // n28=iand(n28,ishft(1,28)-1)
     return -1;
 }
 
@@ -129,12 +117,6 @@ bool chkcall(const char *call, char *bc)
         return false;
 
     // TODO: implement suffix parsing (or rework?)
-    //bc=w(1:6)
-    //i0=char_index(w,'/')
-    //if(max(i0-1,n1-i0).gt.6) go to 100      !Base call must be < 7 characters
-    //if(i0.ge.2 .and. i0.le.n1-1) then       !Extract base call from compound call
-    //   if(i0-1.le.n1-i0) bc=w(i0+1:n1)//'   '
-    //   if(i0-1.gt.n1-i0) bc=w(1:i0-1)//'   '
 
     return true;
 }
@@ -160,7 +142,6 @@ uint16_t packgrid(const char *grid4)
         in_range(grid4[1], 'A', 'R') &&
         is_digit(grid4[2]) && is_digit(grid4[3]))
     {
-        //if (w(3).eq.'R ') ir=1
         uint16_t igrid4 = (grid4[0] - 'A');
         igrid4 = igrid4 * 18 + (grid4[1] - 'A');
         igrid4 = igrid4 * 10 + (grid4[2] - '0');
@@ -220,18 +201,12 @@ int pack77_1(const char *msg, uint8_t *b77)
     uint8_t i3 = 1; // No suffix or /R
 
     // TODO: check for suffixes
-    // if(char_index(w(1),'/P').ge.4 .or. char_index(w(2),'/P').ge.4) i3=2  !Type 2, with "/P"
-    // if(char_index(w(1),'/P').ge.4 .or. char_index(w(1),'/R').ge.4) ipa=1
-    // if(char_index(w(2),'/P').ge.4 .or. char_index(w(2),'/R').ge.4) ipb=1
 
     // Shift in ipa and ipb bits into n28a and n28b
     n28a <<= 1; // ipa = 0
     n28b <<= 1; // ipb = 0
 
     // Pack into (28 + 1) + (28 + 1) + (1 + 15) + 3 bits
-    // write(c77,1000) n28a,ipa,n28b,ipb,ir,igrid4,i3
-    // 1000 format(2(b28.28,b1),b1,b15.15,b3.3)
-
     b77[0] = (n28a >> 21);
     b77[1] = (n28a >> 13);
     b77[2] = (n28a >> 5);
@@ -320,10 +295,8 @@ int pack77(const char *msg, uint8_t *c77)
 
     // TODO:
     // Check 0.5 (telemetry)
-    // i3=0 n3=5 write(c77,1006) ntel,n3,i3 1006 format(b23.23,2b24.24,2b3.3)
 
     // Check Type 4 (One nonstandard call and one hashed call)
-    // pack77_4(nwords,w,i3,n3,c77)
 
     // Default to free text
     // i3=0 n3=0

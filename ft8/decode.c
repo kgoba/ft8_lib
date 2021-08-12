@@ -158,8 +158,7 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
     float inv_n = 1.0f / FT8_N;
     float variance = (sum2 - (sum * sum * inv_n)) * inv_n;
 
-    // Normalize log174 such that sigma = 2.83 (Why? It's in WSJT-X, ft8b.f90)
-    // Seems to be 2.83 = sqrt(8). Experimentally sqrt(32) works better.
+    // Normalize log174 distribution and scale it with experimentally found coefficient
     float norm_factor = sqrtf(32.0f / variance);
     for (int i = 0; i < FT8_N; ++i)
     {
@@ -187,10 +186,10 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
 
     // Extract CRC and check it
     status->crc_extracted = extract_crc(a91);
+    // [1]: 'The CRC is calculated on the source-encoded message, zero-extended from 77 to 82 bits.'
     // TODO: not sure why the zeroing of message is needed and also why CRC over 96-14 bits?
     a91[9] &= 0xF8;
-    a91[10] = 0;
-    a91[11] = 0;
+    a91[10] &= 0x00;
     status->crc_calculated = ft8_crc(a91, 96 - 14);
 
     if (status->crc_extracted != status->crc_calculated)
