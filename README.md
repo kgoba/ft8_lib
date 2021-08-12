@@ -42,7 +42,11 @@ You can decode 15-second (or shorter) WAV files with ```decode_ft8```. This is o
 
 Thanks to Robert Morris, AB1HL, whose Python code (https://github.com/rtmrtmrtmrtm/weakmon) inspired this and helped to test various parts of the code.
 
-This would not of course be possible without the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html).
+The defails of FT4 and FT8 procotols and decoding/encoding are described here: https://physics.princeton.edu/pulsar/k1jt/FT4_FT8_QEX.pdf
+
+The public part of FT4/FT8 implementation is included in this repository under ft4_ft8_public.
+
+Of course in moments of frustration I have looked up the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html). However, this library contains my own original DSP routines and a different implementation of the decoder which is suitable for resource-constrained embedded environments.
 
 Thanks to Mark Borgerding for his FFT implementation (https://github.com/mborgerding/kissfft). I have included a portion of his code.
 
