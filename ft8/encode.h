@@ -19,9 +19,4 @@ void genft8(const uint8_t *payload, uint8_t *itone);
 //   * codeword - array of 174 bits stored as 22 bytes (MSB first)
 void encode174(const uint8_t *message, uint8_t *codeword);
 
-// Compute 14-bit CRC for a sequence of given number of bits
-// [IN] message  - byte sequence (MSB first)
-// [IN] num_bits - number of bits in the sequence
-uint16_t ft8_crc(uint8_t *message, int num_bits);
-
 #endif // _INCLUDE_ENCODE_H_

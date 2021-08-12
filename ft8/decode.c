@@ -1,22 +1,32 @@
 #include "decode.h"
 #include "constants.h"
+#include "crc.h"
+#include "ldpc.h"
+#include "unpack.h"
 
 #include <stdbool.h>
 #include <math.h>
 
+/// Compute log likelihood log(p(1) / p(0)) of 174 message bits for later use in soft-decision LDPC decoding
+/// @param[in] power Waterfall data collected during message slot
+/// @param[in] cand Candidate to extract the message from
+/// @param[in] code_map Symbol encoding map
+/// @param[out] log174 Output of decoded log likelihoods for each of the 174 message bits
+static void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174);
+
 static float max2(float a, float b);
 static float max4(float a, float b, float c, float d);
-static void heapify_down(Candidate heap[], int heap_size);
-static void heapify_up(Candidate heap[], int heap_size);
+static void heapify_down(candidate_t heap[], int heap_size);
+static void heapify_up(candidate_t heap[], int heap_size);
 static void decode_symbol(const uint8_t *power, int bit_idx, float *log174);
 static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms, int bit_idx, float *log174);
 
-static int get_index(const MagArray *power, int block, int time_sub, int freq_sub, int bin)
+static int get_index(const waterfall_t *power, int block, int time_sub, int freq_sub, int bin)
 {
     return ((((block * power->time_osr) + time_sub) * power->freq_osr + freq_sub) * power->num_bins) + bin;
 }
 
-int find_sync(const MagArray *power, int num_candidates, Candidate heap[], int min_score)
+int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], int min_score)
 {
     int heap_size = 0;
     int num_alt = power->time_osr * power->freq_osr;
@@ -28,9 +38,9 @@ int find_sync(const MagArray *power, int num_candidates, Candidate heap[], int m
     {
         for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
         {
-            for (int time_offset = -7; time_offset < power->num_blocks - FT8_NN + 7; ++time_offset)
+            for (int time_offset = -8; time_offset < power->num_blocks - FT8_NN + 8; ++time_offset)
             {
-                for (int freq_offset = 0; freq_offset < power->num_bins - 8; ++freq_offset)
+                for (int freq_offset = 0; freq_offset + 8 < power->num_bins; ++freq_offset)
                 {
                     int score = 0;
 
@@ -116,7 +126,7 @@ int find_sync(const MagArray *power, int num_candidates, Candidate heap[], int m
     return heap_size;
 }
 
-void extract_likelihood(const MagArray *power, const Candidate *cand, float *log174)
+void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174)
 {
     int num_alt = power->time_osr * power->freq_osr;
     int offset = get_index(power, cand->time_offset, cand->time_sub, cand->freq_sub, cand->freq_offset);
@@ -140,21 +150,65 @@ void extract_likelihood(const MagArray *power, const Candidate *cand, float *log
     // Compute the variance of log174
     float sum = 0;
     float sum2 = 0;
-    float inv_n = 1.0f / FT8_N;
     for (int i = 0; i < FT8_N; ++i)
     {
         sum += log174[i];
         sum2 += log174[i] * log174[i];
     }
-    float variance = (sum2 - sum * sum * inv_n) * inv_n;
+    float inv_n = 1.0f / FT8_N;
+    float variance = (sum2 - (sum * sum * inv_n)) * inv_n;
 
     // Normalize log174 such that sigma = 2.83 (Why? It's in WSJT-X, ft8b.f90)
-    // Seems to be 2.83 = sqrt(8). Experimentally sqrt(16) works better.
-    float norm_factor = sqrtf(16.0f / variance);
+    // Seems to be 2.83 = sqrt(8). Experimentally sqrt(32) works better.
+    float norm_factor = sqrtf(32.0f / variance);
     for (int i = 0; i < FT8_N; ++i)
     {
         log174[i] *= norm_factor;
     }
+}
+
+bool decode(const waterfall_t *power, const candidate_t *cand, message_t *message, int max_iterations, decode_status_t *status)
+{
+    float log174[FT8_N]; // message bits encoded as likelihood
+    extract_likelihood(power, cand, log174);
+
+    uint8_t plain174[FT8_N]; // message bits (0/1)
+    bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
+    // ldpc_decode(log174, kLDPC_iterations, plain174, &n_errors);
+
+    if (status->ldpc_errors > 0)
+    {
+        return false;
+    }
+
+    // Extract payload + CRC (first FT8_K bits) packed into a byte array
+    uint8_t a91[FT8_K_BYTES];
+    pack_bits(plain174, FT8_K, a91);
+
+    // Extract CRC and check it
+    status->crc_extracted = extract_crc(a91);
+    // TODO: not sure why the zeroing of message is needed and also why CRC over 96-14 bits?
+    a91[9] &= 0xF8;
+    a91[10] = 0;
+    a91[11] = 0;
+    status->crc_calculated = ft8_crc(a91, 96 - 14);
+
+    if (status->crc_extracted != status->crc_calculated)
+    {
+        return false;
+    }
+
+    status->unpack_status = unpack77(a91, message->text);
+
+    if (status->unpack_status < 0)
+    {
+        return false;
+    }
+
+    // Reuse binary message CRC as hash value for the message
+    message->hash = status->crc_extracted;
+
+    return true;
 }
 
 static float max2(float a, float b)
@@ -167,7 +221,7 @@ static float max4(float a, float b, float c, float d)
     return max2(max2(a, b), max2(c, d));
 }
 
-static void heapify_down(Candidate heap[], int heap_size)
+static void heapify_down(candidate_t heap[], int heap_size)
 {
     // heapify from the root down
     int current = 0;
@@ -190,14 +244,14 @@ static void heapify_down(Candidate heap[], int heap_size)
             break;
         }
 
-        Candidate tmp = heap[largest];
+        candidate_t tmp = heap[largest];
         heap[largest] = heap[current];
         heap[current] = tmp;
         current = largest;
     }
 }
 
-static void heapify_up(Candidate heap[], int heap_size)
+static void heapify_up(candidate_t heap[], int heap_size)
 {
     // heapify from the last node up
     int current = heap_size - 1;
@@ -209,7 +263,7 @@ static void heapify_up(Candidate heap[], int heap_size)
             break;
         }
 
-        Candidate tmp = heap[parent];
+        candidate_t tmp = heap[parent];
         heap[parent] = heap[current];
         heap[current] = tmp;
         current = parent;

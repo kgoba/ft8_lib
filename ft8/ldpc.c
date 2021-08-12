@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 static int ldpc_check(uint8_t codeword[]);
 static float fast_tanh(float x);
@@ -177,12 +178,20 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     for (int iter = 0; iter < max_iters; ++iter)
     {
         float zn[FT8_N];
+        int plain_sum = 0;
 
         // Update bit log likelihood ratios (tov=0 in iter 0)
         for (int i = 0; i < FT8_N; ++i)
         {
             zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
             plain[i] = (zn[i] > 0) ? 1 : 0;
+            plain_sum += plain[i];
+        }
+
+        if (plain_sum == 0)
+        {
+            // message converged to all-zeros, which is prohibited
+            break;
         }
 
         // Check to see if we have a codeword (check before we do any iter)
