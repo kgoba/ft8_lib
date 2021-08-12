@@ -50,20 +50,23 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                     {
                         for (int k = 0; k < 7; ++k)
                         {
+                            int block = time_offset + m + k;
                             // Check for time boundaries
-                            if (time_offset + k + m < 0)
+                            if (block < 0)
                                 continue;
-                            if (time_offset + k + m >= power->num_blocks)
+                            if (block >= power->num_blocks)
                                 break;
 
-                            int offset = get_index(power, time_offset + k + m, time_sub, freq_sub, freq_offset);
+                            int offset = get_index(power, block, time_sub, freq_sub, freq_offset);
                             const uint8_t *p8 = power->mag + offset;
 
                             // Weighted difference between the expected and all other symbols
                             // Does not work as well as the alternative score below
-                            // score += 8 * p8[sync_pattern[k]] -
-                            //              p8[0] - p8[1] - p8[2] - p8[3] -
-                            //              p8[4] - p8[5] - p8[6] - p8[7];
+                            score += 8 * p8[kFT8_Costas_pattern[k]] -
+                                     p8[0] - p8[1] - p8[2] - p8[3] -
+                                     p8[4] - p8[5] - p8[6] - p8[7];
+
+                            ++num_symbols;
 
                             // Check only the neighbors of the expected symbol frequency- and time-wise
                             int sm = kFT8_Costas_pattern[k]; // Index of the expected bin
@@ -71,24 +74,26 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                             {
                                 // look at one frequency bin lower
                                 score += p8[sm] - p8[sm - 1];
+                                ++num_symbols;
                             }
                             if (sm < 7)
                             {
                                 // look at one frequency bin higher
                                 score += p8[sm] - p8[sm + 1];
+                                ++num_symbols;
                             }
                             if (k > 0)
                             {
                                 // look one symbol back in time
                                 score += p8[sm] - p8[sm - num_alt * power->num_bins];
+                                ++num_symbols;
                             }
                             if (k < 6)
                             {
                                 // look one symbol forward in time
                                 score += p8[sm] - p8[sm + num_alt * power->num_bins];
+                                ++num_symbols;
                             }
-
-                            ++num_symbols;
                         }
                     }
                     score /= num_symbols;
@@ -187,7 +192,6 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
     // Extract CRC and check it
     status->crc_extracted = extract_crc(a91);
     // [1]: 'The CRC is calculated on the source-encoded message, zero-extended from 77 to 82 bits.'
-    // TODO: not sure why the zeroing of message is needed and also why CRC over 96-14 bits?
     a91[9] &= 0xF8;
     a91[10] &= 0x00;
     status->crc_calculated = ft8_crc(a91, 96 - 14);

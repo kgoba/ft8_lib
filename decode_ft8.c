@@ -17,8 +17,8 @@
 
 #define LOG_LEVEL LOG_INFO
 
-const int kMin_score = 40; // Minimum sync score threshold for candidates
-const int kMax_candidates = 120;
+const int kMin_score = 20; // Minimum sync score threshold for candidates
+const int kMax_candidates = 160;
 const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
@@ -109,7 +109,7 @@ void extract_power(const float signal[], waterfall_t *power)
             // Extract windowed signal block
             for (int pos = 0; pos < nfft; ++pos)
             {
-                timedata[pos] = window[pos] * signal[(idx_block * block_size) + (pos + time_sub * subblock_size)];
+                timedata[pos] = window[pos] * signal[(idx_block * block_size) + (time_sub * subblock_size) + pos];
             }
 
             kiss_fftr(fft_cfg, timedata, freqdata);
