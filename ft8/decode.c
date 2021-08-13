@@ -29,7 +29,7 @@ static int get_index(const waterfall_t *power, int block, int time_sub, int freq
 int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], int min_score)
 {
     int heap_size = 0;
-    int num_alt = power->time_osr * power->freq_osr;
+    int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
 
     // Here we allow time offsets that exceed signal boundaries, as long as we still have all data bits.
     // I.e. we can afford to skip the first 7 or the last 7 Costas symbols, as long as we track how many
@@ -62,11 +62,10 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
 
                             // Weighted difference between the expected and all other symbols
                             // Does not work as well as the alternative score below
-                            score += 8 * p8[kFT8_Costas_pattern[k]] -
-                                     p8[0] - p8[1] - p8[2] - p8[3] -
-                                     p8[4] - p8[5] - p8[6] - p8[7];
-
-                            ++num_symbols;
+                            // score += 8 * p8[kFT8_Costas_pattern[k]] -
+                            //          p8[0] - p8[1] - p8[2] - p8[3] -
+                            //          p8[4] - p8[5] - p8[6] - p8[7];
+                            // ++num_symbols;
 
                             // Check only the neighbors of the expected symbol frequency- and time-wise
                             int sm = kFT8_Costas_pattern[k]; // Index of the expected bin
@@ -85,13 +84,13 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                             if (k > 0)
                             {
                                 // look one symbol back in time
-                                score += p8[sm] - p8[sm - num_alt * power->num_bins];
+                                score += p8[sm] - p8[sm - sym_stride];
                                 ++num_symbols;
                             }
                             if (k < 6)
                             {
                                 // look one symbol forward in time
-                                score += p8[sm] - p8[sm + num_alt * power->num_bins];
+                                score += p8[sm] - p8[sm + sym_stride];
                                 ++num_symbols;
                             }
                         }
@@ -133,7 +132,7 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
 
 void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174)
 {
-    int num_alt = power->time_osr * power->freq_osr;
+    int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
     int offset = get_index(power, cand->time_offset, cand->time_sub, cand->freq_sub, cand->freq_offset);
 
     // Go over FSK tones and skip Costas sync symbols
@@ -147,7 +146,7 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
         int bit_idx = 3 * k;
 
         // Pointer to 8 bins of the current symbol
-        const uint8_t *ps = power->mag + (offset + sym_idx * num_alt * power->num_bins);
+        const uint8_t *ps = power->mag + offset + (sym_idx * sym_stride);
 
         decode_symbol(ps, bit_idx, log174);
     }
@@ -178,7 +177,7 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
 
     uint8_t plain174[FT8_N]; // message bits (0/1)
     bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
-    // ldpc_decode(log174, kLDPC_iterations, plain174, &n_errors);
+    // ldpc_decode(log174, max_iterations, plain174, &status->ldpc_errors);
 
     if (status->ldpc_errors > 0)
     {
@@ -292,10 +291,6 @@ static void decode_symbol(const uint8_t *power, int bit_idx, float *log174)
 // Compute unnormalized log likelihood log(p(1) / p(0)) of bits corresponding to several FSK symbols at once
 static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms, int bit_idx, float *log174)
 {
-    // The following section implements what seems to be multiple-symbol decode at one go,
-    // corresponding to WSJT-X's ft8b.f90. Experimentally found not to be any better than
-    // 1-symbol decode.
-
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);
 
@@ -321,10 +316,6 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
         s2[j] += (float)power[kFT8_Gray_map[j2] + 4 * num_bins];
         s2[j] += (float)power[kFT8_Gray_map[j1] + 8 * num_bins];
     }
-    // No need to go back to linear scale any more. Works better in dB.
-    // for (int j = 0; j < n_tones; ++j) {
-    //     s2[j] = powf(10.0f, 0.1f * s2[j]);
-    // }
 
     // Extract bit significance (and convert them to float)
     // 8 FSK tones = 3 bits

@@ -83,7 +83,7 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
                         a *= fast_tanh(-m[j][i2] / 2.0f);
                     }
                 }
-                e[j][i1] = logf((1 - a) / (1 + a));
+                e[j][i1] = -2.0f * fast_atanh(a);
             }
         }
 
@@ -139,12 +139,12 @@ static int ldpc_check(uint8_t codeword[])
 {
     int errors = 0;
 
-    for (int j = 0; j < FT8_M; ++j)
+    for (int m = 0; m < FT8_M; ++m)
     {
         uint8_t x = 0;
-        for (int i = 0; i < kFT8_LDPC_num_rows[j]; ++i)
+        for (int i = 0; i < kFT8_LDPC_num_rows[m]; ++i)
         {
-            x ^= codeword[kFT8_LDPC_Nm[j][i] - 1];
+            x ^= codeword[kFT8_LDPC_Nm[m][i] - 1];
         }
         if (x != 0)
         {
@@ -161,29 +161,20 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 
     int min_errors = FT8_M;
 
-    int nclast = 0;
-    int ncnt = 0;
-
     // initialize message data
-    for (int i = 0; i < FT8_N; ++i)
+    for (int n = 0; n < FT8_N; ++n)
     {
-        for (int j = 0; j < 3; ++j)
-        {
-            tov[i][j] = 0;
-        }
+        tov[n][0] = tov[n][1] = tov[n][2] = 0;
     }
 
     for (int iter = 0; iter < max_iters; ++iter)
     {
-        float zn[FT8_N];
+        // Do a hard decision guess (tov=0 in iter 0)
         int plain_sum = 0;
-
-        // Update bit log likelihood ratios (tov=0 in iter 0)
-        for (int i = 0; i < FT8_N; ++i)
+        for (int n = 0; n < FT8_N; ++n)
         {
-            zn[i] = codeword[i] + tov[i][0] + tov[i][1] + tov[i][2];
-            plain[i] = (zn[i] > 0) ? 1 : 0;
-            plain_sum += plain[i];
+            plain[n] = ((codeword[n] + tov[n][0] + tov[n][1] + tov[n][2]) > 0) ? 1 : 0;
+            plain_sum += plain[n];
         }
 
         if (plain_sum == 0)
@@ -207,40 +198,40 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         }
 
         // Send messages from bits to check nodes
-        for (int i = 0; i < FT8_M; ++i)
+        for (int m = 0; m < FT8_M; ++m)
         {
-            for (int j = 0; j < kFT8_LDPC_num_rows[i]; ++j)
+            for (int n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
             {
-                int ibj = kFT8_LDPC_Nm[i][j] - 1;
-                float Tnm = zn[ibj];
-                for (int kk = 0; kk < 3; ++kk)
+                int n = kFT8_LDPC_Nm[m][n_idx] - 1;
+                // for each (n, m)
+                float Tnm = codeword[n];
+                for (int m_idx = 0; m_idx < 3; ++m_idx)
                 {
-                    // subtract off what the bit had received from the check
-                    if ((kFT8_LDPC_Mn[ibj][kk] - 1) == i)
+                    if ((kFT8_LDPC_Mn[n][m_idx] - 1) != m)
                     {
-                        Tnm -= tov[ibj][kk];
-                        break;
+                        Tnm += tov[n][m_idx];
                     }
                 }
-                toc[i][j] = fast_tanh(-Tnm / 2);
+                toc[m][n_idx] = fast_tanh(-Tnm / 2); // == (exp(-Tnm)-1) / (exp(-Tnm)+1)
             }
         }
 
         // send messages from check nodes to variable nodes
-        for (int i = 0; i < FT8_N; ++i)
+        for (int n = 0; n < FT8_N; ++n)
         {
-            for (int j = 0; j < 3; ++j)
+            for (int m_idx = 0; m_idx < 3; ++m_idx)
             {
-                int ichk = kFT8_LDPC_Mn[i][j] - 1;
+                int m = kFT8_LDPC_Mn[n][m_idx] - 1;
+                // for each (n, m)
                 float Tmn = 1.0f;
-                for (int k = 0; k < kFT8_LDPC_num_rows[ichk]; ++k)
+                for (int n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
                 {
-                    if ((kFT8_LDPC_Nm[ichk][k] - 1) != i)
+                    if ((kFT8_LDPC_Nm[m][n_idx] - 1) != n)
                     {
-                        Tmn *= toc[ichk][k];
+                        Tmn *= toc[m][n_idx]; // tanh(q(n', m) / 2)
                     }
                 }
-                tov[i][j] = 2 * fast_atanh(-Tmn);
+                tov[n][m_idx] = 2 * fast_atanh(-Tmn); // == log( (1-Tmn) / (1+Tmn) )
             }
         }
     }
@@ -248,12 +239,12 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     *ok = min_errors;
 }
 
-// https://varietyofsound.wordpress.com/2011/02/14/efficient-tanh-computation-using-lamberts-continued-fraction/
-// http://functions.wolfram.com/ElementaryFunctions/ArcTanh/10/0001/
-// https://mathr.co.uk/blog/2017-09-06_approximating_hyperbolic_tangent.html
+// Ideas for approximating tanh/atanh:
+// * https://varietyofsound.wordpress.com/2011/02/14/efficient-tanh-computation-using-lamberts-continued-fraction/
+// * http://functions.wolfram.com/ElementaryFunctions/ArcTanh/10/0001/
+// * https://mathr.co.uk/blog/2017-09-06_approximating_hyperbolic_tangent.html
+// * https://math.stackexchange.com/a/446411
 
-// thank you Douglas Bagnall
-// https://math.stackexchange.com/a/446411
 static float fast_tanh(float x)
 {
     if (x < -4.97f)

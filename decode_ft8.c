@@ -17,8 +17,8 @@
 
 #define LOG_LEVEL LOG_INFO
 
-const int kMin_score = 20; // Minimum sync score threshold for candidates
-const int kMax_candidates = 160;
+const int kMin_score = 10; // Minimum sync score threshold for candidates
+const int kMax_candidates = 150;
 const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
@@ -30,7 +30,7 @@ const float kFSK_dev = 6.25f; // tone deviation in Hz and symbol rate
 
 void usage()
 {
-    fprintf(stderr, "Decode a 15-second WAV file.\n");
+    fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
 }
 
 float hann_i(int i, int N)
@@ -68,16 +68,16 @@ static float max2(float a, float b)
 }
 
 // Compute FFT magnitudes (log power) for each timeslot in the signal
-void extract_power(const float signal[], waterfall_t *power)
+void extract_power(const float signal[], waterfall_t *power, int block_size)
 {
-    const int block_size = 2 * power->num_bins; // Average over 2 bins per FSK tone
     const int subblock_size = block_size / power->time_osr;
-    const int nfft = block_size * power->freq_osr; // We take FFT of two blocks, advancing by one
+    const int nfft = block_size * power->freq_osr;
     const float fft_norm = 2.0f / nfft;
 
     float window[nfft];
     for (int i = 0; i < nfft; ++i)
     {
+        // window[i] = 1;
         window[i] = hann_i(i, nfft);
         // window[i] = (i < block_size) ? hamming_i(i, block_size) : 0;
         // window[i] = blackman_i(i, nfft);
@@ -200,8 +200,8 @@ int main(int argc, char **argv)
     normalize_signal(signal, num_samples);
 
     // Compute DSP parameters that depend on the sample rate
-    const int num_bins = (int)(sample_rate / (2 * kFSK_dev));
-    const int block_size = 2 * num_bins;
+    const int num_bins = (int)(sample_rate / (2 * kFSK_dev)); // number bins of FSK tone width that the spectrum can be divided into
+    const int block_size = (int)(sample_rate / kFSK_dev);     // samples corresponding to one FSK symbol
     const int subblock_size = block_size / kTime_osr;
     const int nfft = block_size * kFreq_osr;
     const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
@@ -216,7 +216,7 @@ int main(int argc, char **argv)
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
         .mag = mag_power};
-    extract_power(signal, &power);
+    extract_power(signal, &power, block_size);
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
