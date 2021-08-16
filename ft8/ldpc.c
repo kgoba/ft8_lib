@@ -212,7 +212,7 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
                         Tnm += tov[n][m_idx];
                     }
                 }
-                toc[m][n_idx] = fast_tanh(-Tnm / 2); // == (exp(-Tnm)-1) / (exp(-Tnm)+1)
+                toc[m][n_idx] = fast_tanh(-Tnm / 2);
             }
         }
 
@@ -228,10 +228,10 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
                 {
                     if ((kFT8_LDPC_Nm[m][n_idx] - 1) != n)
                     {
-                        Tmn *= toc[m][n_idx]; // tanh(q(n', m) / 2)
+                        Tmn *= toc[m][n_idx];
                     }
                 }
-                tov[n][m_idx] = 2 * fast_atanh(-Tmn); // == log( (1-Tmn) / (1+Tmn) )
+                tov[n][m_idx] = -2 * fast_atanh(Tmn);
             }
         }
     }

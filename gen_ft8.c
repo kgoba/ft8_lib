@@ -12,9 +12,16 @@
 
 #define LOG_LEVEL LOG_INFO
 
+/// Computes a GFSK smoothing pulse.
+/// The pulse is theoretically infinitely long, however, here it's truncated at 3 times the symbol length.
+/// This means the pulse array has to have space for 3*n_spsym elements.
+/// @param[in] n_spsym Number of samples per symbol
+/// @param[in] b Shape parameter (values defined for FT8/FT4)
+/// @param[out] pulse Output array of pulse samples
+///
 void gfsk_pulse(int n_spsym, float b, float *pulse)
 {
-    const float c = M_PI * sqrtf(2 / logf(2));
+    float c = M_PI * sqrtf(2 / logf(2));
 
     for (int i = 0; i < 3 * n_spsym; ++i)
     {
@@ -23,11 +30,19 @@ void gfsk_pulse(int n_spsym, float b, float *pulse)
     }
 }
 
-// Same as synth_fsk, but uses GFSK phase shaping
+/// Synthesize waveform data using GFSK phase shaping.
+/// The output waveform will contain n_sym+2 symbols (extra symbol at the beginning/end).
+/// @param[in] symbols Array of symbols (tones) (0-7 for FT8)
+/// @param[in] n_sym Number of symbols in the symbols array
+/// @param[in] f0 Audio frequency in Hertz for the symbol 0 (base frequency)
+/// @param[in] n_spsym Number of samples per symbol (only integer number of samples supported)
+/// @param[in] signal_rate Sample rate of synthesized signal, Hertz
+/// @param[out] signal Output array of signal waveform samples (should have space for n_spsym*(n_sym+2) samples)
+///
 void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, int n_spsym, int signal_rate, float *signal)
 {
     LOG(LOG_DEBUG, "n_spsym = %d\n", n_spsym);
-    int n_wave = n_sym * n_spsym;
+    int n_wave = n_sym * n_spsym; // Number of output samples
     float hmod = 1.0f;
 
     // Compute the smoothed frequency waveform.
@@ -78,34 +93,6 @@ void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, int n_spsym, int si
     }
 }
 
-// Convert a sequence of symbols (tones) into a sinewave of continuous phase (FSK).
-// Symbol 0 gets encoded as a sine of frequency f0, the others are spaced in increasing
-// fashion.
-void synth_fsk(const uint8_t *symbols, int num_symbols, float f0, float spacing,
-               float symbol_rate, float signal_rate, float *signal)
-{
-    float phase = 0;
-    float dt = 1 / signal_rate;
-    float dt_sym = 1 / symbol_rate;
-    float t = 0;
-    int j = 0;
-    int i = 0;
-    while (j < num_symbols)
-    {
-        float f = f0 + symbols[j] * spacing;
-        phase = fmodf(phase + 2 * M_PI * f / signal_rate, 2 * M_PI);
-        signal[i] = sinf(phase);
-        t += dt;
-        if (t >= dt_sym)
-        {
-            // Move to the next symbol
-            t -= dt_sym;
-            ++j;
-        }
-        ++i;
-    }
-}
-
 void usage()
 {
     printf("Generate a 15-second WAV file encoding a given message.\n");
@@ -135,7 +122,6 @@ int main(int argc, char **argv)
 
     // First, pack the text data into binary message
     uint8_t packed[FT8_K_BYTES];
-    //int rc = packmsg(message, packed);
     int rc = pack77(message, packed);
     if (rc < 0)
     {
@@ -152,8 +138,7 @@ int main(int argc, char **argv)
     printf("\n");
 
     // Second, encode the binary message as a sequence of FSK tones
-    uint8_t tones[FT8_NN]; // FT8_NN = 79, lack of better name at the moment
-    //genft8(packed, 0, tones);
+    uint8_t tones[FT8_NN]; // Array of 79 tones (symbols)
     genft8(packed, tones);
 
     printf("FSK tones: ");
@@ -174,7 +159,6 @@ int main(int argc, char **argv)
         signal[i] = 0;
     }
 
-    // synth_fsk(tones, FT8_NN, frequency, symbol_rate, symbol_rate, sample_rate, signal + num_silence);
     synth_gfsk(tones, FT8_NN, frequency, sample_rate / symbol_rate, sample_rate, signal + num_silence);
     save_wav(signal, num_silence + num_samples + num_silence, sample_rate, wav_path);
 
