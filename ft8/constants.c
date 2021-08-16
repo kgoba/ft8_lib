@@ -1,13 +1,31 @@
 #include "constants.h"
 
-// Costas 7x7 tone pattern
+// Costas sync tone pattern
 const uint8_t kFT8_Costas_pattern[7] = {3, 1, 4, 0, 6, 5, 2};
+const uint8_t kFT4_Costas_pattern[4][4] = {{0, 1, 3, 2},
+                                           {1, 0, 2, 3},
+                                           {2, 3, 1, 0},
+                                           {3, 2, 0, 1}};
 
 // Gray code map
 const uint8_t kFT8_Gray_map[8] = {0, 1, 3, 2, 5, 6, 4, 7};
+const uint8_t kFT4_Gray_map[4] = {0, 1, 3, 2};
+
+const uint8_t kFT4_XOR_sequence[10] = {
+    0x4Au, // 01001010
+    0x5Eu, // 01011110
+    0x89u, // 10001001
+    0xB4u, // 10110100
+    0xB0u, // 10110000
+    0x8Au, // 10001010
+    0x79u, // 01111001
+    0x55u, // 01010101
+    0xBEu, // 10111110
+    0x28u, // 00101 [000]
+};
 
 // Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
-const uint8_t kFT8_LDPC_generator[FT8_M][FT8_K_BYTES] = {
+const uint8_t kFT8_LDPC_generator[FT8_LDPC_M][FT8_LDPC_K_BYTES] = {
     {0x83, 0x29, 0xce, 0x11, 0xbf, 0x31, 0xea, 0xf5, 0x09, 0xf2, 0x7f, 0xc0},
     {0x76, 0x1c, 0x26, 0x4e, 0x25, 0xc2, 0x59, 0x33, 0x54, 0x93, 0x13, 0x20},
     {0xdc, 0x26, 0x59, 0x02, 0xfb, 0x27, 0x7c, 0x64, 0x10, 0xa1, 0xbd, 0xc0},
@@ -95,7 +113,7 @@ const uint8_t kFT8_LDPC_generator[FT8_M][FT8_K_BYTES] = {
 // Each row describes one LDPC parity check.
 // Each number is an index into the codeword (1-origin).
 // The codeword bits mentioned in each row must XOR to zero.
-const uint8_t kFT8_LDPC_Nm[FT8_M][7] = {
+const uint8_t kFT8_LDPC_Nm[FT8_LDPC_M][7] = {
     {4, 31, 59, 91, 92, 96, 153},
     {5, 32, 60, 93, 115, 146, 0},
     {6, 24, 61, 94, 122, 151, 0},
@@ -183,7 +201,7 @@ const uint8_t kFT8_LDPC_Nm[FT8_M][7] = {
 // Each row corresponds to a codeword bit.
 // The numbers indicate which three LDPC parity checks (rows in Nm) refer to the codeword bit.
 // 1-origin.
-const uint8_t kFT8_LDPC_Mn[FT8_N][3] = {
+const uint8_t kFT8_LDPC_Mn[FT8_LDPC_N][3] = {
     {16, 45, 73},
     {25, 51, 62},
     {33, 58, 78},
@@ -359,7 +377,7 @@ const uint8_t kFT8_LDPC_Mn[FT8_N][3] = {
     {20, 44, 48},
     {42, 49, 57}};
 
-const uint8_t kFT8_LDPC_num_rows[FT8_M] = {
+const uint8_t kFT8_LDPC_num_rows[FT8_LDPC_M] = {
     7, 6, 6, 6, 7, 6, 7, 6, 6, 7, 6, 6, 7, 7, 6, 6,
     6, 7, 6, 7, 6, 7, 6, 6, 6, 7, 6, 6, 6, 7, 6, 6,
     6, 6, 7, 6, 6, 6, 7, 7, 6, 6, 6, 6, 7, 7, 6, 6,

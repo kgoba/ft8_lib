@@ -38,7 +38,7 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
     {
         for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
         {
-            for (int time_offset = -8; time_offset < power->num_blocks - FT8_NN + 8; ++time_offset)
+            for (int time_offset = -12; time_offset < power->num_blocks - FT8_NN + 12; ++time_offset)
             {
                 for (int freq_offset = 0; freq_offset + 8 < power->num_bins; ++freq_offset)
                 {
@@ -145,26 +145,36 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
         int sym_idx = (k < FT8_ND / 2) ? (k + 7) : (k + 14);
         int bit_idx = 3 * k;
 
-        // Pointer to 8 bins of the current symbol
-        const uint8_t *ps = power->mag + offset + (sym_idx * sym_stride);
+        int block = cand->time_offset + sym_idx;
 
-        decode_symbol(ps, bit_idx, log174);
+        // Check for time boundaries
+        if ((block < 0) || (block >= power->num_blocks))
+        {
+            log174[bit_idx] = 0;
+        }
+        else
+        {
+            // Pointer to 8 bins of the current symbol
+            const uint8_t *ps = power->mag + offset + (sym_idx * sym_stride);
+
+            decode_symbol(ps, bit_idx, log174);
+        }
     }
 
     // Compute the variance of log174
     float sum = 0;
     float sum2 = 0;
-    for (int i = 0; i < FT8_N; ++i)
+    for (int i = 0; i < FT8_LDPC_N; ++i)
     {
         sum += log174[i];
         sum2 += log174[i] * log174[i];
     }
-    float inv_n = 1.0f / FT8_N;
+    float inv_n = 1.0f / FT8_LDPC_N;
     float variance = (sum2 - (sum * sum * inv_n)) * inv_n;
 
     // Normalize log174 distribution and scale it with experimentally found coefficient
     float norm_factor = sqrtf(32.0f / variance);
-    for (int i = 0; i < FT8_N; ++i)
+    for (int i = 0; i < FT8_LDPC_N; ++i)
     {
         log174[i] *= norm_factor;
     }
@@ -172,10 +182,10 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
 
 bool decode(const waterfall_t *power, const candidate_t *cand, message_t *message, int max_iterations, decode_status_t *status)
 {
-    float log174[FT8_N]; // message bits encoded as likelihood
+    float log174[FT8_LDPC_N]; // message bits encoded as likelihood
     extract_likelihood(power, cand, log174);
 
-    uint8_t plain174[FT8_N]; // message bits (0/1)
+    uint8_t plain174[FT8_LDPC_N]; // message bits (0/1)
     bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
     // ldpc_decode(log174, max_iterations, plain174, &status->ldpc_errors);
 
@@ -184,9 +194,9 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
         return false;
     }
 
-    // Extract payload + CRC (first FT8_K bits) packed into a byte array
-    uint8_t a91[FT8_K_BYTES];
-    pack_bits(plain174, FT8_K, a91);
+    // Extract payload + CRC (first FT8_LDPC_K bits) packed into a byte array
+    uint8_t a91[FT8_LDPC_K_BYTES];
+    pack_bits(plain174, FT8_LDPC_K, a91);
 
     // Extract CRC and check it
     status->crc_extracted = extract_crc(a91);
@@ -321,7 +331,7 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
     // 8 FSK tones = 3 bits
     for (int i = 0; i < n_bits; ++i)
     {
-        if (bit_idx + i >= FT8_N)
+        if (bit_idx + i >= FT8_LDPC_N)
         {
             // Respect array size
             break;

@@ -36,15 +36,24 @@ uint16_t ft8_crc(const uint8_t message[], int num_bits)
     return remainder & ((TOPBIT << 1) - 1u);
 }
 
-uint16_t extract_crc(uint8_t a91[])
+uint16_t extract_crc(const uint8_t a91[])
 {
     uint16_t chksum = ((a91[9] & 0x07) << 11) | (a91[10] << 3) | (a91[11] >> 5);
     return chksum;
 }
 
-void add_crc(uint8_t a91[])
+void add_crc(const uint8_t payload[], uint8_t a91[])
 {
-    // Calculate CRC of 12 bytes = 96 bits, see WSJT-X code
+    // Copy 77 bits of payload data
+    for (int i = 0; i < 10; i++)
+        a91[i] = payload[i];
+
+    // Clear 3 bits after the payload to make 82 bits
+    a91[9] &= 0xF8u;
+    a91[10] = 0;
+
+    // Calculate CRC of 82 bits (77 + 5 zeros)
+    // 'The CRC is calculated on the source-encoded message, zero-extended from 77 to 82 bits'
     uint16_t checksum = ft8_crc(a91, 96 - 14);
 
     // Store the CRC at the end of 77 bit message

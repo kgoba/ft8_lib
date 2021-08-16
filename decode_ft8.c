@@ -17,8 +17,8 @@
 
 #define LOG_LEVEL LOG_INFO
 
-const int kMin_score = 10; // Minimum sync score threshold for candidates
-const int kMax_candidates = 150;
+const int kMin_score = 12; // Minimum sync score threshold for candidates
+const int kMax_candidates = 120;
 const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
@@ -163,7 +163,7 @@ void normalize_signal(float *signal, int num_samples)
 
 void print_tones(const uint8_t *code_map, const float *log174)
 {
-    for (int k = 0; k < FT8_N; k += 3)
+    for (int k = 0; k < FT8_LDPC_N; k += 3)
     {
         uint8_t max = 0;
         if (log174[k + 0] > 0)
