@@ -152,6 +152,8 @@ int main(int argc, char **argv)
 
     if (is_ft4)
     {
+        // '[..] for FT4 only, in order to avoid transmitting a long string of zeros when sending CQ messages,
+        // the assembled 77-bit message is bitwise exclusive-OR’ed with [a] pseudorandom sequence before computing the CRC and FEC parity bits'
         for (int i = 0; i < 10; ++i)
         {
             packed[i] ^= kFT4_XOR_sequence[i];

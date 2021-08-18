@@ -17,9 +17,9 @@
 
 #define LOG_LEVEL LOG_INFO
 
-const int kMin_score = 12; // Minimum sync score threshold for candidates
+const int kMin_score = 10; // Minimum sync score threshold for candidates
 const int kMax_candidates = 120;
-const int kLDPC_iterations = 25;
+const int kLDPC_iterations = 20;
 
 const int kMax_decoded_messages = 50;
 
@@ -35,7 +35,7 @@ void usage()
 
 float hann_i(int i, int N)
 {
-    float x = sinf((float)M_PI * i / (N - 1));
+    float x = sinf((float)M_PI * i / N);
     return x * x;
 }
 
@@ -44,7 +44,7 @@ float hamming_i(int i, int N)
     const float a0 = (float)25 / 46;
     const float a1 = 1 - a0;
 
-    float x1 = cosf(2 * (float)M_PI * i / (N - 1));
+    float x1 = cosf(2 * (float)M_PI * i / N);
     return a0 - a1 * x1;
 }
 
@@ -55,8 +55,7 @@ float blackman_i(int i, int N)
     const float a1 = 1.0f / 2;
     const float a2 = alpha / 2;
 
-    float x1 = cosf(2 * (float)M_PI * i / (N - 1));
-    //float x2 = cosf(4 * (float)M_PI * i / (N - 1));
+    float x1 = cosf(2 * (float)M_PI * i / N);
     float x2 = 2 * x1 * x1 - 1; // Use double angle formula
 
     return a0 - a1 * x1 + a2 * x2;
@@ -73,15 +72,16 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
     const int subblock_size = block_size / power->time_osr;
     const int nfft = block_size * power->freq_osr;
     const float fft_norm = 2.0f / nfft;
+    const int len_window = 1.8f * block_size; // hand-picked and optimized
 
     float window[nfft];
     for (int i = 0; i < nfft; ++i)
     {
         // window[i] = 1;
-        window[i] = hann_i(i, nfft);
-        // window[i] = (i < block_size) ? hamming_i(i, block_size) : 0;
+        // window[i] = hann_i(i, nfft);
         // window[i] = blackman_i(i, nfft);
         // window[i] = hamming_i(i, nfft);
+        window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
     }
 
     size_t fft_work_size;
@@ -96,7 +96,7 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
     int offset = 0;
-    float max_mag = -100.0f;
+    float max_mag = -120.0f;
     for (int idx_block = 0; idx_block < power->num_blocks; ++idx_block)
     {
         // Loop over two possible time offsets (0 and block_size/2)
@@ -118,7 +118,7 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
             for (int idx_bin = 0; idx_bin < nfft / 2 + 1; ++idx_bin)
             {
                 float mag2 = (freqdata[idx_bin].i * freqdata[idx_bin].i) + (freqdata[idx_bin].r * freqdata[idx_bin].r);
-                mag_db[idx_bin] = 10.0f * log10f(1E-10f + mag2 * fft_norm * fft_norm);
+                mag_db[idx_bin] = 10.0f * log10f(1E-12f + mag2 * fft_norm * fft_norm);
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
@@ -128,7 +128,8 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
                 {
                     float db = mag_db[pos * power->freq_osr + freq_sub];
                     // Scale decibels to unsigned 8-bit range and clamp the value
-                    int scaled = (int)(2 * (db + 120));
+                    // Range 0-240 covers -120..0 dB in 0.5 dB steps
+                    int scaled = (int)(2 * db + 240);
 
                     power->mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
                     ++offset;
@@ -142,39 +143,6 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
 
     LOG(LOG_INFO, "Max magnitude: %.1f dB\n", max_mag);
     free(fft_work);
-}
-
-void normalize_signal(float *signal, int num_samples)
-{
-    float max_amp = 1E-5f;
-    for (int i = 0; i < num_samples; ++i)
-    {
-        float amp = fabsf(signal[i]);
-        if (amp > max_amp)
-        {
-            max_amp = amp;
-        }
-    }
-    for (int i = 0; i < num_samples; ++i)
-    {
-        signal[i] /= max_amp;
-    }
-}
-
-void print_tones(const uint8_t *code_map, const float *log174)
-{
-    for (int k = 0; k < FT8_LDPC_N; k += 3)
-    {
-        uint8_t max = 0;
-        if (log174[k + 0] > 0)
-            max |= 4;
-        if (log174[k + 1] > 0)
-            max |= 2;
-        if (log174[k + 2] > 0)
-            max |= 1;
-        LOG(LOG_DEBUG, "%d", code_map[max]);
-    }
-    LOG(LOG_DEBUG, "\n");
 }
 
 int main(int argc, char **argv)
@@ -197,7 +165,6 @@ int main(int argc, char **argv)
     {
         return -1;
     }
-    normalize_signal(signal, num_samples);
 
     // Compute DSP parameters that depend on the sample rate
     const int num_bins = (int)(sample_rate / (2 * kFSK_dev)); // number bins of FSK tone width that the spectrum can be divided into
@@ -221,8 +188,6 @@ int main(int argc, char **argv)
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
     int num_candidates = find_sync(&power, kMax_candidates, candidate_list, kMin_score);
-
-    // TODO: sort the candidates by strongest sync first?
 
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
@@ -265,17 +230,17 @@ int main(int argc, char **argv)
         }
 
         LOG(LOG_DEBUG, "Checking hash table for %4.1fs / %4.1fHz [%d]...\n", time_sec, freq_hz, cand->score);
-        int hash_idx = message.hash % kMax_decoded_messages;
+        int idx_hash = message.hash % kMax_decoded_messages;
         bool found_empty_slot = false;
         bool found_duplicate = false;
         do
         {
-            if (decoded_hashtable[hash_idx] == NULL)
+            if (decoded_hashtable[idx_hash] == NULL)
             {
                 LOG(LOG_DEBUG, "Found an empty slot\n");
                 found_empty_slot = true;
             }
-            else if ((decoded_hashtable[hash_idx]->hash == message.hash) && (0 == strcmp(decoded_hashtable[hash_idx]->text, message.text)))
+            else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == strcmp(decoded_hashtable[idx_hash]->text, message.text)))
             {
                 LOG(LOG_DEBUG, "Found a duplicate [%s]\n", message.text);
                 found_duplicate = true;
@@ -284,20 +249,20 @@ int main(int argc, char **argv)
             {
                 LOG(LOG_DEBUG, "Hash table clash!\n");
                 // Move on to check the next entry in hash table
-                hash_idx = (hash_idx + 1) % kMax_decoded_messages;
+                idx_hash = (idx_hash + 1) % kMax_decoded_messages;
             }
         } while (!found_empty_slot && !found_duplicate);
 
         if (found_empty_slot)
         {
             // Fill the empty hashtable slot
-            memcpy(&decoded[hash_idx], &message, sizeof(message));
-            decoded_hashtable[hash_idx] = &decoded[hash_idx];
+            memcpy(&decoded[idx_hash], &message, sizeof(message));
+            decoded_hashtable[idx_hash] = &decoded[idx_hash];
             ++num_decoded;
 
             // Fake WSJT-X-like output for now
             int snr = 0; // TODO: compute SNR
-            printf("000000 %3d %4.1f %4d ~  %s\n", cand->score, time_sec, (int)(freq_hz + 0.5f), message.text);
+            printf("000000 %3d %+4.2f %4.0f ~  %s\n", cand->score, time_sec, freq_hz, message.text);
         }
     }
     LOG(LOG_INFO, "Decoded %d messages\n", num_decoded);

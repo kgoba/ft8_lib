@@ -38,14 +38,14 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
     {
         for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
         {
-            for (int time_offset = -12; time_offset < power->num_blocks - FT8_NN + 12; ++time_offset)
+            for (int time_offset = -12; time_offset < 24; ++time_offset)
             {
-                for (int freq_offset = 0; freq_offset + 8 < power->num_bins; ++freq_offset)
+                for (int freq_offset = 0; freq_offset + 7 < power->num_bins; ++freq_offset)
                 {
                     int score = 0;
+                    int num_average = 0;
 
                     // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
-                    int num_symbols = 0;
                     for (int m = 0; m <= 72; m += 36)
                     {
                         for (int k = 0; k < 7; ++k)
@@ -65,7 +65,7 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                             // score += 8 * p8[kFT8_Costas_pattern[k]] -
                             //          p8[0] - p8[1] - p8[2] - p8[3] -
                             //          p8[4] - p8[5] - p8[6] - p8[7];
-                            // ++num_symbols;
+                            // ++num_average;
 
                             // Check only the neighbors of the expected symbol frequency- and time-wise
                             int sm = kFT8_Costas_pattern[k]; // Index of the expected bin
@@ -73,29 +73,31 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                             {
                                 // look at one frequency bin lower
                                 score += p8[sm] - p8[sm - 1];
-                                ++num_symbols;
+                                ++num_average;
                             }
                             if (sm < 7)
                             {
                                 // look at one frequency bin higher
                                 score += p8[sm] - p8[sm + 1];
-                                ++num_symbols;
+                                ++num_average;
                             }
-                            if (k > 0)
+                            if ((k > 0) && (block > 0))
                             {
                                 // look one symbol back in time
                                 score += p8[sm] - p8[sm - sym_stride];
-                                ++num_symbols;
+                                ++num_average;
                             }
-                            if (k < 6)
+                            if ((k < 6) && ((block + 1) < power->num_blocks))
                             {
                                 // look one symbol forward in time
                                 score += p8[sm] - p8[sm + sym_stride];
-                                ++num_symbols;
+                                ++num_average;
                             }
                         }
                     }
-                    score /= num_symbols;
+
+                    if (num_average > 0)
+                        score /= num_average;
 
                     if (score < min_score)
                         continue;
@@ -125,6 +127,17 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                 }
             }
         }
+    }
+
+    // Sort the candidates by sync strength - here we benefit from the heap structure
+    int len_unsorted = heap_size;
+    while (len_unsorted > 1)
+    {
+        candidate_t tmp = heap[len_unsorted - 1];
+        heap[len_unsorted - 1] = heap[0];
+        heap[0] = tmp;
+        len_unsorted--;
+        heapify_down(heap, len_unsorted);
     }
 
     return heap_size;
@@ -173,7 +186,7 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
     float variance = (sum2 - (sum * sum * inv_n)) * inv_n;
 
     // Normalize log174 distribution and scale it with experimentally found coefficient
-    float norm_factor = sqrtf(32.0f / variance);
+    float norm_factor = sqrtf(24.0f / variance);
     for (int i = 0; i < FT8_LDPC_N; ++i)
     {
         log174[i] *= norm_factor;
