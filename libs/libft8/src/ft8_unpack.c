@@ -1,5 +1,5 @@
-#include "unpack.h"
-#include "text.h"
+#include "ft8_unpack.h"
+#include "ft8_text.h"
 
 #include <string.h>
 

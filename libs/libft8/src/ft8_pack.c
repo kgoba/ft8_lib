@@ -1,5 +1,5 @@
-#include "pack.h"
-#include "text.h"
+#include "ft8_pack.h"
+#include "ft8_text.h"
 
 #include <stdbool.h>
 #include <stdint.h>

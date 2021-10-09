@@ -1,4 +1,4 @@
-#include "constants.h"
+#include "ft8_constants.h"
 
 // Costas sync tone pattern
 const uint8_t kFT8_Costas_pattern[7] = {3, 1, 4, 0, 6, 5, 2};

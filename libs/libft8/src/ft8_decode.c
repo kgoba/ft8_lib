@@ -1,8 +1,8 @@
-#include "decode.h"
-#include "constants.h"
-#include "crc.h"
-#include "ldpc.h"
-#include "unpack.h"
+#include "ft8_decode.h"
+#include "ft8_constants.h"
+#include "ft8_crc.h"
+#include "ft8_ldpc.h"
+#include "ft8_unpack.h"
 
 #include <stdbool.h>
 #include <math.h>

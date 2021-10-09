@@ -9,8 +9,8 @@
 // codeword[i] = log ( P(x=0) / P(x=1) )
 //
 
-#include "ldpc.h"
-#include "constants.h"
+#include "ft8_ldpc.h"
+#include "ft8_constants.h"
 
 #include <stdio.h>
 #include <math.h>

@@ -1,5 +1,5 @@
-#include "crc.h"
-#include "constants.h"
+#include "ft8_crc.h"
+#include "ft8_constants.h"
 
 #define TOPBIT (1u << (FT8_CRC_WIDTH - 1))
 

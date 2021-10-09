@@ -1,4 +1,4 @@
-#include "text.h"
+#include "ft8_text.h"
 
 #include <string.h>
 
