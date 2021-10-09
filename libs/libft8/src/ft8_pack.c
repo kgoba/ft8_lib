@@ -224,6 +224,8 @@ int pack77_1(const char *msg, uint8_t *b77)
 void packtext77(const char *text, uint8_t *b77)
 {
     int length = strlen(text);
+    int i = 0;
+    int j = 0;
 
     // Skip leading and trailing spaces
     while (*text == ' ' && *text != 0)
@@ -237,18 +239,18 @@ void packtext77(const char *text, uint8_t *b77)
     }
 
     // Clear the first 72 bits representing a long number
-    for (int i = 0; i < 9; ++i)
+    for (i = 0; i < 9; ++i)
     {
         b77[i] = 0;
     }
 
     // Now express the text as base-42 number stored
     // in the first 72 bits of b77
-    for (int j = 0; j < 13; ++j)
+    for (j = 0; j < 13; ++j)
     {
         // Multiply the long integer in b77 by 42
         uint16_t x = 0;
-        for (int i = 8; i >= 0; --i)
+        for (i = 8; i >= 0; --i)
         {
             x += b77[i] * (uint16_t)42;
             b77[i] = (x & 0xFF);
@@ -270,7 +272,7 @@ void packtext77(const char *text, uint8_t *b77)
         x <<= 1;
 
         // Now add the number to our long number
-        for (int i = 8; i >= 0; --i)
+        for (i = 8; i >= 0; --i)
         {
             if (x == 0)
                 break;
@@ -322,8 +324,9 @@ bool test1()
         "LL3AJG",
         "CQ ",
         0};
+    int i = 0;
 
-    for (int i = 0; inputs[i]; ++i)
+    for (i = 0; inputs[i]; ++i)
     {
         int32_t result = ft8_v2::pack28(inputs[i]);
         printf("pack28(\"%s\") = %d\n", inputs[i], result);
@@ -342,13 +345,15 @@ bool test2()
         "L0UAA LL3JG RRR",
         "L0UAA LL3JG 73",
         0};
+    int i = 0;
+    int j = 0;
 
-    for (int i = 0; inputs[i]; ++i)
+    for (i = 0; inputs[i]; ++i)
     {
         uint8_t result[10];
         int rc = ft8_v2::pack77_1(inputs[i], result);
         printf("pack77_1(\"%s\") = %d\t[", inputs[i], rc);
-        for (int j = 0; j < 10; ++j)
+        for (j = 0; j < 10; ++j)
         {
             printf("%02x ", result[j]);
         }

@@ -11,9 +11,10 @@ uint16_t ft8_crc(const uint8_t message[], int num_bits)
 {
     uint16_t remainder = 0;
     int idx_byte = 0;
+    int idx_bit = 0;
 
     // Perform modulo-2 division, a bit at a time.
-    for (int idx_bit = 0; idx_bit < num_bits; ++idx_bit)
+    for (idx_bit = 0; idx_bit < num_bits; ++idx_bit)
     {
         if (idx_bit % 8 == 0)
         {
@@ -45,7 +46,8 @@ uint16_t extract_crc(const uint8_t a91[])
 void add_crc(const uint8_t payload[], uint8_t a91[])
 {
     // Copy 77 bits of payload data
-    for (int i = 0; i < 10; i++)
+    int i = 0;
+    for (i = 0; i < 10; i++)
         a91[i] = payload[i];
 
     // Clear 3 bits after the payload to make 82 bits
