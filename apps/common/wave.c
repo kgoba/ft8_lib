@@ -17,6 +17,7 @@ void save_wav(const float *signal, int num_samples, int sample_rate, const char 
     uint32_t sampleRate = sample_rate;
     uint16_t blockAlign = numChannels * bitsPerSample / 8;
     uint32_t byteRate = sampleRate * blockAlign;
+    int i = 0;
 
     char subChunk2ID[4] = {'d', 'a', 't', 'a'};
     uint32_t subChunk2Size = num_samples * blockAlign;
@@ -26,7 +27,7 @@ void save_wav(const float *signal, int num_samples, int sample_rate, const char 
     char format[4] = {'W', 'A', 'V', 'E'};
 
     int16_t *raw_data = (int16_t *)malloc(num_samples * blockAlign);
-    for (int i = 0; i < num_samples; i++)
+    for (i = 0; i < num_samples; i++)
     {
         float x = signal[i];
         if (x > 1.0)
@@ -80,6 +81,7 @@ int load_wav(float *signal, int *num_samples, int *sample_rate, const char *path
     char chunkID[4];    // = {'R', 'I', 'F', 'F'};
     uint32_t chunkSize; // = 4 + (8 + subChunk1Size) + (8 + subChunk2Size);
     char format[4];     // = {'W', 'A', 'V', 'E'};
+    int i = 0;
 
     FILE *f = fopen(path, "rb");
 
@@ -115,7 +117,7 @@ int load_wav(float *signal, int *num_samples, int *sample_rate, const char *path
     int16_t *raw_data = (int16_t *)malloc(*num_samples * blockAlign);
 
     fread((void *)raw_data, blockAlign, *num_samples, f);
-    for (int i = 0; i < *num_samples; i++)
+    for (i = 0; i < *num_samples; i++)
     {
         signal[i] = raw_data[i] / 32768.0f;
     }

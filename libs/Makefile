@@ -1,5 +1,7 @@
-SUBDIRS := libs
-SUBDIRS += apps
+SUBDIRS := libfft
+SUBDIRS += libft8
+
+
 
 all install:
 	echo $(SUBDIRS)

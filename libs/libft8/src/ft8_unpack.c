@@ -1,5 +1,5 @@
-#include "unpack.h"
-#include "text.h"
+#include "ft8_unpack.h"
+#include "ft8_text.h"
 
 #include <string.h>
 
@@ -12,6 +12,7 @@
 int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
 {
     // Check for special tokens DE, QRZ, CQ, CQ_nnn, CQ_aaaa
+    int i = 0;
     if (n28 < NTOKENS)
     {
         if (n28 <= 2)
@@ -38,7 +39,7 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
             char aaaa[5];
 
             aaaa[4] = '\0';
-            for (int i = 3; /* */; --i)
+            for (i = 3; /* */; --i)
             {
                 aaaa[i] = charn(n % 27, 4);
                 if (i == 0)
@@ -206,10 +207,12 @@ int unpack_text(const uint8_t *a71, char *text)
 {
     // TODO: test
     uint8_t b71[9];
+    int i = 0;
+    int idx = 0;
 
     // Shift 71 bits right by 1 bit, so that it's right-aligned in the byte array
     uint8_t carry = 0;
-    for (int i = 0; i < 9; ++i)
+    for (i = 0; i < 9; ++i)
     {
         b71[i] = carry | (a71[i] >> 1);
         carry = (a71[i] & 1) ? 0x80 : 0;
@@ -217,11 +220,11 @@ int unpack_text(const uint8_t *a71, char *text)
 
     char c14[14];
     c14[13] = 0;
-    for (int idx = 12; idx >= 0; --idx)
+    for (idx = 12; idx >= 0; --idx)
     {
         // Divide the long integer in b71 by 42
         uint16_t rem = 0;
-        for (int i = 0; i < 9; ++i)
+        for (i = 0; i < 9; ++i)
         {
             rem = (rem << 8) | b71[i];
             b71[i] = rem / 42;
@@ -237,17 +240,18 @@ int unpack_text(const uint8_t *a71, char *text)
 int unpack_telemetry(const uint8_t *a71, char *telemetry)
 {
     uint8_t b71[9];
+    int i = 0;
 
     // Shift bits in a71 right by 1 bit
     uint8_t carry = 0;
-    for (int i = 0; i < 9; ++i)
+    for (i = 0; i < 9; ++i)
     {
         b71[i] = (carry << 7) | (a71[i] >> 1);
         carry = (a71[i] & 0x01);
     }
 
     // Convert b71 to hexadecimal string
-    for (int i = 0; i < 9; ++i)
+    for (i = 0; i < 9; ++i)
     {
         uint8_t nibble1 = (b71[i] >> 4);
         uint8_t nibble2 = (b71[i] & 0x0F);
@@ -267,6 +271,7 @@ int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *e
 {
     uint32_t n12, iflip, nrpt, icq;
     uint64_t n58;
+    int i = 0;
     n12 = (a77[0] << 4);  //11 ~4  : 8
     n12 |= (a77[1] >> 4); //3~0 : 12
 
@@ -287,7 +292,7 @@ int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *e
     char c11[12];
     c11[11] = '\0';
 
-    for (int i = 10; /* no condition */; --i)
+    for (i = 10; /* no condition */; --i)
     {
         c11[i] = charn(n58 % 38, 5);
         if (i == 0)

@@ -4,11 +4,11 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "common/wave.h"
-#include "common/debug.h"
-#include "ft8/pack.h"
-#include "ft8/encode.h"
-#include "ft8/constants.h"
+#include "wave.h"
+#include "debug.h"
+#include "ft8_pack.h"
+#include "ft8_encode.h"
+#include "ft8_constants.h"
 
 #define LOG_LEVEL LOG_INFO
 
@@ -31,7 +31,8 @@
 ///
 void gfsk_pulse(int n_spsym, float symbol_bt, float *pulse)
 {
-    for (int i = 0; i < 3 * n_spsym; ++i)
+    int i = 0;
+    for (i = 0; i < 3 * n_spsym; ++i)
     {
         float t = i / (float)n_spsym - 1.5f;
         float arg1 = GFSK_CONST_K * symbol_bt * (t + 0.5f);
@@ -55,6 +56,9 @@ void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, fl
     int n_spsym = (int)(0.5f + signal_rate / symbol_rate); // Samples per symbol
     int n_wave = n_sym * n_spsym;                          // Number of output samples
     float hmod = 1.0f;
+    int i = 0;
+    int j = 0;
+    int k = 0;
 
     LOG(LOG_DEBUG, "n_spsym = %d\n", n_spsym);
     // Compute the smoothed frequency waveform.
@@ -63,7 +67,7 @@ void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, fl
     float dphi[n_wave + 2 * n_spsym];
 
     // Shift frequency up by f0
-    for (int i = 0; i < n_wave + 2 * n_spsym; ++i)
+    for (i = 0; i < n_wave + 2 * n_spsym; ++i)
     {
         dphi[i] = 2 * M_PI * f0 / signal_rate;
     }
@@ -71,17 +75,17 @@ void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, fl
     float pulse[3 * n_spsym];
     gfsk_pulse(n_spsym, symbol_bt, pulse);
 
-    for (int i = 0; i < n_sym; ++i)
+    for (i = 0; i < n_sym; ++i)
     {
         int ib = i * n_spsym;
-        for (int j = 0; j < 3 * n_spsym; ++j)
+        for (j = 0; j < 3 * n_spsym; ++j)
         {
             dphi[j + ib] += dphi_peak * symbols[i] * pulse[j];
         }
     }
 
     // Add dummy symbols at beginning and end with tone values equal to 1st and last symbol, respectively
-    for (int j = 0; j < 2 * n_spsym; ++j)
+    for (j = 0; j < 2 * n_spsym; ++j)
     {
         dphi[j] += dphi_peak * pulse[j + n_spsym] * symbols[0];
         dphi[j + n_sym * n_spsym] += dphi_peak * pulse[j] * symbols[n_sym - 1];
@@ -89,7 +93,7 @@ void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, fl
 
     // Calculate and insert the audio waveform
     float phi = 0;
-    for (int k = 0; k < n_wave; ++k)
+    for (k = 0; k < n_wave; ++k)
     { // Don't include dummy symbols
         signal[k] = sinf(phi);
         phi = fmodf(phi + dphi[k + n_spsym], 2 * M_PI);
@@ -97,7 +101,7 @@ void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, fl
 
     // Apply envelope shaping to the first and last symbols
     int n_ramp = n_spsym / 8;
-    for (int i = 0; i < n_ramp; ++i)
+    for (i = 0; i < n_ramp; ++i)
     {
         float env = (1 - cosf(2 * M_PI * i / (2 * n_ramp))) / 2;
         signal[i] *= env;
@@ -124,6 +128,9 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    int j = 0;
+    int i = 0;
+
     const char *message = argv[1];
     const char *wav_path = argv[2];
     float frequency = 1000.0;
@@ -144,7 +151,7 @@ int main(int argc, char **argv)
     }
 
     printf("Packed data: ");
-    for (int j = 0; j < 10; ++j)
+    for (j = 0; j < 10; ++j)
     {
         printf("%02x ", packed[j]);
     }
@@ -154,7 +161,7 @@ int main(int argc, char **argv)
     {
         // '[..] for FT4 only, in order to avoid transmitting a long string of zeros when sending CQ messages,
         // the assembled 77-bit message is bitwise exclusive-OR’ed with [a] pseudorandom sequence before computing the CRC and FEC parity bits'
-        for (int i = 0; i < 10; ++i)
+        for (i = 0; i < 10; ++i)
         {
             packed[i] ^= kFT4_XOR_sequence[i];
         }
@@ -177,7 +184,7 @@ int main(int argc, char **argv)
     }
 
     printf("FSK tones: ");
-    for (int j = 0; j < num_tones; ++j)
+    for (j = 0; j < num_tones; ++j)
     {
         printf("%d", tones[j]);
     }
@@ -189,7 +196,7 @@ int main(int argc, char **argv)
     int num_silence = (slot_time * sample_rate - num_samples) / 2;         // Silence padding at both ends to make 15 seconds
     int num_total_samples = num_silence + num_samples + num_silence;       // Number of samples in the padded signal
     float signal[num_total_samples];
-    for (int i = 0; i < num_silence; i++)
+    for (i = 0; i < num_silence; i++)
     {
         signal[i] = 0;
         signal[i + num_samples + num_silence] = 0;

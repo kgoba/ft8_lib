@@ -1,8 +1,8 @@
-#include "decode.h"
-#include "constants.h"
-#include "crc.h"
-#include "ldpc.h"
-#include "unpack.h"
+#include "ft8_decode.h"
+#include "ft8_constants.h"
+#include "ft8_crc.h"
+#include "ft8_ldpc.h"
+#include "ft8_unpack.h"
 
 #include <stdbool.h>
 #include <math.h>
@@ -30,25 +30,31 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
 {
     int heap_size = 0;
     int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
+    int time_sub = 0;
+    int freq_sub = 0;
+    int time_offset = 0;
+    int freq_offset = 0;
+    int m = 0;
+    int k = 0;
 
     // Here we allow time offsets that exceed signal boundaries, as long as we still have all data bits.
     // I.e. we can afford to skip the first 7 or the last 7 Costas symbols, as long as we track how many
     // sync symbols we included in the score, so the score is averaged.
-    for (int time_sub = 0; time_sub < power->time_osr; ++time_sub)
+    for (time_sub = 0; time_sub < power->time_osr; ++time_sub)
     {
-        for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
+        for (freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
         {
-            for (int time_offset = -12; time_offset < 24; ++time_offset)
+            for (time_offset = -12; time_offset < 24; ++time_offset)
             {
-                for (int freq_offset = 0; freq_offset + 7 < power->num_bins; ++freq_offset)
+                for (freq_offset = 0; freq_offset + 7 < power->num_bins; ++freq_offset)
                 {
                     int score = 0;
                     int num_average = 0;
 
                     // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
-                    for (int m = 0; m <= 72; m += 36)
+                    for (m = 0; m <= 72; m += 36)
                     {
-                        for (int k = 0; k < 7; ++k)
+                        for (k = 0; k < 7; ++k)
                         {
                             int block = time_offset + m + k;
                             // Check for time boundaries
@@ -152,7 +158,8 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
     const int n_syms = 1;
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);
-    for (int k = 0; k < FT8_ND; k += n_syms)
+    int k = 0;
+    for (k = 0; k < FT8_ND; k += n_syms)
     {
         // Add either 7 or 14 extra symbols to account for sync
         int sym_idx = (k < FT8_ND / 2) ? (k + 7) : (k + 14);
@@ -177,7 +184,8 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
     // Compute the variance of log174
     float sum = 0;
     float sum2 = 0;
-    for (int i = 0; i < FT8_LDPC_N; ++i)
+    int i = 0;
+    for (i = 0; i < FT8_LDPC_N; ++i)
     {
         sum += log174[i];
         sum2 += log174[i] * log174[i];
@@ -187,7 +195,7 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
 
     // Normalize log174 distribution and scale it with experimentally found coefficient
     float norm_factor = sqrtf(24.0f / variance);
-    for (int i = 0; i < FT8_LDPC_N; ++i)
+    for (i = 0; i < FT8_LDPC_N; ++i)
     {
         log174[i] *= norm_factor;
     }
@@ -300,8 +308,9 @@ static void decode_symbol(const uint8_t *power, int bit_idx, float *log174)
 {
     // Cleaned up code for the simple case of n_syms==1
     float s2[8];
+    int j = 0;
 
-    for (int j = 0; j < 8; ++j)
+    for (j = 0; j < 8; ++j)
     {
         s2[j] = (float)power[kFT8_Gray_map[j]];
     }
@@ -318,8 +327,9 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
     const int n_tones = (1 << n_bits);
 
     float s2[n_tones];
+    int j = 0;
 
-    for (int j = 0; j < n_tones; ++j)
+    for (j = 0; j < n_tones; ++j)
     {
         int j1 = j & 0x07;
         if (n_syms == 1)
@@ -342,7 +352,9 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
 
     // Extract bit significance (and convert them to float)
     // 8 FSK tones = 3 bits
-    for (int i = 0; i < n_bits; ++i)
+    int i = 0;
+    int n = 0;
+    for (i = 0; i < n_bits; ++i)
     {
         if (bit_idx + i >= FT8_LDPC_N)
         {
@@ -352,7 +364,7 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
 
         uint16_t mask = (n_tones >> (i + 1));
         float max_zero = -1000, max_one = -1000;
-        for (int n = 0; n < n_tones; ++n)
+        for (n = 0; n < n_tones; ++n)
         {
             if (n & mask)
             {

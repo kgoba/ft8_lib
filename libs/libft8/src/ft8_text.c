@@ -1,4 +1,4 @@
-#include "text.h"
+#include "ft8_text.h"
 
 #include <string.h>
 
@@ -69,7 +69,8 @@ bool equals(const char *string1, const char *string2)
 
 int char_index(const char *string, char c)
 {
-    for (int i = 0; *string; ++i, ++string)
+    int i = 0;
+    for (i = 0; *string; ++i, ++string)
     {
         if (c == *string)
         {
@@ -133,6 +134,7 @@ int dd_to_int(const char *str, int length)
 // Convert a 2 digit integer to string
 void int_to_dd(char *str, int value, int width, bool full_sign)
 {
+    int i = 0;
     if (value < 0)
     {
         *str = '-';
@@ -146,7 +148,7 @@ void int_to_dd(char *str, int value, int width, bool full_sign)
     }
 
     int divisor = 1;
-    for (int i = 0; i < width - 1; ++i)
+    for (i = 0; i < width - 1; ++i)
     {
         divisor *= 10;
     }

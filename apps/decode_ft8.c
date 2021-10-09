@@ -4,16 +4,16 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "ft8/unpack.h"
-#include "ft8/ldpc.h"
-#include "ft8/decode.h"
-#include "ft8/constants.h"
-#include "ft8/encode.h"
-#include "ft8/crc.h"
+#include "ft8_unpack.h"
+#include "ft8_ldpc.h"
+#include "ft8_decode.h"
+#include "ft8_constants.h"
+#include "ft8_encode.h"
+#include "ft8_crc.h"
 
-#include "common/wave.h"
-#include "common/debug.h"
-#include "fft/kiss_fftr.h"
+#include "wave.h"
+#include "debug.h"
+#include "kiss_fftr.h"
 
 #define LOG_LEVEL LOG_INFO
 

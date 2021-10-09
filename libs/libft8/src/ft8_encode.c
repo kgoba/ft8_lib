@@ -1,6 +1,6 @@
-#include "encode.h"
-#include "constants.h"
-#include "crc.h"
+#include "ft8_encode.h"
+#include "ft8_constants.h"
+#include "ft8_crc.h"
 
 #include <stdio.h>
 
@@ -24,7 +24,9 @@ void encode174(const uint8_t *message, uint8_t *codeword)
     // This implementation accesses the generator bits straight from the packed binary representation in kFT8_LDPC_generator
 
     // Fill the codeword with message and zeros, as we will only update binary ones later
-    for (int j = 0; j < FT8_LDPC_N_BYTES; ++j)
+    int j = 0;
+    int i = 0;
+    for (j = 0; j < FT8_LDPC_N_BYTES; ++j)
     {
         codeword[j] = (j < FT8_LDPC_K_BYTES) ? message[j] : 0;
     }
@@ -34,13 +36,13 @@ void encode174(const uint8_t *message, uint8_t *codeword)
     uint8_t col_idx = FT8_LDPC_K_BYTES - 1;          // index into byte array
 
     // Compute the LDPC checksum bits and store them in codeword
-    for (int i = 0; i < FT8_LDPC_M; ++i)
+    for (i = 0; i < FT8_LDPC_M; ++i)
     {
         // Fast implementation of bitwise multiplication and parity checking
         // Normally nsum would contain the result of dot product between message and kFT8_LDPC_generator[i],
         // but we only compute the sum modulo 2.
         uint8_t nsum = 0;
-        for (int j = 0; j < FT8_LDPC_K_BYTES; ++j)
+        for (j = 0; j < FT8_LDPC_K_BYTES; ++j)
         {
             uint8_t bits = message[j] & kFT8_LDPC_generator[i][j]; // bitwise AND (bitwise multiplication)
             nsum ^= parity8(bits);                                 // bitwise XOR (addition modulo 2)
@@ -78,7 +80,8 @@ void genft8(const uint8_t *payload, uint8_t *tones)
 
     uint8_t mask = 0x80u; // Mask to extract 1 bit from codeword
     int i_byte = 0;       // Index of the current byte of the codeword
-    for (int i_tone = 0; i_tone < FT8_NN; ++i_tone)
+    int i_tone = 0;
+    for (i_tone = 0; i_tone < FT8_NN; ++i_tone)
     {
         if ((i_tone >= 0) && (i_tone < 7))
         {
@@ -140,7 +143,8 @@ void genft4(const uint8_t *payload, uint8_t *tones)
 
     uint8_t mask = 0x80u; // Mask to extract 1 bit from codeword
     int i_byte = 0;       // Index of the current byte of the codeword
-    for (int i_tone = 0; i_tone < FT4_NN; ++i_tone)
+    int i_tone = 0;
+    for (i_tone = 0; i_tone < FT4_NN; ++i_tone)
     {
         if ((i_tone == 0) || (i_tone == 104))
         {

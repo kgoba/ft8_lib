@@ -4,13 +4,13 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "ft8/text.h"
-#include "ft8/pack.h"
-#include "ft8/encode.h"
-#include "ft8/constants.h"
+#include "ft8_text.h"
+#include "ft8_pack.h"
+#include "ft8_encode.h"
+#include "ft8_constants.h"
 
-#include "fft/kiss_fftr.h"
-#include "common/debug.h"
+#include "kiss_fftr.h"
+#include "debug.h"
 
 #define LOG_LEVEL LOG_INFO
 

@@ -9,8 +9,8 @@
 // codeword[i] = log ( P(x=0) / P(x=1) )
 //
 
-#include "ldpc.h"
-#include "constants.h"
+#include "ft8_ldpc.h"
+#include "ft8_constants.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -26,14 +26,15 @@ static float fast_atanh(float x);
 void pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[])
 {
     int num_bytes = (num_bits + 7) / 8;
-    for (int i = 0; i < num_bytes; ++i)
+    int i = 0;
+    for (i = 0; i < num_bytes; ++i)
     {
         packed[i] = 0;
     }
 
     uint8_t mask = 0x80;
     int byte_idx = 0;
-    for (int i = 0; i < num_bits; ++i)
+    for (i = 0; i < num_bits; ++i)
     {
         if (plain[i])
         {
@@ -57,25 +58,32 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     float m[FT8_LDPC_M][FT8_LDPC_N]; // ~60 kB
     float e[FT8_LDPC_M][FT8_LDPC_N]; // ~60 kB
     int min_errors = FT8_LDPC_M;
+    int i = 0;
+    int j = 0;
+    int ii1 = 0;
+    int ii2 = 0;
+    int ji1 = 0;
+    int ji2 = 0;
+    int iter = 0;
 
-    for (int j = 0; j < FT8_LDPC_M; j++)
+    for (j = 0; j < FT8_LDPC_M; j++)
     {
-        for (int i = 0; i < FT8_LDPC_N; i++)
+        for (i = 0; i < FT8_LDPC_N; i++)
         {
             m[j][i] = codeword[i];
             e[j][i] = 0.0f;
         }
     }
 
-    for (int iter = 0; iter < max_iters; iter++)
+    for (iter = 0; iter < max_iters; iter++)
     {
-        for (int j = 0; j < FT8_LDPC_M; j++)
+        for (j = 0; j < FT8_LDPC_M; j++)
         {
-            for (int ii1 = 0; ii1 < kFT8_LDPC_num_rows[j]; ii1++)
+            for (ii1 = 0; ii1 < kFT8_LDPC_num_rows[j]; ii1++)
             {
                 int i1 = kFT8_LDPC_Nm[j][ii1] - 1;
                 float a = 1.0f;
-                for (int ii2 = 0; ii2 < kFT8_LDPC_num_rows[j]; ii2++)
+                for (ii2 = 0; ii2 < kFT8_LDPC_num_rows[j]; ii2++)
                 {
                     int i2 = kFT8_LDPC_Nm[j][ii2] - 1;
                     if (i2 != i1)
@@ -87,10 +95,10 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
             }
         }
 
-        for (int i = 0; i < FT8_LDPC_N; i++)
+        for (i = 0; i < FT8_LDPC_N; i++)
         {
             float l = codeword[i];
-            for (int j = 0; j < 3; j++)
+            for (j = 0; j < 3; j++)
                 l += e[kFT8_LDPC_Mn[i][j] - 1][i];
             plain[i] = (l > 0) ? 1 : 0;
         }
@@ -108,13 +116,13 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
             }
         }
 
-        for (int i = 0; i < FT8_LDPC_N; i++)
+        for (i = 0; i < FT8_LDPC_N; i++)
         {
-            for (int ji1 = 0; ji1 < 3; ji1++)
+            for (ji1 = 0; ji1 < 3; ji1++)
             {
                 int j1 = kFT8_LDPC_Mn[i][ji1] - 1;
                 float l = codeword[i];
-                for (int ji2 = 0; ji2 < 3; ji2++)
+                for (ji2 = 0; ji2 < 3; ji2++)
                 {
                     if (ji1 != ji2)
                     {
@@ -138,11 +146,13 @@ void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 static int ldpc_check(uint8_t codeword[])
 {
     int errors = 0;
+    int i = 0;
+    int m = 0;
 
-    for (int m = 0; m < FT8_LDPC_M; ++m)
+    for (m = 0; m < FT8_LDPC_M; ++m)
     {
         uint8_t x = 0;
-        for (int i = 0; i < kFT8_LDPC_num_rows[m]; ++i)
+        for (i = 0; i < kFT8_LDPC_num_rows[m]; ++i)
         {
             x ^= codeword[kFT8_LDPC_Nm[m][i] - 1];
         }
@@ -160,18 +170,23 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     float toc[FT8_LDPC_M][7];
 
     int min_errors = FT8_LDPC_M;
+    int n = 0;
+    int m = 0;
+    int iter = 0;
+    int n_idx = 0;
+    int m_idx = 0;
 
     // initialize message data
-    for (int n = 0; n < FT8_LDPC_N; ++n)
+    for (n = 0; n < FT8_LDPC_N; ++n)
     {
         tov[n][0] = tov[n][1] = tov[n][2] = 0;
     }
 
-    for (int iter = 0; iter < max_iters; ++iter)
+    for (iter = 0; iter < max_iters; ++iter)
     {
         // Do a hard decision guess (tov=0 in iter 0)
         int plain_sum = 0;
-        for (int n = 0; n < FT8_LDPC_N; ++n)
+        for (n = 0; n < FT8_LDPC_N; ++n)
         {
             plain[n] = ((codeword[n] + tov[n][0] + tov[n][1] + tov[n][2]) > 0) ? 1 : 0;
             plain_sum += plain[n];
@@ -198,14 +213,14 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         }
 
         // Send messages from bits to check nodes
-        for (int m = 0; m < FT8_LDPC_M; ++m)
+        for (m = 0; m < FT8_LDPC_M; ++m)
         {
-            for (int n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
+            for (n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
             {
-                int n = kFT8_LDPC_Nm[m][n_idx] - 1;
+                n = kFT8_LDPC_Nm[m][n_idx] - 1;
                 // for each (n, m)
                 float Tnm = codeword[n];
-                for (int m_idx = 0; m_idx < 3; ++m_idx)
+                for (m_idx = 0; m_idx < 3; ++m_idx)
                 {
                     if ((kFT8_LDPC_Mn[n][m_idx] - 1) != m)
                     {
@@ -217,14 +232,14 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         }
 
         // send messages from check nodes to variable nodes
-        for (int n = 0; n < FT8_LDPC_N; ++n)
+        for (n = 0; n < FT8_LDPC_N; ++n)
         {
-            for (int m_idx = 0; m_idx < 3; ++m_idx)
+            for (m_idx = 0; m_idx < 3; ++m_idx)
             {
-                int m = kFT8_LDPC_Mn[n][m_idx] - 1;
+                m = kFT8_LDPC_Mn[n][m_idx] - 1;
                 // for each (n, m)
                 float Tmn = 1.0f;
-                for (int n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
+                for (n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
                 {
                     if ((kFT8_LDPC_Nm[m][n_idx] - 1) != n)
                     {
