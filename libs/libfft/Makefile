@@ -21,12 +21,12 @@ OBJS := $(patsubst %.c, $(OBJDIR)/%.o, $(notdir ${SRCS}))
 
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.c
-	$(CXX) -c -o "$(OBJDIR)/$(*F).o" $(INC) $(CFLAGS) "$<" 
+	$(CC) -c -o "$(OBJDIR)/$(*F).o" $(INC) $(CFLAGS) "$<" 
 
 all: $(OUTFILE)
 
 $(OUTFILE): $(OBJDIR) $(OBJS)
-	$(CXX) -o "$(OUTFILE)" $(OBJS) $(LDFLAGS)
+	$(CC) -o "$(OUTFILE)" $(OBJS) $(LDFLAGS)
 	ln -sf $(LIBFILE) $(SODIR)/$(LIBS)
 
 
