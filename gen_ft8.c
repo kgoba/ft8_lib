@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdbool.h>
 
+#include "common/common.h"
 #include "common/wave.h"
 #include "common/debug.h"
 #include "ft8/pack.h"

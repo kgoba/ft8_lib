@@ -10,6 +10,7 @@
 #include "ft8/constants.h"
 
 #include "fft/kiss_fftr.h"
+#include "common/common.h"
 #include "common/debug.h"
 
 #define LOG_LEVEL LOG_INFO
