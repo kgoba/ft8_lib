@@ -3,7 +3,10 @@ gen_ft8
 decode_ft8
 test
 
-## the following is for Xcode
+## Mac Finder
+.DS_Store
+
+## Xcode
 ## User settings
 xcuserdata/
 
