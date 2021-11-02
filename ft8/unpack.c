@@ -28,7 +28,7 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
         {
             // CQ_nnn with 3 digits
             strcpy(result, "CQ ");
-            int_to_dd(result + 3, n28 - 3, 3, false);
+            ft8_int_to_dd(result + 3, n28 - 3, 3, false);
             return 0; // Success
         }
         if (n28 <= 532443L)
@@ -40,14 +40,14 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
             aaaa[4] = '\0';
             for (int i = 3; /* */; --i)
             {
-                aaaa[i] = charn(n % 27, 4);
+                aaaa[i] = ft8_charn(n % 27, 4);
                 if (i == 0)
                     break;
                 n /= 27;
             }
 
             strcpy(result, "CQ ");
-            strcat(result, trim_front(aaaa));
+            strcat(result, ft8_trim_front(aaaa));
             return 0; // Success
         }
         // ? TODO: unspecified in the WSJT-X code
@@ -72,20 +72,20 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
 
     char callsign[7];
     callsign[6] = '\0';
-    callsign[5] = charn(n % 27, 4);
+    callsign[5] = ft8_charn(n % 27, 4);
     n /= 27;
-    callsign[4] = charn(n % 27, 4);
+    callsign[4] = ft8_charn(n % 27, 4);
     n /= 27;
-    callsign[3] = charn(n % 27, 4);
+    callsign[3] = ft8_charn(n % 27, 4);
     n /= 27;
-    callsign[2] = charn(n % 10, 3);
+    callsign[2] = ft8_charn(n % 10, 3);
     n /= 10;
-    callsign[1] = charn(n % 36, 2);
+    callsign[1] = ft8_charn(n % 36, 2);
     n /= 36;
-    callsign[0] = charn(n % 37, 1);
+    callsign[0] = ft8_charn(n % 37, 1);
 
     // Skip trailing and leading whitespace in case of a short callsign
-    strcpy(result, trim(callsign));
+    strcpy(result, ft8_trim(callsign));
     if (strlen(result) == 0)
         return -1;
 
@@ -193,7 +193,7 @@ int unpack_type1(const uint8_t *a77, uint8_t i3, char *call_to, char *call_de, c
             {
                 *dst++ = 'R'; // Add "R" before report
             }
-            int_to_dd(dst, irpt - 35, 2, true);
+            ft8_int_to_dd(dst, irpt - 35, 2, true);
             break;
         }
         // if (irpt >= 2 && strncmp(call_to, "CQ", 2) == 0) return -1;
@@ -227,10 +227,10 @@ int unpack_text(const uint8_t *a71, char *text)
             b71[i] = rem / 42;
             rem = rem % 42;
         }
-        c14[idx] = charn(rem, 0);
+        c14[idx] = ft8_charn(rem, 0);
     }
 
-    strcpy(text, trim(c14));
+    strcpy(text, ft8_trim(c14));
     return 0; // Success
 }
 
@@ -289,7 +289,7 @@ int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *e
 
     for (int i = 10; /* no condition */; --i)
     {
-        c11[i] = charn(n58 % 38, 5);
+        c11[i] = ft8_charn(n58 % 38, 5);
         if (i == 0)
             break;
         n58 /= 38;
@@ -309,7 +309,7 @@ int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *e
 
     if (icq == 0)
     {
-        strcpy(call_to, trim(call_1));
+        strcpy(call_to, ft8_trim(call_1));
         if (nrpt == 1)
             strcpy(extra, "RRR");
         else if (nrpt == 2)
@@ -326,7 +326,7 @@ int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *e
         strcpy(call_to, "CQ");
         extra[0] = '\0';
     }
-    strcpy(call_de, trim(call_2));
+    strcpy(call_de, ft8_trim(call_2));
 
     return 0;
 }

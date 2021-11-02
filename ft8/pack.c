@@ -22,14 +22,14 @@ const char A4[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 int32_t pack28(const char *callsign)
 {
     // Check for special tokens first
-    if (starts_with(callsign, "DE "))
+    if (ft8_starts_with(callsign, "DE "))
         return 0;
-    if (starts_with(callsign, "QRZ "))
+    if (ft8_starts_with(callsign, "QRZ "))
         return 1;
-    if (starts_with(callsign, "CQ "))
+    if (ft8_starts_with(callsign, "CQ "))
         return 2;
 
-    if (starts_with(callsign, "CQ_"))
+    if (ft8_starts_with(callsign, "CQ_"))
     {
         int nnum = 0, nlet = 0;
 
@@ -47,13 +47,13 @@ int32_t pack28(const char *callsign)
     }
 
     // Copy callsign to 6 character buffer
-    if (starts_with(callsign, "3DA0") && length <= 7)
+    if (ft8_starts_with(callsign, "3DA0") && length <= 7)
     {
         // Work-around for Swaziland prefix: 3DA0XYZ -> 3D0XYZ
         memcpy(c6, "3D0", 3);
         memcpy(c6 + 3, callsign + 4, length - 4);
     }
-    else if (starts_with(callsign, "3X") && is_letter(callsign[2]) && length <= 7)
+    else if (ft8_starts_with(callsign, "3X") && ft8_is_letter(callsign[2]) && length <= 7)
     {
         // Work-around for Guinea prefixes: 3XA0XYZ -> QA0XYZ
         memcpy(c6, "Q", 1);
@@ -61,12 +61,12 @@ int32_t pack28(const char *callsign)
     }
     else
     {
-        if (is_digit(callsign[2]) && length <= 6)
+        if (ft8_is_digit(callsign[2]) && length <= 6)
         {
             // AB0XYZ
             memcpy(c6, callsign, length);
         }
-        else if (is_digit(callsign[1]) && length <= 5)
+        else if (ft8_is_digit(callsign[1]) && length <= 5)
         {
             // A0XYZ -> " A0XYZ"
             memcpy(c6 + 1, callsign, length);
@@ -75,9 +75,9 @@ int32_t pack28(const char *callsign)
 
     // Check for standard callsign
     int i0, i1, i2, i3, i4, i5;
-    if ((i0 = char_index(A1, c6[0])) >= 0 && (i1 = char_index(A2, c6[1])) >= 0 &&
-        (i2 = char_index(A3, c6[2])) >= 0 && (i3 = char_index(A4, c6[3])) >= 0 &&
-        (i4 = char_index(A4, c6[4])) >= 0 && (i5 = char_index(A4, c6[5])) >= 0)
+    if ((i0 = ft8_char_index(A1, c6[0])) >= 0 && (i1 = ft8_char_index(A2, c6[1])) >= 0 &&
+        (i2 = ft8_char_index(A3, c6[2])) >= 0 && (i3 = ft8_char_index(A4, c6[3])) >= 0 &&
+        (i4 = ft8_char_index(A4, c6[4])) >= 0 && (i5 = ft8_char_index(A4, c6[5])) >= 0)
     {
         // This is a standard callsign
         int32_t n28 = i0;
@@ -130,17 +130,17 @@ uint16_t packgrid(const char *grid4)
     }
 
     // Take care of special cases
-    if (equals(grid4, "RRR"))
+    if (ft8_equals(grid4, "RRR"))
         return MAXGRID4 + 2;
-    if (equals(grid4, "RR73"))
+    if (ft8_equals(grid4, "RR73"))
         return MAXGRID4 + 3;
-    if (equals(grid4, "73"))
+    if (ft8_equals(grid4, "73"))
         return MAXGRID4 + 4;
 
     // Check for standard 4 letter grid
-    if (in_range(grid4[0], 'A', 'R') &&
-        in_range(grid4[1], 'A', 'R') &&
-        is_digit(grid4[2]) && is_digit(grid4[3]))
+    if (ft8_in_range(grid4[0], 'A', 'R') &&
+        ft8_in_range(grid4[1], 'A', 'R') &&
+        ft8_is_digit(grid4[2]) && ft8_is_digit(grid4[3]))
     {
         uint16_t igrid4 = (grid4[0] - 'A');
         igrid4 = igrid4 * 18 + (grid4[1] - 'A');
@@ -153,13 +153,13 @@ uint16_t packgrid(const char *grid4)
     // TODO: check the range of dd
     if (grid4[0] == 'R')
     {
-        int dd = dd_to_int(grid4 + 1, 3);
+        int dd = ft8_dd_to_int(grid4 + 1, 3);
         uint16_t irpt = 35 + dd;
         return (MAXGRID4 + irpt) | 0x8000; // ir = 1
     }
     else
     {
-        int dd = dd_to_int(grid4, 3);
+        int dd = ft8_dd_to_int(grid4, 3);
         uint16_t irpt = 35 + dd;
         return (MAXGRID4 + irpt); // ir = 0
     }
@@ -258,7 +258,7 @@ void packtext77(const char *text, uint8_t *b77)
         // Get the index of the current char
         if (j < length)
         {
-            int q = char_index(A0, text[j]);
+            int q = ft8_char_index(A0, text[j]);
             x = (q > 0) ? q : 0;
         }
         else
