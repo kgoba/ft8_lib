@@ -20,6 +20,20 @@
                ReferencedContainer = "container:ft8_lib.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "652CE5AF273129E000C91652"
+               BuildableName = "libft8.a"
+               BlueprintName = "libft8.a"
+               ReferencedContainer = "container:ft8_lib.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
