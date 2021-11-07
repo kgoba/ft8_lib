@@ -11,6 +11,7 @@
 #include "ft8/encode.h"
 #include "ft8/crc.h"
 
+#include "common/common.h"
 #include "common/wave.h"
 #include "common/debug.h"
 #include "fft/kiss_fftr.h"
