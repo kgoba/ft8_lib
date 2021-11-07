@@ -1,3 +1,6 @@
+#ifdef __linux__
+  #define _GNU_SOURCE
+#endif
 #include "unpack.h"
 #include "text.h"
 
@@ -391,7 +394,7 @@ int unpack77(const uint8_t *a77, char *message)
 {
     char call_to[14];
     char call_de[14];
-    char extra[7];
+    char extra[19];
 
     int rc = unpack77_fields(a77, call_to, call_de, extra);
     if (rc < 0)
