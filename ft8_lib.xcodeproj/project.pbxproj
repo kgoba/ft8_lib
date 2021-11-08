@@ -98,6 +98,18 @@
 		659888B72731481500F64B3C /* decode_ft8.c in Sources */ = {isa = PBXBuildFile; fileRef = 659888B3273147F400F64B3C /* decode_ft8.c */; };
 		659888BB2731482C00F64B3C /* wave.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598887827312ECE00F64B3C /* wave.c */; };
 		659888C52731483800F64B3C /* wave.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598887827312ECE00F64B3C /* wave.c */; };
+		6598F2512739C5660060A608 /* FT8Framework.h in Headers */ = {isa = PBXBuildFile; fileRef = 6598F24F2739C5660060A608 /* FT8Framework.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		6598F2552739C59B0060A608 /* decode.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598884C27312EC200F64B3C /* decode.c */; };
+		6598F2562739C59B0060A608 /* constants.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598884627312EC200F64B3C /* constants.c */; };
+		6598F2572739C59B0060A608 /* ldpc.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598885427312EC200F64B3C /* ldpc.c */; };
+		6598F2582739C59B0060A608 /* text.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598885027312EC200F64B3C /* text.c */; };
+		6598F2592739C59B0060A608 /* unpack.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598884927312EC200F64B3C /* unpack.c */; };
+		6598F25A2739C59B0060A608 /* encode.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598884D27312EC200F64B3C /* encode.c */; };
+		6598F25B2739C59B0060A608 /* ft8.h in Headers */ = {isa = PBXBuildFile; fileRef = 650D01262732C16600811CC1 /* ft8.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		6598F25C2739C59B0060A608 /* crc.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598885227312EC200F64B3C /* crc.c */; };
+		6598F25D2739C59B0060A608 /* pack.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598884E27312EC200F64B3C /* pack.c */; };
+		6598F25E2739C5B20060A608 /* kiss_fft.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598883627312EB100F64B3C /* kiss_fft.c */; };
+		6598F25F2739C5B20060A608 /* kiss_fftr.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598883727312EB100F64B3C /* kiss_fftr.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -232,6 +244,9 @@
 		659888B4273147F400F64B3C /* gen_ft8.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = gen_ft8.c; sourceTree = "<group>"; };
 		659888C12731482C00F64B3C /* gen_ft8 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = gen_ft8; sourceTree = BUILT_PRODUCTS_DIR; };
 		659888CB2731483800F64B3C /* test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = test; sourceTree = BUILT_PRODUCTS_DIR; };
+		6598F24D2739C5660060A608 /* FT8Framework.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = FT8Framework.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		6598F24F2739C5660060A608 /* FT8Framework.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FT8Framework.h; sourceTree = "<group>"; };
+		6598F2502739C5660060A608 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -281,6 +296,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6598F24A2739C5660060A608 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -291,6 +313,7 @@
 				6598887627312ECE00F64B3C /* common */,
 				6598884527312EC200F64B3C /* ft8 */,
 				6598883527312EB100F64B3C /* fft */,
+				6598F24E2739C5660060A608 /* FT8Framework */,
 				652CE59E273127D200C91652 /* Products */,
 				6598888F273130DF00F64B3C /* Frameworks */,
 			);
@@ -305,6 +328,7 @@
 				659888C12731482C00F64B3C /* gen_ft8 */,
 				659888CB2731483800F64B3C /* test */,
 				650D013B27355AB800811CC1 /* looptest */,
+				6598F24D2739C5660060A608 /* FT8Framework.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -315,8 +339,8 @@
 				6598883827312EB100F64B3C /* _kiss_fft_guts.h */,
 				6598883927312EB100F64B3C /* kiss_fft.h */,
 				6598883627312EB100F64B3C /* kiss_fft.c */,
-				6598883727312EB100F64B3C /* kiss_fftr.c */,
 				6598883A27312EB100F64B3C /* kiss_fftr.h */,
+				6598883727312EB100F64B3C /* kiss_fftr.c */,
 			);
 			path = fft;
 			sourceTree = "<group>";
@@ -371,6 +395,15 @@
 			name = "Demos and Tests";
 			sourceTree = "<group>";
 		};
+		6598F24E2739C5660060A608 /* FT8Framework */ = {
+			isa = PBXGroup;
+			children = (
+				6598F24F2739C5660060A608 /* FT8Framework.h */,
+				6598F2502739C5660060A608 /* Info.plist */,
+			);
+			path = FT8Framework;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -403,6 +436,15 @@
 				659888AF2731399C00F64B3C /* kiss_fft.h in Headers */,
 				659888A62731399300F64B3C /* text.h in Headers */,
 				659888A82731399300F64B3C /* crc.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6598F2482739C5660060A608 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6598F2512739C5660060A608 /* FT8Framework.h in Headers */,
+				6598F25B2739C59B0060A608 /* ft8.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -511,6 +553,24 @@
 			productReference = 659888CB2731483800F64B3C /* test */;
 			productType = "com.apple.product-type.tool";
 		};
+		6598F24C2739C5660060A608 /* FT8Framework */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6598F2522739C5660060A608 /* Build configuration list for PBXNativeTarget "FT8Framework" */;
+			buildPhases = (
+				6598F2482739C5660060A608 /* Headers */,
+				6598F2492739C5660060A608 /* Sources */,
+				6598F24A2739C5660060A608 /* Frameworks */,
+				6598F24B2739C5660060A608 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FT8Framework;
+			productName = FT8Framework;
+			productReference = 6598F24D2739C5660060A608 /* FT8Framework.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -537,6 +597,9 @@
 					6598F21E2737EFC40060A608 = {
 						CreatedOnToolsVersion = 12.5;
 					};
+					6598F24C2739C5660060A608 = {
+						CreatedOnToolsVersion = 12.5;
+					};
 				};
 			};
 			buildConfigurationList = 652CE598273127D200C91652 /* Build configuration list for PBXProject "ft8_lib" */;
@@ -561,9 +624,20 @@
 				659888B82731482C00F64B3C /* gen_ft8 */,
 				650D013227355AB800811CC1 /* looptest */,
 				659888C22731483800F64B3C /* test */,
+				6598F24C2739C5660060A608 /* FT8Framework */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6598F24B2739C5660060A608 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		650D013327355AB800811CC1 /* Sources */ = {
@@ -633,6 +707,23 @@
 			files = (
 				659888C52731483800F64B3C /* wave.c in Sources */,
 				6590878D27314881007667A1 /* test.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6598F2492739C5660060A608 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6598F2592739C59B0060A608 /* unpack.c in Sources */,
+				6598F25F2739C5B20060A608 /* kiss_fftr.c in Sources */,
+				6598F25C2739C59B0060A608 /* crc.c in Sources */,
+				6598F25A2739C59B0060A608 /* encode.c in Sources */,
+				6598F2582739C59B0060A608 /* text.c in Sources */,
+				6598F2552739C59B0060A608 /* decode.c in Sources */,
+				6598F2572739C59B0060A608 /* ldpc.c in Sources */,
+				6598F25D2739C59B0060A608 /* pack.c in Sources */,
+				6598F2562739C59B0060A608 /* constants.c in Sources */,
+				6598F25E2739C5B20060A608 /* kiss_fft.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -987,6 +1078,58 @@
 			};
 			name = Release;
 		};
+		6598F2532739C5660060A608 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = DVX9JXSKVT;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INFOPLIST_FILE = FT8Framework/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.lobotomo.FT8Framework;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		6598F2542739C5660060A608 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = DVX9JXSKVT;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INFOPLIST_FILE = FT8Framework/Info.plist;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.lobotomo.FT8Framework;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1076,6 +1219,15 @@
 			buildConfigurations = (
 				6598F2202737EFC40060A608 /* Debug */,
 				6598F2212737EFC40060A608 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6598F2522739C5660060A608 /* Build configuration list for PBXNativeTarget "FT8Framework" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6598F2532739C5660060A608 /* Debug */,
+				6598F2542739C5660060A608 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
