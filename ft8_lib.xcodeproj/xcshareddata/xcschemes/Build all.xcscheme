@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "659888832731305000F64B3C"
-               BuildableName = "decode_ft8"
-               BlueprintName = "decode_ft8"
+               BlueprintIdentifier = "6598F21E2737EFC40060A608"
+               BuildableName = "Build all"
+               BlueprintName = "Build all"
                ReferencedContainer = "container:ft8_lib.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -40,16 +40,6 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "659888832731305000F64B3C"
-            BuildableName = "decode_ft8"
-            BlueprintName = "decode_ft8"
-            ReferencedContainer = "container:ft8_lib.xcodeproj">
-         </BuildableReference>
-      </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -57,16 +47,15 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "659888832731305000F64B3C"
-            BuildableName = "decode_ft8"
-            BlueprintName = "decode_ft8"
+            BlueprintIdentifier = "6598F21E2737EFC40060A608"
+            BuildableName = "Build all"
+            BlueprintName = "Build all"
             ReferencedContainer = "container:ft8_lib.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

@@ -36,13 +36,13 @@ uint16_t ft8_crc(const uint8_t message[], int num_bits)
     return remainder & ((TOPBIT << 1) - 1u);
 }
 
-uint16_t extract_crc(const uint8_t a91[])
+uint16_t ft8_extract_crc(const uint8_t a91[])
 {
     uint16_t chksum = ((a91[9] & 0x07) << 11) | (a91[10] << 3) | (a91[11] >> 5);
     return chksum;
 }
 
-void add_crc(const uint8_t payload[], uint8_t a91[])
+void ft8_add_crc(const uint8_t payload[], uint8_t a91[])
 {
     // Copy 77 bits of payload data
     for (int i = 0; i < 10; i++)

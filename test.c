@@ -6,13 +6,10 @@
 
 #include "ft8/text.h"
 #include "ft8/pack.h"
-#include "ft8/encode.h"
 #include "ft8/constants.h"
 
 #include "fft/kiss_fftr.h"
 #include "common/debug.h"
-
-#define LOG_LEVEL LOG_INFO
 
 void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits)
 {
@@ -114,7 +111,7 @@ void test_tones(float *log174)
     }
 }
 
-void test4()
+void test4(void)
 {
     const int nfft = 128;
     const float fft_norm = 2.0 / nfft;

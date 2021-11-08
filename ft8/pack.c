@@ -19,7 +19,7 @@ const char A4[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 // Pack a special token, a 22-bit hash code, or a valid base call
 // into a 28-bit integer.
-int32_t pack28(const char *callsign)
+static int32_t pack28(const char *callsign)
 {
     // Check for special tokens first
     if (ft8_starts_with(callsign, "DE "))
@@ -100,9 +100,9 @@ int32_t pack28(const char *callsign)
 // Check if a string could be a valid standard callsign or a valid
 // compound callsign.
 // Return base call "bc" and a logical "cok" indicator.
-bool chkcall(const char *call, char *bc)
+static bool chkcall(const char *call, char *bc)
 {
-    int length = strlen(call); // n1=len_trim(w)
+    size_t length = strlen(call); // n1=len_trim(w)
     if (length > 11)
         return false;
     if (0 != strchr(call, '.'))
@@ -121,7 +121,7 @@ bool chkcall(const char *call, char *bc)
     return true;
 }
 
-uint16_t packgrid(const char *grid4)
+static uint16_t packgrid(const char *grid4)
 {
     if (grid4 == 0)
     {
@@ -168,7 +168,7 @@ uint16_t packgrid(const char *grid4)
 }
 
 // Pack Type 1 (Standard 77-bit message) and Type 2 (ditto, with a "/P" call)
-int pack77_1(const char *msg, uint8_t *b77)
+static int pack77_1(const char *msg, uint8_t *b77)
 {
     // Locate the first delimiter
     const char *s1 = strchr(msg, ' ');
@@ -221,7 +221,7 @@ int pack77_1(const char *msg, uint8_t *b77)
     return 0;
 }
 
-void packtext77(const char *text, uint8_t *b77)
+static void packtext77(const char *text, uint8_t *b77)
 {
     int length = strlen(text);
 
@@ -285,7 +285,7 @@ void packtext77(const char *text, uint8_t *b77)
     b77[9] &= 0x00;
 }
 
-int pack77(const char *msg, uint8_t *c77)
+int ft8_pack77(const char *msg, uint8_t *c77)
 {
     // Check Type 1 (Standard 77-bit message) or Type 2, with optional "/P"
     if (0 == pack77_1(msg, c77))
@@ -308,7 +308,7 @@ int pack77(const char *msg, uint8_t *c77)
 
 #include <iostream>
 
-bool test1()
+static bool test1()
 {
     const char *inputs[] = {
         "",
@@ -332,7 +332,7 @@ bool test1()
     return true;
 }
 
-bool test2()
+static bool test2()
 {
     const char *inputs[] = {
         "CQ LL3JG",
@@ -358,7 +358,7 @@ bool test2()
     return true;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     test1();
     test2();

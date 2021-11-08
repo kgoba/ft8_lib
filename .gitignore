@@ -2,11 +2,14 @@
 gen_ft8
 decode_ft8
 test
+looptest
+libft8.a
+libft8.dylib
 
-## Mac Finder
+## macOS Finder metadata
 .DS_Store
 
-## Xcode
+## the following is for Xcode
 ## User settings
 xcuserdata/
 

@@ -1,19 +1,71 @@
-#include "decode.h"
+#include <stdbool.h>
+#include <math.h>
+
+#include "ft8/ft8.h"
+
 #include "constants.h"
 #include "crc.h"
 #include "ldpc.h"
 #include "unpack.h"
+#include "fft/kiss_fftr.h"
+#include "common/debug.h"
 
-#include <stdbool.h>
-#include <math.h>
+const int kMin_score = 10; // Minimum sync score threshold for candidates
+const int kMax_candidates = 120;
+const int kLDPC_iterations = 20;
 
-/// Compute log likelihood log(p(1) / p(0)) of 174 message bits for later use in soft-decision LDPC decoding
-/// @param[in] power Waterfall data collected during message slot
-/// @param[in] cand Candidate to extract the message from
-/// @param[in] code_map Symbol encoding map
-/// @param[out] log174 Output of decoded log likelihoods for each of the 174 message bits
+const int kMax_decoded_messages = 50;
+
+const int kFreq_osr = 2;
+const int kTime_osr = 2;
+
+const float kFSK_dev = 6.25f; // tone deviation in Hz and symbol rate
+
+/// Input structure to find_sync() function. This structure describes stored waterfall data over the whole message slot.
+/// Fields time_osr and freq_osr specify additional oversampling rate for time and frequency resolution.
+/// If time_osr=1, FFT magnitude data is collected once for every symbol transmitted, i.e. every 1/6.25 = 0.16 seconds.
+/// Values time_osr > 1 mean each symbol is further subdivided in time.
+/// If freq_osr=1, each bin in the FFT magnitude data corresponds to 6.25 Hz, which is the tone spacing.
+/// Values freq_osr > 1 mean the tone spacing is further subdivided by FFT analysis.
+typedef struct
+{
+    int num_blocks; ///< number of total blocks (symbols) in terms of 160 ms time periods
+    int num_bins;   ///< number of FFT bins in terms of 6.25 Hz
+    int time_osr;   ///< number of time subdivisions
+    int freq_osr;   ///< number of frequency subdivisions
+    uint8_t *mag;   ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+} waterfall_t;
+
+/// Output structure of find_sync() and input structure of extract_likelihood().
+/// Holds the position of potential start of a message in time and frequency.
+typedef struct
+{
+    int16_t score;       ///< Candidate score (non-negative number; higher score means higher likelihood)
+    int16_t time_offset; ///< Index of the time block
+    int16_t freq_offset; ///< Index of the frequency bin
+    uint8_t time_sub;    ///< Index of the time subdivision used
+    uint8_t freq_sub;    ///< Index of the frequency subdivision used
+} candidate_t;
+
+/// Structure that holds the decoded message
+typedef struct
+{
+    // TODO: check again that this size is enough
+    char text[25]; // plain text
+    uint16_t hash; // hash value to be used in hash table and quick checking for duplicates
+} message_t;
+
+/// Structure that contains the status of various steps during decoding of a message
+typedef struct
+{
+    int ldpc_errors;
+    uint16_t crc_extracted;
+    uint16_t crc_calculated;
+    int unpack_status;
+} decode_status_t;
+
+// forward declarations
 static void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174);
-
 static float max2(float a, float b);
 static float max4(float a, float b, float c, float d);
 static void heapify_down(candidate_t heap[], int heap_size);
@@ -26,7 +78,7 @@ static int get_index(const waterfall_t *power, int block, int time_sub, int freq
     return ((((block * power->time_osr) + time_sub) * power->freq_osr + freq_sub) * power->num_bins) + bin;
 }
 
-int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], int min_score)
+static int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], int min_score)
 {
     int heap_size = 0;
     int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
@@ -143,15 +195,17 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
     return heap_size;
 }
 
-void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174)
+/// Compute log likelihood log(p(1) / p(0)) of 174 message bits for later use in soft-decision LDPC decoding
+/// @param[in] power Waterfall data collected during message slot
+/// @param[in] cand Candidate to extract the message from
+/// @param[out] log174 Output of decoded log likelihoods for each of the 174 message bits
+static void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174)
 {
     int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
     int offset = get_index(power, cand->time_offset, cand->time_sub, cand->freq_sub, cand->freq_offset);
 
     // Go over FSK tones and skip Costas sync symbols
     const int n_syms = 1;
-    const int n_bits = 3 * n_syms;
-    const int n_tones = (1 << n_bits);
     for (int k = 0; k < FT8_ND; k += n_syms)
     {
         // Add either 7 or 14 extra symbols to account for sync
@@ -193,13 +247,13 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
     }
 }
 
-bool decode(const waterfall_t *power, const candidate_t *cand, message_t *message, int max_iterations, decode_status_t *status)
+static bool decode(const waterfall_t *power, const candidate_t *cand, message_t *message, int max_iterations, decode_status_t *status)
 {
     float log174[FT8_LDPC_N]; // message bits encoded as likelihood
     extract_likelihood(power, cand, log174);
 
     uint8_t plain174[FT8_LDPC_N]; // message bits (0/1)
-    bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
+    ft8_bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
     // ldpc_decode(log174, max_iterations, plain174, &status->ldpc_errors);
 
     if (status->ldpc_errors > 0)
@@ -209,10 +263,10 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
 
     // Extract payload + CRC (first FT8_LDPC_K bits) packed into a byte array
     uint8_t a91[FT8_LDPC_K_BYTES];
-    pack_bits(plain174, FT8_LDPC_K, a91);
+    ft8_pack_bits(plain174, FT8_LDPC_K, a91);
 
     // Extract CRC and check it
-    status->crc_extracted = extract_crc(a91);
+    status->crc_extracted = ft8_extract_crc(a91);
     // [1]: 'The CRC is calculated on the source-encoded message, zero-extended from 77 to 82 bits.'
     a91[9] &= 0xF8;
     a91[10] &= 0x00;
@@ -223,7 +277,7 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
         return false;
     }
 
-    status->unpack_status = unpack77(a91, message->text);
+    status->unpack_status = ft8_unpack77(a91, message->text);
 
     if (status->unpack_status < 0)
     {
@@ -366,4 +420,211 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
 
         log174[bit_idx + i] = max_one - max_zero;
     }
+}
+
+static float hann_i(int i, int N)
+{
+    float x = sinf((float)M_PI * i / N);
+    return x * x;
+}
+
+static float hamming_i(int i, int N)
+{
+    const float a0 = (float)25 / 46;
+    const float a1 = 1 - a0;
+
+    float x1 = cosf(2 * (float)M_PI * i / N);
+    return a0 - a1 * x1;
+}
+
+static float blackman_i(int i, int N)
+{
+    const float alpha = 0.16f; // or 2860/18608
+    const float a0 = (1 - alpha) / 2;
+    const float a1 = 1.0f / 2;
+    const float a2 = alpha / 2;
+
+    float x1 = cosf(2 * (float)M_PI * i / N);
+    float x2 = 2 * x1 * x1 - 1; // Use double angle formula
+
+    return a0 - a1 * x1 + a2 * x2;
+}
+
+// Compute FFT magnitudes (log power) for each timeslot in the signal
+static void extract_power(const float signal[], waterfall_t *power, int block_size)
+{
+    const int subblock_size = block_size / power->time_osr;
+    const int nfft = block_size * power->freq_osr;
+    const float fft_norm = 2.0f / nfft;
+    const int len_window = 1.8f * block_size; // hand-picked and optimized
+
+    float window[nfft];
+    for (int i = 0; i < nfft; ++i)
+    {
+        // window[i] = 1;
+        // window[i] = hann_i(i, nfft);
+        // window[i] = blackman_i(i, nfft);
+        // window[i] = hamming_i(i, nfft);
+        window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
+    }
+
+    size_t fft_work_size;
+    kiss_fftr_alloc(nfft, 0, 0, &fft_work_size);
+
+    LOG(LOG_INFO, "Block size = %d\n", block_size);
+    LOG(LOG_INFO, "Subblock size = %d\n", subblock_size);
+    LOG(LOG_INFO, "N_FFT = %d\n", nfft);
+    LOG(LOG_INFO, "FFT work area = %lu\n", fft_work_size);
+    
+    void *fft_work = malloc(fft_work_size);
+    kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
+
+    int offset = 0;
+    float max_mag = -120.0f;
+    for (int idx_block = 0; idx_block < power->num_blocks; ++idx_block)
+    {
+        // Loop over two possible time offsets (0 and block_size/2)
+        for (int time_sub = 0; time_sub < power->time_osr; ++time_sub)
+        {
+            kiss_fft_scalar timedata[nfft];
+            kiss_fft_cpx freqdata[nfft / 2 + 1];
+            float mag_db[nfft / 2 + 1];
+
+            // Extract windowed signal block
+            for (int pos = 0; pos < nfft; ++pos)
+            {
+                timedata[pos] = window[pos] * signal[(idx_block * block_size) + (time_sub * subblock_size) + pos];
+            }
+
+            kiss_fftr(fft_cfg, timedata, freqdata);
+
+            // Compute log magnitude in decibels
+            for (int idx_bin = 0; idx_bin < nfft / 2 + 1; ++idx_bin)
+            {
+                float mag2 = (freqdata[idx_bin].i * freqdata[idx_bin].i) + (freqdata[idx_bin].r * freqdata[idx_bin].r);
+                mag_db[idx_bin] = 10.0f * log10f(1E-12f + mag2 * fft_norm * fft_norm);
+            }
+
+            // Loop over two possible frequency bin offsets (for averaging)
+            for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
+            {
+                for (int pos = 0; pos < power->num_bins; ++pos)
+                {
+                    float db = mag_db[pos * power->freq_osr + freq_sub];
+                    // Scale decibels to unsigned 8-bit range and clamp the value
+                    // Range 0-240 covers -120..0 dB in 0.5 dB steps
+                    int scaled = (int)(2 * db + 240);
+
+                    power->mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
+                    ++offset;
+
+                    if (db > max_mag)
+                        max_mag = db;
+                }
+            }
+        }
+    }
+
+    LOG(LOG_INFO, "Max magnitude: %.1f dB\n", max_mag);
+
+    free(fft_work);
+}
+
+int ft8_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callback_t callback, void *ctx)
+{
+    // compute DSP parameters that depend on the sample rate
+    const int num_bins = (int)(sample_rate / (2 * kFSK_dev)); // number bins of FSK tone width that the spectrum can be divided into
+    const int block_size = (int)(sample_rate / kFSK_dev);     // samples corresponding to one FSK symbol
+    const int subblock_size = block_size / kTime_osr;
+    const int nfft = block_size * kFreq_osr;
+    const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
+
+    // Compute FFT over the whole signal and store it
+    uint8_t mag_power[num_blocks * kFreq_osr * kTime_osr * num_bins];
+    waterfall_t power = {
+        .num_blocks = num_blocks,
+        .num_bins = num_bins,
+        .time_osr = kTime_osr,
+        .freq_osr = kFreq_osr,
+        .mag = mag_power};
+    extract_power(signal, &power, block_size);
+
+    // Find top candidates by Costas sync score and localize them in time and frequency
+    candidate_t candidate_list[kMax_candidates];
+    int num_candidates = find_sync(&power, kMax_candidates, candidate_list, kMin_score);
+
+    // Hash table for decoded messages (to check for duplicates)
+    int num_decoded = 0;
+    message_t decoded[kMax_decoded_messages];
+    message_t *decoded_hashtable[kMax_decoded_messages];
+
+    // Initialize hash table pointers
+    for (int i = 0; i < kMax_decoded_messages; ++i)
+    {
+        decoded_hashtable[i] = NULL;
+    }
+
+    // Go over candidates and attempt to decode messages
+    for (int idx = 0; idx < num_candidates; ++idx)
+    {
+        const candidate_t *cand = &candidate_list[idx];
+        if (cand->score < kMin_score)
+            continue;
+
+        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) * kFSK_dev;
+        float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) / kFSK_dev;
+
+        message_t message;
+        decode_status_t status;
+        if (!decode(&power, cand, &message, kLDPC_iterations, &status))
+        {
+            if (status.ldpc_errors > 0)
+            {
+                LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
+            }
+            else if (status.crc_calculated != status.crc_extracted)
+            {
+                LOG(LOG_DEBUG, "CRC mismatch!\n");
+            }
+            else if (status.unpack_status != 0)
+            {
+                LOG(LOG_DEBUG, "Error while unpacking!\n");
+            }
+            continue;
+        }
+        
+        int idx_hash = message.hash % kMax_decoded_messages;
+        bool found_empty_slot = false;
+        bool found_duplicate = false;
+        do
+        {
+            if (decoded_hashtable[idx_hash] == NULL)
+            {
+                found_empty_slot = true;
+            }
+            else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == strcmp(decoded_hashtable[idx_hash]->text, message.text)))
+            {
+                found_duplicate = true;
+            }
+            else
+            {
+                // move on to check the next entry in hash table
+                idx_hash = (idx_hash + 1) % kMax_decoded_messages;
+            }
+        } while (!found_empty_slot && !found_duplicate);
+
+        if (found_empty_slot)
+        {
+            // fill the empty hashtable slot
+            memcpy(&decoded[idx_hash], &message, sizeof(message));
+            decoded_hashtable[idx_hash] = &decoded[idx_hash];
+            ++num_decoded;
+            
+            // report message through callback
+            // TODO: compute SNR
+            callback(message.text, freq_hz, time_sec, 0.0, cand->score, ctx);
+        }
+    }
+
+    return num_decoded;
 }

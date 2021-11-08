@@ -23,7 +23,7 @@ static float fast_atanh(float x);
 
 // Packs a string of bits each represented as a zero/non-zero byte in plain[],
 // as a string of packed bits starting from the MSB of the first byte of packed[]
-void pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[])
+void ft8_pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[])
 {
     int num_bytes = (num_bits + 7) / 8;
     for (int i = 0; i < num_bytes; ++i)
@@ -52,7 +52,7 @@ void pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[])
 // plain is a return value, 174 ints, to be 0 or 1.
 // max_iters is how hard to try.
 // ok == 87 means success.
-void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
+void ft8_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 {
     float m[FT8_LDPC_M][FT8_LDPC_N]; // ~60 kB
     float e[FT8_LDPC_M][FT8_LDPC_N]; // ~60 kB
@@ -154,7 +154,7 @@ static int ldpc_check(uint8_t codeword[])
     return errors;
 }
 
-void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
+void ft8_bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 {
     float tov[FT8_LDPC_N][3];
     float toc[FT8_LDPC_M][7];

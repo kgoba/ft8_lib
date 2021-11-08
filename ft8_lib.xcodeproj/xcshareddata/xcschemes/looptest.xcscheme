@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "659888832731305000F64B3C"
-               BuildableName = "decode_ft8"
-               BlueprintName = "decode_ft8"
+               BlueprintIdentifier = "650D013227355AB800811CC1"
+               BuildableName = "looptest"
+               BlueprintName = "looptest"
                ReferencedContainer = "container:ft8_lib.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -44,9 +44,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "659888832731305000F64B3C"
-            BuildableName = "decode_ft8"
-            BlueprintName = "decode_ft8"
+            BlueprintIdentifier = "650D013227355AB800811CC1"
+            BuildableName = "looptest"
+            BlueprintName = "looptest"
             ReferencedContainer = "container:ft8_lib.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -61,9 +61,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "659888832731305000F64B3C"
-            BuildableName = "decode_ft8"
-            BlueprintName = "decode_ft8"
+            BlueprintIdentifier = "650D013227355AB800811CC1"
+            BuildableName = "looptest"
+            BlueprintName = "looptest"
             ReferencedContainer = "container:ft8_lib.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

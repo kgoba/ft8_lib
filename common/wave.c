@@ -83,6 +83,10 @@ int load_wav(float *signal, int *num_samples, int *sample_rate, const char *path
 
     FILE *f = fopen(path, "rb");
 
+    if (f == NULL) {
+        return -1;
+    }
+    
     // NOTE: works only on little-endian architecture
     fread((void *)chunkID, sizeof(chunkID), 1, f);
     fread((void *)&chunkSize, sizeof(chunkSize), 1, f);
