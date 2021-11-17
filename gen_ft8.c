@@ -13,13 +13,13 @@
 
 #define LOG_LEVEL LOG_INFO
 
-#define FT8_SLOT_TIME 15.0f   // total length of output waveform in seconds
+#define FT8_SLOT_TIME   15.0f // total length of output waveform in seconds
 #define FT8_SYMBOL_RATE 6.25f // tone deviation (and symbol rate) in Hz
-#define FT8_SYMBOL_BT 2.0f    // symbol smoothing filter bandwidth factor (BT)
+#define FT8_SYMBOL_BT   2.0f // symbol smoothing filter bandwidth factor (BT)
 
-#define FT4_SLOT_TIME 7.5f         // total length of output waveform in seconds
+#define FT4_SLOT_TIME   7.5f // total length of output waveform in seconds
 #define FT4_SYMBOL_RATE 20.833333f // tone deviation (and symbol rate) in Hz
-#define FT4_SYMBOL_BT 1.0f         // symbol smoothing filter bandwidth factor (BT)
+#define FT4_SYMBOL_BT   1.0f // symbol smoothing filter bandwidth factor (BT)
 
 #define GFSK_CONST_K 5.336446f // pi * sqrt(2 / log(2))
 
@@ -30,7 +30,7 @@
 /// @param[in] b Shape parameter (values defined for FT8/FT4)
 /// @param[out] pulse Output array of pulse samples
 ///
-void gfsk_pulse(int n_spsym, float symbol_bt, float *pulse)
+void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
 {
     for (int i = 0; i < 3 * n_spsym; ++i)
     {
@@ -51,10 +51,10 @@ void gfsk_pulse(int n_spsym, float symbol_bt, float *pulse)
 /// @param[in] signal_rate Sample rate of synthesized signal, Hertz
 /// @param[out] signal Output array of signal waveform samples (should have space for n_sym*n_spsym samples)
 ///
-void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, float symbol_rate, int signal_rate, float *signal)
+void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, float symbol_rate, int signal_rate, float* signal)
 {
     int n_spsym = (int)(0.5f + signal_rate / symbol_rate); // Samples per symbol
-    int n_wave = n_sym * n_spsym;                          // Number of output samples
+    int n_wave = n_sym * n_spsym; // Number of output samples
     float hmod = 1.0f;
 
     LOG(LOG_DEBUG, "n_spsym = %d\n", n_spsym);
@@ -116,7 +116,7 @@ void usage()
     printf("(Note that you might have to enclose your message in quote marks if it contains spaces)\n");
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     // Expect two command-line arguments
     if (argc < 3)
@@ -125,8 +125,8 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    const char *message = argv[1];
-    const char *wav_path = argv[2];
+    const char* message = argv[1];
+    const char* wav_path = argv[2];
     float frequency = 1000.0;
     if (argc > 3)
     {
@@ -170,11 +170,11 @@ int main(int argc, char **argv)
     uint8_t tones[num_tones]; // Array of 79 tones (symbols)
     if (is_ft4)
     {
-        genft4(packed, tones);
+        ft4_encode(packed, tones);
     }
     else
     {
-        genft8(packed, tones);
+        ft8_encode(packed, tones);
     }
 
     printf("FSK tones: ");
@@ -187,8 +187,8 @@ int main(int argc, char **argv)
     // Third, convert the FSK tones into an audio signal
     int sample_rate = 12000;
     int num_samples = (int)(0.5f + num_tones / symbol_rate * sample_rate); // Number of samples in the data signal
-    int num_silence = (slot_time * sample_rate - num_samples) / 2;         // Silence padding at both ends to make 15 seconds
-    int num_total_samples = num_silence + num_samples + num_silence;       // Number of samples in the padded signal
+    int num_silence = (slot_time * sample_rate - num_samples) / 2; // Silence padding at both ends to make 15 seconds
+    int num_total_samples = num_silence + num_samples + num_silence; // Number of samples in the padded signal
     float signal[num_total_samples];
     for (int i = 0; i < num_silence; i++)
     {

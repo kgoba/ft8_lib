@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-const char *trim_front(const char *str)
+const char* trim_front(const char* str)
 {
     // Skip leading whitespace
     while (*str == ' ')
@@ -12,7 +12,7 @@ const char *trim_front(const char *str)
     return str;
 }
 
-void trim_back(char *str)
+void trim_back(char* str)
 {
     // Skip trailing whitespace by replacing it with '\0' characters
     int idx = strlen(str) - 1;
@@ -24,9 +24,9 @@ void trim_back(char *str)
 
 // 1) trims a string from the back by changing whitespaces to '\0'
 // 2) trims a string from the front by skipping whitespaces
-char *trim(char *str)
+char* trim(char* str)
 {
-    str = (char *)trim_front(str);
+    str = (char*)trim_front(str);
     trim_back(str);
     // return a pointer to the first non-whitespace character
     return str;
@@ -57,17 +57,17 @@ bool in_range(char c, char min, char max)
     return (c >= min) && (c <= max);
 }
 
-bool starts_with(const char *string, const char *prefix)
+bool starts_with(const char* string, const char* prefix)
 {
     return 0 == memcmp(string, prefix, strlen(prefix));
 }
 
-bool equals(const char *string1, const char *string2)
+bool equals(const char* string1, const char* string2)
 {
     return 0 == strcmp(string1, string2);
 }
 
-int char_index(const char *string, char c)
+int char_index(const char* string, char c)
 {
     for (int i = 0; *string; ++i, ++string)
     {
@@ -82,7 +82,7 @@ int char_index(const char *string, char c)
 // Text message formatting:
 //   - replaces lowercase letters with uppercase
 //   - merges consecutive spaces into single space
-void fmtmsg(char *msg_out, const char *msg_in)
+void fmtmsg(char* msg_out, const char* msg_in)
 {
     char c;
     char last_out = 0;
@@ -100,7 +100,7 @@ void fmtmsg(char *msg_out, const char *msg_in)
 }
 
 // Parse a 2 digit integer from string
-int dd_to_int(const char *str, int length)
+int dd_to_int(const char* str, int length)
 {
     int result = 0;
     bool negative;
@@ -131,7 +131,7 @@ int dd_to_int(const char *str, int length)
 }
 
 // Convert a 2 digit integer to string
-void int_to_dd(char *str, int value, int width, bool full_sign)
+void int_to_dd(char* str, int value, int width, bool full_sign)
 {
     if (value < 0)
     {

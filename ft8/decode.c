@@ -12,21 +12,28 @@
 /// @param[in] cand Candidate to extract the message from
 /// @param[in] code_map Symbol encoding map
 /// @param[out] log174 Output of decoded log likelihoods for each of the 174 message bits
-static void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174);
+static void ft8_extract_likelihood(const waterfall_t* power, const candidate_t* cand, float* log174);
+
+/// Packs a string of bits each represented as a zero/non-zero byte in bit_array[],
+/// as a string of packed bits starting from the MSB of the first byte of packed[]
+/// @param[in] plain Array of bits (0 and nonzero values) with num_bits entires
+/// @param[in] num_bits Number of bits (entries) passed in bit_array
+/// @param[out] packed Byte-packed bits representing the data in bit_array
+static void pack_bits(const uint8_t bit_array[], int num_bits, uint8_t packed[]);
 
 static float max2(float a, float b);
 static float max4(float a, float b, float c, float d);
 static void heapify_down(candidate_t heap[], int heap_size);
 static void heapify_up(candidate_t heap[], int heap_size);
-static void decode_symbol(const uint8_t *power, int bit_idx, float *log174);
-static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms, int bit_idx, float *log174);
+static void decode_symbol(const uint8_t* power, int bit_idx, float* log174);
+static void decode_multi_symbols(const uint8_t* power, int num_bins, int n_syms, int bit_idx, float* log174);
 
-static int get_index(const waterfall_t *power, int block, int time_sub, int freq_sub, int bin)
+static int get_index(const waterfall_t* power, int block, int time_sub, int freq_sub, int bin)
 {
     return ((((block * power->time_osr) + time_sub) * power->freq_osr + freq_sub) * power->num_bins) + bin;
 }
 
-int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], int min_score)
+int ft8_find_sync(const waterfall_t* power, int num_candidates, candidate_t heap[], int min_score)
 {
     int heap_size = 0;
     int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
@@ -58,7 +65,7 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
                                 break;
 
                             int offset = get_index(power, block, time_sub, freq_sub, freq_offset);
-                            const uint8_t *p8 = power->mag + offset;
+                            const uint8_t* p8 = power->mag + offset;
 
                             // Weighted difference between the expected and all other symbols
                             // Does not work as well as the alternative score below
@@ -143,7 +150,7 @@ int find_sync(const waterfall_t *power, int num_candidates, candidate_t heap[], 
     return heap_size;
 }
 
-void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float *log174)
+void ft8_extract_likelihood(const waterfall_t* power, const candidate_t* cand, float* log174)
 {
     int sym_stride = power->time_osr * power->freq_osr * power->num_bins;
     int offset = get_index(power, cand->time_offset, cand->time_sub, cand->freq_sub, cand->freq_offset);
@@ -168,7 +175,7 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
         else
         {
             // Pointer to 8 bins of the current symbol
-            const uint8_t *ps = power->mag + offset + (sym_idx * sym_stride);
+            const uint8_t* ps = power->mag + offset + (sym_idx * sym_stride);
 
             decode_symbol(ps, bit_idx, log174);
         }
@@ -193,10 +200,10 @@ void extract_likelihood(const waterfall_t *power, const candidate_t *cand, float
     }
 }
 
-bool decode(const waterfall_t *power, const candidate_t *cand, message_t *message, int max_iterations, decode_status_t *status)
+bool ft8_decode(const waterfall_t* power, const candidate_t* cand, message_t* message, int max_iterations, decode_status_t* status)
 {
     float log174[FT8_LDPC_N]; // message bits encoded as likelihood
-    extract_likelihood(power, cand, log174);
+    ft8_extract_likelihood(power, cand, log174);
 
     uint8_t plain174[FT8_LDPC_N]; // message bits (0/1)
     bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
@@ -212,11 +219,11 @@ bool decode(const waterfall_t *power, const candidate_t *cand, message_t *messag
     pack_bits(plain174, FT8_LDPC_K, a91);
 
     // Extract CRC and check it
-    status->crc_extracted = extract_crc(a91);
+    status->crc_extracted = ftx_extract_crc(a91);
     // [1]: 'The CRC is calculated on the source-encoded message, zero-extended from 77 to 82 bits.'
     a91[9] &= 0xF8;
     a91[10] &= 0x00;
-    status->crc_calculated = ft8_crc(a91, 96 - 14);
+    status->crc_calculated = ftx_compute_crc(a91, 96 - 14);
 
     if (status->crc_extracted != status->crc_calculated)
     {
@@ -296,7 +303,7 @@ static void heapify_up(candidate_t heap[], int heap_size)
 }
 
 // Compute unnormalized log likelihood log(p(1) / p(0)) of 3 message bits (1 FSK symbol)
-static void decode_symbol(const uint8_t *power, int bit_idx, float *log174)
+static void decode_symbol(const uint8_t* power, int bit_idx, float* log174)
 {
     // Cleaned up code for the simple case of n_syms==1
     float s2[8];
@@ -312,7 +319,7 @@ static void decode_symbol(const uint8_t *power, int bit_idx, float *log174)
 }
 
 // Compute unnormalized log likelihood log(p(1) / p(0)) of bits corresponding to several FSK symbols at once
-static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms, int bit_idx, float *log174)
+static void decode_multi_symbols(const uint8_t* power, int num_bins, int n_syms, int bit_idx, float* log174)
 {
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);
@@ -365,5 +372,32 @@ static void decode_multi_symbols(const uint8_t *power, int num_bins, int n_syms,
         }
 
         log174[bit_idx + i] = max_one - max_zero;
+    }
+}
+
+// Packs a string of bits each represented as a zero/non-zero byte in plain[],
+// as a string of packed bits starting from the MSB of the first byte of packed[]
+static void pack_bits(const uint8_t bit_array[], int num_bits, uint8_t packed[])
+{
+    int num_bytes = (num_bits + 7) / 8;
+    for (int i = 0; i < num_bytes; ++i)
+    {
+        packed[i] = 0;
+    }
+
+    uint8_t mask = 0x80;
+    int byte_idx = 0;
+    for (int i = 0; i < num_bits; ++i)
+    {
+        if (bit_array[i])
+        {
+            packed[byte_idx] |= mask;
+        }
+        mask >>= 1;
+        if (!mask)
+        {
+            mask = 0x80;
+            ++byte_idx;
+        }
     }
 }

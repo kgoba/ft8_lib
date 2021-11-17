@@ -9,21 +9,21 @@
 #define FT8_NN (79) ///< Total channel symbols (FT8_NS + FT8_ND)
 
 // Define FT4 symbol counts
-#define FT4_ND (87)  ///< Data symbols
-#define FT4_NS (16)  ///< Sync symbols (3 @ Costas 7x7)
-#define FT4_NR (2)   ///< Ramp symbols (beginning + end)
+#define FT4_ND (87) ///< Data symbols
+#define FT4_NS (16) ///< Sync symbols (3 @ Costas 7x7)
+#define FT4_NR (2) ///< Ramp symbols (beginning + end)
 #define FT4_NN (105) ///< Total channel symbols (FT4_NS + FT4_ND + FT4_NR)
 
 // Define LDPC parameters
-#define FT8_LDPC_N (174)                        ///< Number of bits in the encoded message (payload with LDPC checksum bits)
-#define FT8_LDPC_K (91)                         ///< Number of payload bits (including CRC)
-#define FT8_LDPC_M (83)                         ///< Number of LDPC checksum bits (FT8_LDPC_N - FT8_LDPC_K)
+#define FT8_LDPC_N       (174) ///< Number of bits in the encoded message (payload with LDPC checksum bits)
+#define FT8_LDPC_K       (91) ///< Number of payload bits (including CRC)
+#define FT8_LDPC_M       (83) ///< Number of LDPC checksum bits (FT8_LDPC_N - FT8_LDPC_K)
 #define FT8_LDPC_N_BYTES ((FT8_LDPC_N + 7) / 8) ///< Number of whole bytes needed to store 174 bits (full message)
 #define FT8_LDPC_K_BYTES ((FT8_LDPC_K + 7) / 8) ///< Number of whole bytes needed to store 91 bits (payload + CRC only)
 
 // Define CRC parameters
 #define FT8_CRC_POLYNOMIAL ((uint16_t)0x2757u) ///< CRC-14 polynomial without the leading (MSB) 1
-#define FT8_CRC_WIDTH (14)
+#define FT8_CRC_WIDTH      (14)
 
 /// Costas 7x7 tone pattern for synchronization
 extern const uint8_t kFT8_Costas_pattern[7];

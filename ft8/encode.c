@@ -5,21 +5,21 @@
 #include <stdio.h>
 
 // Returns 1 if an odd number of bits are set in x, zero otherwise
-uint8_t parity8(uint8_t x)
+static uint8_t parity8(uint8_t x)
 {
-    x ^= x >> 4;  // a b c d ae bf cg dh
-    x ^= x >> 2;  // a b ac bd cae dbf aecg bfdh
-    x ^= x >> 1;  // a ab bac acbd bdcae caedbf aecgbfdh
+    x ^= x >> 4; // a b c d ae bf cg dh
+    x ^= x >> 2; // a b ac bd cae dbf aecg bfdh
+    x ^= x >> 1; // a ab bac acbd bdcae caedbf aecgbfdh
     return x % 2; // modulo 2
 }
 
-// Encode a 91-bit message and return a 174-bit codeword.
+// Encode via LDPC a 91-bit message and return a 174-bit codeword.
 // The generator matrix has dimensions (87,87).
 // The code is a (174,91) regular LDPC code with column weight 3.
 // Arguments:
 // [IN] message   - array of 91 bits stored as 12 bytes (MSB first)
 // [OUT] codeword - array of 174 bits stored as 22 bytes (MSB first)
-void encode174(const uint8_t *message, uint8_t *codeword)
+static void encode174(const uint8_t* message, uint8_t* codeword)
 {
     // This implementation accesses the generator bits straight from the packed binary representation in kFT8_LDPC_generator
 
@@ -31,7 +31,7 @@ void encode174(const uint8_t *message, uint8_t *codeword)
 
     // Compute the byte index and bit mask for the first checksum bit
     uint8_t col_mask = (0x80u >> (FT8_LDPC_K % 8u)); // bitmask of current byte
-    uint8_t col_idx = FT8_LDPC_K_BYTES - 1;          // index into byte array
+    uint8_t col_idx = FT8_LDPC_K_BYTES - 1; // index into byte array
 
     // Compute the LDPC checksum bits and store them in codeword
     for (int i = 0; i < FT8_LDPC_M; ++i)
@@ -43,7 +43,7 @@ void encode174(const uint8_t *message, uint8_t *codeword)
         for (int j = 0; j < FT8_LDPC_K_BYTES; ++j)
         {
             uint8_t bits = message[j] & kFT8_LDPC_generator[i][j]; // bitwise AND (bitwise multiplication)
-            nsum ^= parity8(bits);                                 // bitwise XOR (addition modulo 2)
+            nsum ^= parity8(bits); // bitwise XOR (addition modulo 2)
         }
 
         // Set the current checksum bit in codeword if nsum is odd
@@ -62,13 +62,13 @@ void encode174(const uint8_t *message, uint8_t *codeword)
     }
 }
 
-void genft8(const uint8_t *payload, uint8_t *tones)
+void ft8_encode(const uint8_t* payload, uint8_t* tones)
 {
     uint8_t a91[12]; // Store 77 bits of payload + 14 bits CRC
 
     // Compute and add CRC at the end of the message
     // a91 contains 77 bits of payload + 14 bits of CRC
-    add_crc(payload, a91);
+    ftx_add_crc(payload, a91);
 
     uint8_t codeword[22];
     encode174(a91, codeword);
@@ -77,7 +77,7 @@ void genft8(const uint8_t *payload, uint8_t *tones)
     // Total symbols: 79 (FT8_NN)
 
     uint8_t mask = 0x80u; // Mask to extract 1 bit from codeword
-    int i_byte = 0;       // Index of the current byte of the codeword
+    int i_byte = 0; // Index of the current byte of the codeword
     for (int i_tone = 0; i_tone < FT8_NN; ++i_tone)
     {
         if ((i_tone >= 0) && (i_tone < 7))
@@ -124,13 +124,13 @@ void genft8(const uint8_t *payload, uint8_t *tones)
     }
 }
 
-void genft4(const uint8_t *payload, uint8_t *tones)
+void ft4_encode(const uint8_t* payload, uint8_t* tones)
 {
     uint8_t a91[12]; // Store 77 bits of payload + 14 bits CRC
 
     // Compute and add CRC at the end of the message
     // a91 contains 77 bits of payload + 14 bits of CRC
-    add_crc(payload, a91);
+    ftx_add_crc(payload, a91);
 
     uint8_t codeword[22];
     encode174(a91, codeword); // 91 bits -> 174 bits
@@ -139,7 +139,7 @@ void genft4(const uint8_t *payload, uint8_t *tones)
     // Total symbols: 105 (FT4_NN)
 
     uint8_t mask = 0x80u; // Mask to extract 1 bit from codeword
-    int i_byte = 0;       // Index of the current byte of the codeword
+    int i_byte = 0; // Index of the current byte of the codeword
     for (int i_tone = 0; i_tone < FT4_NN; ++i_tone)
     {
         if ((i_tone == 0) || (i_tone == 104))

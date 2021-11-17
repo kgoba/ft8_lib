@@ -1,6 +1,6 @@
-CFLAGS = -O3
+CFLAGS = -O3 -ggdb3 -fsanitize=address
 CPPFLAGS = -std=c11 -I.
-LDFLAGS = -lm
+LDFLAGS = -lm -fsanitize=address
 
 TARGETS = gen_ft8 decode_ft8 test
 

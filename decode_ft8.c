@@ -68,7 +68,7 @@ static float max2(float a, float b)
 }
 
 // Compute FFT magnitudes (log power) for each timeslot in the signal
-void extract_power(const float signal[], waterfall_t *power, int block_size)
+void extract_power(const float signal[], waterfall_t* power, int block_size)
 {
     const int subblock_size = block_size / power->time_osr;
     const int nfft = block_size * power->freq_osr;
@@ -93,7 +93,7 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
     LOG(LOG_INFO, "N_FFT = %d\n", nfft);
     LOG(LOG_INFO, "FFT work area = %lu\n", fft_work_size);
 
-    void *fft_work = malloc(fft_work_size);
+    void* fft_work = malloc(fft_work_size);
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
     int offset = 0;
@@ -146,7 +146,7 @@ void extract_power(const float signal[], waterfall_t *power, int block_size)
     free(fft_work);
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     // Expect one command-line argument
     if (argc < 2)
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    const char *wav_path = argv[1];
+    const char* wav_path = argv[1];
 
     int sample_rate = 12000;
     int num_samples = 15 * sample_rate;
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 
     // Compute DSP parameters that depend on the sample rate
     const int num_bins = (int)(sample_rate / (2 * kFSK_dev)); // number bins of FSK tone width that the spectrum can be divided into
-    const int block_size = (int)(sample_rate / kFSK_dev);     // samples corresponding to one FSK symbol
+    const int block_size = (int)(sample_rate / kFSK_dev); // samples corresponding to one FSK symbol
     const int subblock_size = block_size / kTime_osr;
     const int nfft = block_size * kFreq_osr;
     const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
@@ -183,17 +183,18 @@ int main(int argc, char **argv)
         .num_bins = num_bins,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
-        .mag = mag_power};
+        .mag = mag_power
+    };
     extract_power(signal, &power, block_size);
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
-    int num_candidates = find_sync(&power, kMax_candidates, candidate_list, kMin_score);
+    int num_candidates = ft8_find_sync(&power, kMax_candidates, candidate_list, kMin_score);
 
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
     message_t decoded[kMax_decoded_messages];
-    message_t *decoded_hashtable[kMax_decoded_messages];
+    message_t* decoded_hashtable[kMax_decoded_messages];
 
     // Initialize hash table pointers
     for (int i = 0; i < kMax_decoded_messages; ++i)
@@ -204,7 +205,7 @@ int main(int argc, char **argv)
     // Go over candidates and attempt to decode messages
     for (int idx = 0; idx < num_candidates; ++idx)
     {
-        const candidate_t *cand = &candidate_list[idx];
+        const candidate_t* cand = &candidate_list[idx];
         if (cand->score < kMin_score)
             continue;
 
@@ -213,7 +214,7 @@ int main(int argc, char **argv)
 
         message_t message;
         decode_status_t status;
-        if (!decode(&power, cand, &message, kLDPC_iterations, &status))
+        if (!ft8_decode(&power, cand, &message, kLDPC_iterations, &status))
         {
             if (status.ldpc_errors > 0)
             {

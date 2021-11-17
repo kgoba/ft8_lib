@@ -15,7 +15,7 @@
 
 #define LOG_LEVEL LOG_INFO
 
-void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits)
+void convert_8bit_to_6bit(uint8_t* dst, const uint8_t* src, int nBits)
 {
     // Zero-fill the destination array as we will only be setting bits later
     for (int j = 0; j < (nBits + 5) / 6; ++j)
@@ -96,17 +96,17 @@ void test2() {
 
 void test3() {
     uint8_t test_in2[10] = { 0x11, 0x00, 0x00, 0x00, 0x00, 0x0E, 0x10, 0x04, 0x01, 0x00 };
-    uint16_t crc1 = ft8_crc(test_in2, 76);  // Calculate CRC of 76 bits only
+    uint16_t crc1 = ftx_compute_crc(test_in2, 76);  // Calculate CRC of 76 bits only
     LOG(LOG_INFO, "CRC: %04x\n", crc1);            // should be 0x0708
 }
 */
 
-void test_tones(float *log174)
+void test_tones(float* log174)
 {
     // Just a test case
     for (int i = 0; i < FT8_ND; ++i)
     {
-        const uint8_t inv_map[8] = {0, 1, 3, 2, 6, 4, 5, 7};
+        const uint8_t inv_map[8] = { 0, 1, 3, 2, 6, 4, 5, 7 };
         uint8_t tone = ("0000000011721762454112705354533170166234757420515470163426"[i]) - '0';
         uint8_t b3 = inv_map[tone];
         log174[3 * i] = (b3 & 4) ? +1.0 : -1.0;
@@ -126,7 +126,7 @@ void test4()
     printf("N_FFT = %d\n", nfft);
     printf("FFT work area = %lu\n", fft_work_size);
 
-    void *fft_work = malloc(fft_work_size);
+    void* fft_work = malloc(fft_work_size);
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
     kiss_fft_scalar window[nfft];
