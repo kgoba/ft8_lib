@@ -26,6 +26,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Checkout sub-modules
+      run: |
+        git submodule update --init --recursive
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v1
       with:
