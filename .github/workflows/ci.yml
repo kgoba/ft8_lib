@@ -1,0 +1,59 @@
+name: "CI"
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '42 20 * * 5'
+
+jobs:
+  analyze:
+    name: Build-Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      with:
+        languages: ${{ matrix.language }}
+
+    - name: Install dependencies and build
+      run: |
+        sudo apt-get -y update
+        sudo apt-get -y install build-essential
+        make
+
+    - name: SAST check (C/C++ code analysis)
+      run: |
+        sudo apt-get -y install cppcheck
+        echo "===== CPPCHECK ====="
+        cppcheck --std=c11 *.c
+
+    - name: Cpplint check (formatting & best-practice check)
+      run: |
+        pip install cpplint
+        echo "===== CPPLINT ====="
+        cpplint --linelength=1000 --extensions=c --headers=h *.c || true
+
+    - name: Spellchecking
+      run: |
+        pip install codespell
+        echo "===== CODESPELL ====="
+        codespell *.c *.h
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v1
