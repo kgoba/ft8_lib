@@ -31,7 +31,7 @@ const float kFSK_dev = 6.25f; // tone deviation in Hz and symbol rate
 
 void usage()
 {
-    fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
+    fprintf(stderr, "Decode a 15-second (or slightly shorter) WAV file.\n");
 }
 
 float hann_i(int i, int N)
