@@ -14,7 +14,7 @@
 #include "common/common.h"
 #include "common/wave.h"
 #include "common/debug.h"
-#include "fft/kiss_fftr.h"
+#include "kissfft/kiss_fftr.h"
 
 #define LOG_LEVEL LOG_INFO
 
