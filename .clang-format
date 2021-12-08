@@ -13,6 +13,7 @@ AllowShortCaseLabelsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: false
+AlignTrailingComments: true
 BreakConstructorInitializers: BeforeColon
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 0

@@ -4,20 +4,24 @@
 #include <stdint.h>
 
 // Define FT8 symbol counts
-#define FT8_ND (58) ///< Data symbols
-#define FT8_NS (21) ///< Sync symbols (3 @ Costas 7x7)
-#define FT8_NN (79) ///< Total channel symbols (FT8_NS + FT8_ND)
+#define FT8_ND          (58) ///< Data symbols
+#define FT8_NN          (79) ///< Total channel symbols (FT8_NS + FT8_ND)
+#define FT8_LENGTH_SYNC (7)  ///< Length of each sync group
+#define FT8_NUM_SYNC    (3)  ///< Number of sync groups
+#define FT8_SYNC_OFFSET (36) ///< Offset between sync groups
 
 // Define FT4 symbol counts
-#define FT4_ND (87) ///< Data symbols
-#define FT4_NS (16) ///< Sync symbols (3 @ Costas 7x7)
-#define FT4_NR (2) ///< Ramp symbols (beginning + end)
-#define FT4_NN (105) ///< Total channel symbols (FT4_NS + FT4_ND + FT4_NR)
+#define FT4_ND          (87)  ///< Data symbols
+#define FT4_NR          (2)   ///< Ramp symbols (beginning + end)
+#define FT4_NN          (105) ///< Total channel symbols (FT4_NS + FT4_ND + FT4_NR)
+#define FT4_LENGTH_SYNC (4)   ///< Length of each sync group
+#define FT4_NUM_SYNC    (4)   ///< Number of sync groups
+#define FT4_SYNC_OFFSET (33)  ///< Offset between sync groups
 
 // Define LDPC parameters
-#define FT8_LDPC_N       (174) ///< Number of bits in the encoded message (payload with LDPC checksum bits)
-#define FT8_LDPC_K       (91) ///< Number of payload bits (including CRC)
-#define FT8_LDPC_M       (83) ///< Number of LDPC checksum bits (FT8_LDPC_N - FT8_LDPC_K)
+#define FT8_LDPC_N       (174)                  ///< Number of bits in the encoded message (payload with LDPC checksum bits)
+#define FT8_LDPC_K       (91)                   ///< Number of payload bits (including CRC)
+#define FT8_LDPC_M       (83)                   ///< Number of LDPC checksum bits (FT8_LDPC_N - FT8_LDPC_K)
 #define FT8_LDPC_N_BYTES ((FT8_LDPC_N + 7) / 8) ///< Number of whole bytes needed to store 174 bits (full message)
 #define FT8_LDPC_K_BYTES ((FT8_LDPC_K + 7) / 8) ///< Number of whole bytes needed to store 91 bits (payload + CRC only)
 

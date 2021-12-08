@@ -169,7 +169,7 @@ int main(int argc, char** argv)
 
     // Compute DSP parameters that depend on the sample rate
     const int num_bins = (int)(sample_rate / (2 * kFSK_dev)); // number bins of FSK tone width that the spectrum can be divided into
-    const int block_size = (int)(sample_rate / kFSK_dev); // samples corresponding to one FSK symbol
+    const int block_size = (int)(sample_rate / kFSK_dev);     // samples corresponding to one FSK symbol
     const int subblock_size = block_size / kTime_osr;
     const int nfft = block_size * kFreq_osr;
     const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
@@ -183,7 +183,8 @@ int main(int argc, char** argv)
         .num_bins = num_bins,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
-        .mag = mag_power
+        .mag = mag_power,
+        .block_stride = (kTime_osr * kFreq_osr * num_bins)
     };
     extract_power(signal, &power, block_size);
 

@@ -12,39 +12,40 @@
 /// Values freq_osr > 1 mean the tone spacing is further subdivided by FFT analysis.
 typedef struct
 {
-    int num_blocks; ///< number of total blocks (symbols) in terms of 160 ms time periods
-    int num_bins; ///< number of FFT bins in terms of 6.25 Hz
-    int time_osr; ///< number of time subdivisions
-    int freq_osr; ///< number of frequency subdivisions
-    uint8_t* mag; ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    int num_blocks;   ///< number of total blocks (symbols) in terms of 160 ms time periods
+    int num_bins;     ///< number of FFT bins in terms of 6.25 Hz
+    int time_osr;     ///< number of time subdivisions
+    int freq_osr;     ///< number of frequency subdivisions
+    uint8_t* mag;     ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    int block_stride; ///< Helper value = time_osr * freq_osr * num_bins
 } waterfall_t;
 
 /// Output structure of ft8_find_sync() and input structure of ft8_decode().
 /// Holds the position of potential start of a message in time and frequency.
 typedef struct
 {
-    int16_t score; ///< Candidate score (non-negative number; higher score means higher likelihood)
+    int16_t score;       ///< Candidate score (non-negative number; higher score means higher likelihood)
     int16_t time_offset; ///< Index of the time block
     int16_t freq_offset; ///< Index of the frequency bin
-    uint8_t time_sub; ///< Index of the time subdivision used
-    uint8_t freq_sub; ///< Index of the frequency subdivision used
+    uint8_t time_sub;    ///< Index of the time subdivision used
+    uint8_t freq_sub;    ///< Index of the frequency subdivision used
 } candidate_t;
 
 /// Structure that holds the decoded message
 typedef struct
 {
     // TODO: check again that this size is enough
-    char text[25]; // plain text
-    uint16_t hash; // hash value to be used in hash table and quick checking for duplicates
+    char text[25]; ///< Plain text
+    uint16_t hash; ///< Hash value to be used in hash table and quick checking for duplicates
 } message_t;
 
 /// Structure that contains the status of various steps during decoding of a message
 typedef struct
 {
-    int ldpc_errors;
-    uint16_t crc_extracted;
-    uint16_t crc_calculated;
-    int unpack_status;
+    int ldpc_errors;         ///< Number of LDPC errors during decoding
+    uint16_t crc_extracted;  ///< CRC value recovered from the message
+    uint16_t crc_calculated; ///< CRC value calculated over the payload
+    int unpack_status;       ///< Return value of the unpack routine
 } decode_status_t;
 
 /// Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
