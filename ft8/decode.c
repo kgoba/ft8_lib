@@ -25,8 +25,9 @@ static float max2(float a, float b);
 static float max4(float a, float b, float c, float d);
 static void heapify_down(candidate_t heap[], int heap_size);
 static void heapify_up(candidate_t heap[], int heap_size);
-static void decode_symbol(const uint8_t* power, int bit_idx, float* log174);
-static void decode_multi_symbols(const uint8_t* power, int num_bins, int n_syms, int bit_idx, float* log174);
+static void ft4_decode_symbol(const uint8_t* power, int bit_idx, float* log174);
+static void ft8_decode_symbol(const uint8_t* power, int bit_idx, float* log174);
+static void ft8_decode_multi_symbols(const uint8_t* power, int num_bins, int n_syms, int bit_idx, float* log174);
 
 static int get_index(const waterfall_t* power, const candidate_t* candidate)
 {
@@ -244,7 +245,7 @@ void ft8_extract_likelihood(const waterfall_t* power, const candidate_t* cand, f
             // Pointer to 8 bins of the current symbol
             const uint8_t* ps = mag_cand + (sym_idx * power->block_stride);
 
-            decode_symbol(ps, bit_idx, log174);
+            ft8_decode_symbol(ps, bit_idx, log174);
         }
     }
 
@@ -369,8 +370,23 @@ static void heapify_up(candidate_t heap[], int heap_size)
     }
 }
 
+// Compute unnormalized log likelihood log(p(1) / p(0)) of 2 message bits (1 FSK symbol)
+static void ft4_decode_symbol(const uint8_t* power, int bit_idx, float* log174)
+{
+    // Cleaned up code for the simple case of n_syms==1
+    float s2[4];
+
+    for (int j = 0; j < 4; ++j)
+    {
+        s2[j] = (float)power[kFT4_Gray_map[j]];
+    }
+
+    log174[bit_idx + 0] = max2(s2[2], s2[3]) - max2(s2[0], s2[1]);
+    log174[bit_idx + 1] = max2(s2[1], s2[3]) - max2(s2[0], s2[2]);
+}
+
 // Compute unnormalized log likelihood log(p(1) / p(0)) of 3 message bits (1 FSK symbol)
-static void decode_symbol(const uint8_t* power, int bit_idx, float* log174)
+static void ft8_decode_symbol(const uint8_t* power, int bit_idx, float* log174)
 {
     // Cleaned up code for the simple case of n_syms==1
     float s2[8];
@@ -386,7 +402,7 @@ static void decode_symbol(const uint8_t* power, int bit_idx, float* log174)
 }
 
 // Compute unnormalized log likelihood log(p(1) / p(0)) of bits corresponding to several FSK symbols at once
-static void decode_multi_symbols(const uint8_t* power, int num_bins, int n_syms, int bit_idx, float* log174)
+static void ft8_decode_multi_symbols(const uint8_t* power, int num_bins, int n_syms, int bit_idx, float* log174)
 {
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);

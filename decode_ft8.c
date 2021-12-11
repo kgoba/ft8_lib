@@ -24,23 +24,26 @@ const int kLDPC_iterations = 20;
 
 const int kMax_decoded_messages = 50;
 
-const int kFreq_osr = 2;
-const int kTime_osr = 2;
+const int kFreq_osr = 2; // Frequency oversampling rate (bin subdivision)
+const int kTime_osr = 2; // Time oversampling rate (symbol subdivision)
 
-const float kFSK_dev = 6.25f; // tone deviation in Hz and symbol rate
+// const float kSymbol_period = 0.048f; // governs FT4 tone deviation in Hz and symbol rate
+// const float kSlot_time = 7.5f;       // FT4 slot period
+const float kSymbol_period = 0.160f; // governs FT8 tone deviation in Hz and symbol rate
+const float kSlot_time = 15.0f;      // FT8 slot period
 
 void usage()
 {
     fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
 }
 
-float hann_i(int i, int N)
+static float hann_i(int i, int N)
 {
     float x = sinf((float)M_PI * i / N);
     return x * x;
 }
 
-float hamming_i(int i, int N)
+static float hamming_i(int i, int N)
 {
     const float a0 = (float)25 / 46;
     const float a1 = 1 - a0;
@@ -49,7 +52,7 @@ float hamming_i(int i, int N)
     return a0 - a1 * x1;
 }
 
-float blackman_i(int i, int N)
+static float blackman_i(int i, int N)
 {
     const float alpha = 0.16f; // or 2860/18608
     const float a0 = (1 - alpha) / 2;
@@ -62,88 +65,160 @@ float blackman_i(int i, int N)
     return a0 - a1 * x1 + a2 * x2;
 }
 
-static float max2(float a, float b)
+void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int time_osr, int freq_osr)
 {
-    return (a >= b) ? a : b;
+    size_t mag_size = max_blocks * time_osr * freq_osr * num_bins * sizeof(me->mag[0]);
+    me->max_blocks = max_blocks;
+    me->num_blocks = 0;
+    me->num_bins = num_bins;
+    me->time_osr = time_osr;
+    me->freq_osr = freq_osr;
+    me->block_stride = (time_osr * freq_osr * num_bins);
+    me->mag = malloc(mag_size);
+    LOG(LOG_DEBUG, "Waterfall size = %lu\n", mag_size);
 }
 
-// Compute FFT magnitudes (log power) for each timeslot in the signal
-void extract_power(const float signal[], waterfall_t* power, int block_size)
+void waterfall_free(waterfall_t* me)
 {
-    const int subblock_size = block_size / power->time_osr;
-    const int nfft = block_size * power->freq_osr;
-    const float fft_norm = 2.0f / nfft;
-    const int len_window = 1.8f * block_size; // hand-picked and optimized
+    free(me->mag);
+}
 
-    float window[nfft];
-    for (int i = 0; i < nfft; ++i)
+typedef struct
+{
+    float slot_time;
+    float symbol_period;
+    float f_min;
+    float f_max;
+    int sample_rate;
+    int time_osr;
+    int freq_osr;
+} monitor_config_t;
+
+typedef struct
+{
+    int block_size;    ///< Number of samples per symbol (block)
+    int subblock_size; ///< Analysis shift size (number of samples)
+    int nfft;          ///< FFT size
+    float fft_norm;    ///< FFT normalization factor
+    float* window;     ///< Window function for STFT analysis (nfft samples)
+    float* last_frame; ///< Current STFT analysis frame (nfft samples)
+    waterfall_t wf;    ///< Waterfall object
+    float max_mag;     ///< Maximum detected magnitude (debug stats)
+
+    // KISS FFT housekeeping variables
+    void* fft_work;        ///< Work area required by Kiss FFT
+    kiss_fftr_cfg fft_cfg; ///< Kiss FFT housekeeping object
+} monitor_t;
+
+void monitor_init(monitor_t* me, const monitor_config_t* cfg)
+{
+    // Compute DSP parameters that depend on the sample rate
+    me->block_size = (int)(cfg->sample_rate * cfg->symbol_period); // samples corresponding to one FSK symbol
+    me->subblock_size = me->block_size / cfg->time_osr;
+    me->nfft = me->block_size * cfg->freq_osr;
+    me->fft_norm = 2.0f / me->nfft;
+    const int len_window = 1.8f * me->block_size; // hand-picked and optimized
+
+    me->window = malloc(me->nfft * sizeof(me->window[0]));
+    for (int i = 0; i < me->nfft; ++i)
     {
         // window[i] = 1;
         // window[i] = hann_i(i, nfft);
         // window[i] = blackman_i(i, nfft);
         // window[i] = hamming_i(i, nfft);
-        window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
+        me->window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
     }
+    me->last_frame = malloc(me->nfft * sizeof(me->last_frame[0]));
 
     size_t fft_work_size;
-    kiss_fftr_alloc(nfft, 0, 0, &fft_work_size);
+    kiss_fftr_alloc(me->nfft, 0, 0, &fft_work_size);
 
-    LOG(LOG_INFO, "Block size = %d\n", block_size);
-    LOG(LOG_INFO, "Subblock size = %d\n", subblock_size);
-    LOG(LOG_INFO, "N_FFT = %d\n", nfft);
-    LOG(LOG_INFO, "FFT work area = %lu\n", fft_work_size);
+    LOG(LOG_INFO, "Block size = %d\n", me->block_size);
+    LOG(LOG_INFO, "Subblock size = %d\n", me->subblock_size);
+    LOG(LOG_INFO, "N_FFT = %d\n", me->nfft);
+    LOG(LOG_DEBUG, "FFT work area = %lu\n", fft_work_size);
 
-    void* fft_work = malloc(fft_work_size);
-    kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
+    me->fft_work = malloc(fft_work_size);
+    me->fft_cfg = kiss_fftr_alloc(me->nfft, 0, me->fft_work, &fft_work_size);
 
-    int offset = 0;
-    float max_mag = -120.0f;
-    for (int idx_block = 0; idx_block < power->num_blocks; ++idx_block)
+    const int max_blocks = (int)(cfg->slot_time / cfg->symbol_period);
+    const int num_bins = (int)(cfg->sample_rate * kSymbol_period / 2);
+    waterfall_init(&me->wf, max_blocks, num_bins, cfg->time_osr, cfg->freq_osr);
+
+    me->max_mag = 0;
+}
+
+void monitor_free(monitor_t* me)
+{
+    waterfall_free(&me->wf);
+    free(me->fft_work);
+    free(me->last_frame);
+    free(me->window);
+}
+
+// Compute FFT magnitudes (log wf) for a frame in the signal and update waterfall data
+void monitor_process(monitor_t* me, const float* frame)
+{
+    // Check if we can still store more waterfall data
+    if (me->wf.num_blocks >= me->wf.max_blocks)
+        return;
+
+    int offset = me->wf.num_blocks * me->wf.block_stride;
+    int frame_pos = 0;
+
+    // Loop over block subdivisions
+    for (int time_sub = 0; time_sub < me->wf.time_osr; ++time_sub)
     {
-        // Loop over two possible time offsets (0 and block_size/2)
-        for (int time_sub = 0; time_sub < power->time_osr; ++time_sub)
+        kiss_fft_scalar timedata[me->nfft];
+        kiss_fft_cpx freqdata[me->nfft / 2 + 1];
+
+        // Shift the new data into analysis frame
+        for (int pos = 0; pos < me->nfft - me->subblock_size; ++pos)
         {
-            kiss_fft_scalar timedata[nfft];
-            kiss_fft_cpx freqdata[nfft / 2 + 1];
-            float mag_db[nfft / 2 + 1];
+            me->last_frame[pos] = me->last_frame[pos + me->subblock_size];
+        }
+        for (int pos = me->nfft - me->subblock_size; pos < me->nfft; ++pos)
+        {
+            me->last_frame[pos] = frame[frame_pos];
+            ++frame_pos;
+        }
 
-            // Extract windowed signal block
-            for (int pos = 0; pos < nfft; ++pos)
+        // Compute windowed analysis frame
+        for (int pos = 0; pos < me->nfft; ++pos)
+        {
+            timedata[pos] = me->fft_norm * me->window[pos] * me->last_frame[pos];
+        }
+
+        kiss_fftr(me->fft_cfg, timedata, freqdata);
+
+        // Loop over two possible frequency bin offsets (for averaging)
+        for (int freq_sub = 0; freq_sub < me->wf.freq_osr; ++freq_sub)
+        {
+            for (int bin = 0; bin < me->wf.num_bins; ++bin)
             {
-                timedata[pos] = window[pos] * signal[(idx_block * block_size) + (time_sub * subblock_size) + pos];
-            }
+                int src_bin = (bin * me->wf.freq_osr) + freq_sub;
+                float mag2 = (freqdata[src_bin].i * freqdata[src_bin].i) + (freqdata[src_bin].r * freqdata[src_bin].r);
+                float db = 10.0f * log10f(1E-12f + mag2);
+                // Scale decibels to unsigned 8-bit range and clamp the value
+                // Range 0-240 covers -120..0 dB in 0.5 dB steps
+                int scaled = (int)(2 * db + 240);
 
-            kiss_fftr(fft_cfg, timedata, freqdata);
+                me->wf.mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
+                ++offset;
 
-            // Compute log magnitude in decibels
-            for (int idx_bin = 0; idx_bin < nfft / 2 + 1; ++idx_bin)
-            {
-                float mag2 = (freqdata[idx_bin].i * freqdata[idx_bin].i) + (freqdata[idx_bin].r * freqdata[idx_bin].r);
-                mag_db[idx_bin] = 10.0f * log10f(1E-12f + mag2 * fft_norm * fft_norm);
-            }
-
-            // Loop over two possible frequency bin offsets (for averaging)
-            for (int freq_sub = 0; freq_sub < power->freq_osr; ++freq_sub)
-            {
-                for (int pos = 0; pos < power->num_bins; ++pos)
-                {
-                    float db = mag_db[pos * power->freq_osr + freq_sub];
-                    // Scale decibels to unsigned 8-bit range and clamp the value
-                    // Range 0-240 covers -120..0 dB in 0.5 dB steps
-                    int scaled = (int)(2 * db + 240);
-
-                    power->mag[offset] = (scaled < 0) ? 0 : ((scaled > 255) ? 255 : scaled);
-                    ++offset;
-
-                    if (db > max_mag)
-                        max_mag = db;
-                }
+                if (db > me->max_mag)
+                    me->max_mag = db;
             }
         }
     }
 
-    LOG(LOG_INFO, "Max magnitude: %.1f dB\n", max_mag);
-    free(fft_work);
+    ++me->wf.num_blocks;
+}
+
+void monitor_reset(monitor_t* me)
+{
+    me->wf.num_blocks = 0;
+    me->max_mag = 0;
 }
 
 int main(int argc, char** argv)
@@ -167,30 +242,32 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    // Compute DSP parameters that depend on the sample rate
-    const int num_bins = (int)(sample_rate / (2 * kFSK_dev)); // number bins of FSK tone width that the spectrum can be divided into
-    const int block_size = (int)(sample_rate / kFSK_dev);     // samples corresponding to one FSK symbol
-    const int subblock_size = block_size / kTime_osr;
-    const int nfft = block_size * kFreq_osr;
-    const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
-
-    LOG(LOG_INFO, "Sample rate %d Hz, %d blocks, %d bins\n", sample_rate, num_blocks, num_bins);
+    LOG(LOG_INFO, "Sample rate %d Hz, %d samples, %.3f seconds\n", sample_rate, num_samples, (double)num_samples / sample_rate);
 
     // Compute FFT over the whole signal and store it
-    uint8_t mag_power[num_blocks * kFreq_osr * kTime_osr * num_bins];
-    waterfall_t power = {
-        .num_blocks = num_blocks,
-        .num_bins = num_bins,
+    monitor_t mon;
+    monitor_config_t mon_cfg = {
+        .symbol_period = kSymbol_period,
+        .sample_rate = sample_rate,
+        .slot_time = kSlot_time,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
-        .mag = mag_power,
-        .block_stride = (kTime_osr * kFreq_osr * num_bins)
+        .f_min = 100,
+        .f_max = 3000
     };
-    extract_power(signal, &power, block_size);
+    monitor_init(&mon, &mon_cfg);
+    LOG(LOG_DEBUG, "Waterfall allocated %d symbols\n", mon.wf.max_blocks);
+    for (int frame_pos = 0; frame_pos + mon.block_size <= num_samples; frame_pos += mon.block_size)
+    {
+        // Process the waveform data frame by frame - you could have a live loop here with data from an audio device
+        monitor_process(&mon, signal + frame_pos);
+    }
+    LOG(LOG_DEBUG, "Waterfall accumulated %d symbols\n", mon.wf.num_blocks);
+    LOG(LOG_INFO, "Max magnitude: %.1f dB\n", mon.max_mag);
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
-    int num_candidates = ft8_find_sync(&power, kMax_candidates, candidate_list, kMin_score);
+    int num_candidates = ft8_find_sync(&mon.wf, kMax_candidates, candidate_list, kMin_score);
 
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
@@ -210,16 +287,17 @@ int main(int argc, char** argv)
         if (cand->score < kMin_score)
             continue;
 
-        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) * kFSK_dev;
-        float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) / kFSK_dev;
+        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) / kSymbol_period;
+        float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) * kSymbol_period;
 
         message_t message;
         decode_status_t status;
-        if (!ft8_decode(&power, cand, &message, kLDPC_iterations, &status))
+        if (!ft8_decode(&mon.wf, cand, &message, kLDPC_iterations, &status))
         {
             if (status.ldpc_errors > 0)
             {
                 LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
+                // printf("000000 %3d %+4.2f %4.0f ~  ---\n", cand->score, time_sec, freq_hz);
             }
             else if (status.crc_calculated != status.crc_extracted)
             {

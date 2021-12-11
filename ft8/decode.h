@@ -12,7 +12,8 @@
 /// Values freq_osr > 1 mean the tone spacing is further subdivided by FFT analysis.
 typedef struct
 {
-    int num_blocks;   ///< number of total blocks (symbols) in terms of 160 ms time periods
+    int max_blocks;   ///< number of blocks (symbols) allocated in the mag array
+    int num_blocks;   ///< number of blocks (symbols) stored in the mag array
     int num_bins;     ///< number of FFT bins in terms of 6.25 Hz
     int time_osr;     ///< number of time subdivisions
     int freq_osr;     ///< number of frequency subdivisions
