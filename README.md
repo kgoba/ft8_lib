@@ -1,16 +1,16 @@
-# FT8 library 
+# FT8 (and now FT4) library 
 
-C implementation of FT8 protocol decoder and encoder, mostly intended for experimental use on microcontrollers.
+C implementation of a lightweight FT8/FT4 decoder and encoder, mostly intended for experimental use on microcontrollers.
 
-The intent of this library is to foster experimentation with e.g. automated beacons. For example, FT8 supports free-text messages and raw telemetry data (71 bits).
+The intent of this library is to allow FT8/FT4 encoding and decoding in standalone (i.e. without a PC or RPi), e.g. automated beacons or standalone SDR transceivers. It's also my learning process, optimization problem and source of fun.
 
 The encoding process is relatively light on resources, and an Arduino should be perfectly capable of running this code.
 
-The decoder is designed with memory and computing efficiency in mind, in order to be usable with a fast enough microcontroller. It is shown to be working on STM32F7 boards fast enough for real work, but the embedded application itself is beyond this repository. This repository provides an example decoder which can decode a 15-second WAV file on a desktop machine or SBC. The decoder needs to access the whole 15-second window in spectral magnitude representation (the window can be also shorter, and messages can have varying starting time within the window). The example decoder uses slightly less than 200 KB of RAM. 
+The decoder is designed with memory and computing efficiency in mind, in order to be usable with a fast enough microcontroller. It is shown to be working on STM32F7 boards fast enough for real work, but the embedded application itself is beyond this repository. This repository provides an example decoder which can decode a 15-second WAV file on a desktop machine or SBC. The decoder needs to access the whole 15-second window in spectral magnitude representation (the window can be also shorter, and messages can have varying starting time within the window). The example FT8 decoder can work with slightly less than 200 KB of RAM. 
 
-# What works
+# Current state
 
-Currently the basic message set of the revised FT8 protocol with 77-bit payload (introduced since WSJT-X version 2.0) is supported:
+Currently the basic message set for establishing QSOs, as well as telemetry and free-text message modes are supported:
 * CQ {call} {grid}, e.g. CQ CA0LL GG77
 * CQ {xy} {call} {grid}, e.g. CQ JA CA0LL GG77
 * {call} {call} {report}, e.g. CA0LL OT7ER R-07
@@ -18,15 +18,13 @@ Currently the basic message set of the revised FT8 protocol with 77-bit payload 
 * Free-text messages (up to 13 characters from a limited alphabet) (decoding only, untested)
 * Telemetry data (71 bits as 18 hex symbols)
 
-There is historical code that supports the same set of FT8 version 1 (75-bit) messages minus telemetry data.
+Encoding and decoding works for both FT8 and FT4. For encoding and decoding, there is a desktop application provided for each, which serves mostly as test code, and could be a starting point for your potential application on an MCU. I don't provide a concrete example for a particular MCU hardware here, since it would be very specific.
 
-# What doesn't
+The code is not yet really a library, rather a collection of routines and example code.
 
-I'm currently working on decoding, which still needs refactoring. The code is not yet really a library, rather a collection of routines and example code.
+# Future ideas
 
 Incremental decoding (processing during the 15 second window) is something that I would like to explore, but haven't started.
-
-FT4 is not supported, but I would like to add it one day soon.
 
 These features are low on my priority list:
 * Contest modes
@@ -34,9 +32,9 @@ These features are low on my priority list:
 
 # What to do with it
 
-You can generate 15-second WAV files with your own messages as a proof of concept or for testing purposes. They can either be played back or opened directly from WSJT-X. To do that, run ```make```. Then run ```gen_ft8```. Currently messages are modulated at 1000-1050 Hz.
+You can generate 15-second WAV files with your own messages as a proof of concept or for testing purposes. They can either be played back or opened directly from WSJT-X. To do that, run ```make```. Then run ```gen_ft8``` (run it without parameters to check what parameters are supported). Currently messages are modulated at 1000-1050 Hz.
 
-You can decode 15-second (or shorter) WAV files with ```decode_ft8```. This is only an example application and does not support live processing/recording, for that you could use third party code (PortAudio, for example).
+You can decode 15-second (or shorter) WAV files with ```decode_ft8```. This is only an example application and does not support live processing/recording. For that you could use third party code (PortAudio, for example).
 
 # References and credits
 
