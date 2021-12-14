@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "constants.h"
+
 /// Input structure to ft8_find_sync() function. This structure describes stored waterfall data over the whole message slot.
 /// Fields time_osr and freq_osr specify additional oversampling rate for time and frequency resolution.
 /// If time_osr=1, FFT magnitude data is collected once for every symbol transmitted, i.e. every 1/6.25 = 0.16 seconds.
@@ -12,13 +14,14 @@
 /// Values freq_osr > 1 mean the tone spacing is further subdivided by FFT analysis.
 typedef struct
 {
-    int max_blocks;   ///< number of blocks (symbols) allocated in the mag array
-    int num_blocks;   ///< number of blocks (symbols) stored in the mag array
-    int num_bins;     ///< number of FFT bins in terms of 6.25 Hz
-    int time_osr;     ///< number of time subdivisions
-    int freq_osr;     ///< number of frequency subdivisions
-    uint8_t* mag;     ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
-    int block_stride; ///< Helper value = time_osr * freq_osr * num_bins
+    int max_blocks;          ///< number of blocks (symbols) allocated in the mag array
+    int num_blocks;          ///< number of blocks (symbols) stored in the mag array
+    int num_bins;            ///< number of FFT bins in terms of 6.25 Hz
+    int time_osr;            ///< number of time subdivisions
+    int freq_osr;            ///< number of frequency subdivisions
+    uint8_t* mag;            ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    int block_stride;        ///< Helper value = time_osr * freq_osr * num_bins
+    ftx_protocol_t protocol; ///< Indicate if using FT4 or FT8
 } waterfall_t;
 
 /// Output structure of ft8_find_sync() and input structure of ft8_decode().

@@ -27,11 +27,6 @@ const int kMax_decoded_messages = 50;
 const int kFreq_osr = 2; // Frequency oversampling rate (bin subdivision)
 const int kTime_osr = 2; // Time oversampling rate (symbol subdivision)
 
-// const float kSymbol_period = 0.048f; // governs FT4 tone deviation in Hz and symbol rate
-// const float kSlot_time = 7.5f;       // FT4 slot period
-const float kSymbol_period = 0.160f; // governs FT8 tone deviation in Hz and symbol rate
-const float kSlot_time = 15.0f;      // FT8 slot period
-
 void usage()
 {
     fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
@@ -83,27 +78,30 @@ void waterfall_free(waterfall_t* me)
     free(me->mag);
 }
 
+/// Configuration options for FT4/FT8 monitor
 typedef struct
 {
-    float slot_time;
-    float symbol_period;
-    float f_min;
-    float f_max;
-    int sample_rate;
-    int time_osr;
-    int freq_osr;
+    float f_min;             ///< Lower frequency bound for analysis
+    float f_max;             ///< Upper frequency bound for analysis
+    int sample_rate;         ///< Sample rate in Hertz
+    int time_osr;            ///< Number of time subdivisions
+    int freq_osr;            ///< Number of frequency subdivisions
+    ftx_protocol_t protocol; ///< Protocol: FT4 or FT8
 } monitor_config_t;
 
+/// FT4/FT8 monitor object that manages DSP processing of incoming audio data
+/// and prepares a waterfall object
 typedef struct
 {
-    int block_size;    ///< Number of samples per symbol (block)
-    int subblock_size; ///< Analysis shift size (number of samples)
-    int nfft;          ///< FFT size
-    float fft_norm;    ///< FFT normalization factor
-    float* window;     ///< Window function for STFT analysis (nfft samples)
-    float* last_frame; ///< Current STFT analysis frame (nfft samples)
-    waterfall_t wf;    ///< Waterfall object
-    float max_mag;     ///< Maximum detected magnitude (debug stats)
+    float symbol_period; ///< FT4/FT8 symbol period in seconds
+    int block_size;      ///< Number of samples per symbol (block)
+    int subblock_size;   ///< Analysis shift size (number of samples)
+    int nfft;            ///< FFT size
+    float fft_norm;      ///< FFT normalization factor
+    float* window;       ///< Window function for STFT analysis (nfft samples)
+    float* last_frame;   ///< Current STFT analysis frame (nfft samples)
+    waterfall_t wf;      ///< Waterfall object
+    float max_mag;       ///< Maximum detected magnitude (debug stats)
 
     // KISS FFT housekeeping variables
     void* fft_work;        ///< Work area required by Kiss FFT
@@ -112,21 +110,23 @@ typedef struct
 
 void monitor_init(monitor_t* me, const monitor_config_t* cfg)
 {
+    float slot_time = (cfg->protocol == PROTO_FT4) ? FT4_SLOT_TIME : FT8_SLOT_TIME;
+    float symbol_period = (cfg->protocol == PROTO_FT4) ? FT4_SYMBOL_PERIOD : FT8_SYMBOL_PERIOD;
     // Compute DSP parameters that depend on the sample rate
-    me->block_size = (int)(cfg->sample_rate * cfg->symbol_period); // samples corresponding to one FSK symbol
+    me->block_size = (int)(cfg->sample_rate * symbol_period); // samples corresponding to one FSK symbol
     me->subblock_size = me->block_size / cfg->time_osr;
     me->nfft = me->block_size * cfg->freq_osr;
     me->fft_norm = 2.0f / me->nfft;
-    const int len_window = 1.8f * me->block_size; // hand-picked and optimized
+    // const int len_window = 1.8f * me->block_size; // hand-picked and optimized
 
     me->window = malloc(me->nfft * sizeof(me->window[0]));
     for (int i = 0; i < me->nfft; ++i)
     {
         // window[i] = 1;
-        // window[i] = hann_i(i, nfft);
-        // window[i] = blackman_i(i, nfft);
-        // window[i] = hamming_i(i, nfft);
-        me->window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
+        me->window[i] = hann_i(i, me->nfft);
+        // me->window[i] = blackman_i(i, me->nfft);
+        // me->window[i] = hamming_i(i, me->nfft);
+        // me->window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
     }
     me->last_frame = malloc(me->nfft * sizeof(me->last_frame[0]));
 
@@ -141,11 +141,13 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->fft_work = malloc(fft_work_size);
     me->fft_cfg = kiss_fftr_alloc(me->nfft, 0, me->fft_work, &fft_work_size);
 
-    const int max_blocks = (int)(cfg->slot_time / cfg->symbol_period);
-    const int num_bins = (int)(cfg->sample_rate * kSymbol_period / 2);
+    const int max_blocks = (int)(slot_time / symbol_period);
+    const int num_bins = (int)(cfg->sample_rate * symbol_period / 2);
     waterfall_init(&me->wf, max_blocks, num_bins, cfg->time_osr, cfg->freq_osr);
+    me->wf.protocol = cfg->protocol;
+    me->symbol_period = symbol_period;
 
-    me->max_mag = 0;
+    me->max_mag = -120.0f;
 }
 
 void monitor_free(monitor_t* me)
@@ -223,14 +225,48 @@ void monitor_reset(monitor_t* me)
 
 int main(int argc, char** argv)
 {
-    // Expect one command-line argument
-    if (argc < 2)
+    // Accepted arguments
+    const char* wav_path = NULL;
+    bool is_ft8 = true;
+
+    // Parse arguments one by one
+    int arg_idx = 1;
+    while (arg_idx < argc)
+    {
+        // Check if the current argument is an option (-xxx)
+        if (argv[arg_idx][0] == '-')
+        {
+            // Check agaist valid options
+            if (0 == strcmp(argv[arg_idx], "-ft4"))
+            {
+                is_ft8 = false;
+            }
+            else
+            {
+                usage();
+                return -1;
+            }
+        }
+        else
+        {
+            if (wav_path == NULL)
+            {
+                wav_path = argv[arg_idx];
+            }
+            else
+            {
+                usage();
+                return -1;
+            }
+        }
+        ++arg_idx;
+    }
+    // Check if all mandatory arguments have been received
+    if (wav_path == NULL)
     {
         usage();
         return -1;
     }
-
-    const char* wav_path = argv[1];
 
     int sample_rate = 12000;
     int num_samples = 15 * sample_rate;
@@ -247,13 +283,12 @@ int main(int argc, char** argv)
     // Compute FFT over the whole signal and store it
     monitor_t mon;
     monitor_config_t mon_cfg = {
-        .symbol_period = kSymbol_period,
         .sample_rate = sample_rate,
-        .slot_time = kSlot_time,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
         .f_min = 100,
-        .f_max = 3000
+        .f_max = 3000,
+        .protocol = is_ft8 ? PROTO_FT8 : PROTO_FT4
     };
     monitor_init(&mon, &mon_cfg);
     LOG(LOG_DEBUG, "Waterfall allocated %d symbols\n", mon.wf.max_blocks);
@@ -287,17 +322,17 @@ int main(int argc, char** argv)
         if (cand->score < kMin_score)
             continue;
 
-        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) / kSymbol_period;
-        float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) * kSymbol_period;
+        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / mon.wf.freq_osr) / mon.symbol_period;
+        float time_sec = (cand->time_offset + (float)cand->time_sub / mon.wf.time_osr) * mon.symbol_period;
 
         message_t message;
         decode_status_t status;
         if (!ft8_decode(&mon.wf, cand, &message, kLDPC_iterations, &status))
         {
+            // printf("000000 %3d %+4.2f %4.0f ~  ---\n", cand->score, time_sec, freq_hz);
             if (status.ldpc_errors > 0)
             {
                 LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
-                // printf("000000 %3d %+4.2f %4.0f ~  ---\n", cand->score, time_sec, freq_hz);
             }
             else if (status.crc_calculated != status.crc_extracted)
             {
