@@ -18,7 +18,7 @@ Currently the basic message set for establishing QSOs, as well as telemetry and 
 * Free-text messages (up to 13 characters from a limited alphabet) (decoding only, untested)
 * Telemetry data (71 bits as 18 hex symbols)
 
-Encoding and decoding works for both FT8 and FT4. For encoding and decoding, there is a desktop application provided for each, which serves mostly as test code, and could be a starting point for your potential application on an MCU. I don't provide a concrete example for a particular MCU hardware here, since it would be very specific.
+Encoding and decoding works for both FT8 and FT4. For encoding and decoding, there is a console application provided for each, which serves mostly as test code, and could be a starting point for your potential application on an MCU. The console apps should run perfectly well on a RPi or a PC/Mac. I don't provide a concrete example for a particular MCU hardware here, since it would be very specific.
 
 The code is not yet really a library, rather a collection of routines and example code.
 
