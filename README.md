@@ -2,7 +2,7 @@
 
 C implementation of a lightweight FT8/FT4 decoder and encoder, mostly intended for experimental use on microcontrollers.
 
-The intent of this library is to allow FT8/FT4 encoding and decoding in standalone (i.e. without a PC or RPi), e.g. automated beacons or standalone SDR transceivers. It's also my learning process, optimization problem and source of fun.
+The intent of this library is to allow FT8/FT4 encoding and decoding in standalone environments (i.e. without a PC or RPi), e.g. automated beacons or SDR transceivers. It's also my learning process, optimization problem and source of fun.
 
 The encoding process is relatively light on resources, and an Arduino should be perfectly capable of running this code.
 
@@ -38,15 +38,17 @@ You can decode 15-second (or shorter) WAV files with ```decode_ft8```. This is o
 
 # References and credits
 
-Thanks to Robert Morris, AB1HL, whose Python code (https://github.com/rtmrtmrtmrtm/weakmon) inspired this and helped to test various parts of the code.
+Thanks goes out to:
+* my contributors who have provided me with various improvements which have often been beyond my skill set.
+* Robert Morris, AB1HL, whose Python code (https://github.com/rtmrtmrtmrtm/weakmon) inspired this and helped to test various parts of the code.
+* Mark Borgerding for his FFT implementation (https://github.com/mborgerding/kissfft). I have included a portion of his code.
+* WSJT-X authors, who developed a very interesting and novel communications protocol
 
-The defails of FT4 and FT8 procotols and decoding/encoding are described here: https://physics.princeton.edu/pulsar/k1jt/FT4_FT8_QEX.pdf
+The details of FT4 and FT8 procotols and decoding/encoding are described here: https://physics.princeton.edu/pulsar/k1jt/FT4_FT8_QEX.pdf
 
 The public part of FT4/FT8 implementation is included in this repository under ft4_ft8_public.
 
 Of course in moments of frustration I have looked up the original WSJT-X code, which is mostly written in Fortran (http://physics.princeton.edu/pulsar/K1JT/wsjtx.html). However, this library contains my own original DSP routines and a different implementation of the decoder which is suitable for resource-constrained embedded environments.
-
-Thanks to Mark Borgerding for his FFT implementation (https://github.com/mborgerding/kissfft). I have included a portion of his code.
 
 Karlis Goba,
 YL3JG
