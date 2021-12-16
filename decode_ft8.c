@@ -14,7 +14,7 @@
 #include "common/common.h"
 #include "common/wave.h"
 #include "common/debug.h"
-#include "fft/kiss_fftr.h"
+#include "kissfft/kiss_fftr.h"
 
 #define LOG_LEVEL LOG_INFO
 
@@ -29,7 +29,7 @@ const int kTime_osr = 2; // Time oversampling rate (symbol subdivision)
 
 void usage()
 {
-    fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
+    fprintf(stderr, "Decode a 15-second (or slightly shorter) WAV file.\n");
 }
 
 static float hann_i(int i, int N)
