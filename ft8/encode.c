@@ -146,7 +146,7 @@ void ft4_encode(const uint8_t* payload, uint8_t* tones)
         {
             tones[i_tone] = 0; // R (ramp) symbol
         }
-        else if ((i_tone >= 1) && (i_tone < 5))
+        else if (i_tone < 5)
         {
             tones[i_tone] = kFT4_Costas_pattern[0][i_tone - 1];
         }
