@@ -80,7 +80,7 @@ void ft8_encode(const uint8_t* payload, uint8_t* tones)
     int i_byte = 0; // Index of the current byte of the codeword
     for (int i_tone = 0; i_tone < FT8_NN; ++i_tone)
     {
-        if ((i_tone >= 0) && (i_tone < 7))
+        if (i_tone < 7)
         {
             tones[i_tone] = kFT8_Costas_pattern[i_tone];
         }
