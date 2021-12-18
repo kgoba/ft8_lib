@@ -69,8 +69,8 @@ void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int time_osr,
     me->time_osr = time_osr;
     me->freq_osr = freq_osr;
     me->block_stride = (time_osr * freq_osr * num_bins);
-    me->mag = malloc(mag_size);
-    LOG(LOG_DEBUG, "Waterfall size = %lu\n", mag_size);
+    me->mag = (uint8_t  *)malloc(mag_size);
+    LOG(LOG_DEBUG, "Waterfall size = %zu\n", mag_size);
 }
 
 void waterfall_free(waterfall_t* me)
@@ -119,7 +119,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->fft_norm = 2.0f / me->nfft;
     // const int len_window = 1.8f * me->block_size; // hand-picked and optimized
 
-    me->window = malloc(me->nfft * sizeof(me->window[0]));
+    me->window = (float *)malloc(me->nfft * sizeof(me->window[0]));
     for (int i = 0; i < me->nfft; ++i)
     {
         // window[i] = 1;
@@ -128,7 +128,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
         // me->window[i] = hamming_i(i, me->nfft);
         // me->window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
     }
-    me->last_frame = malloc(me->nfft * sizeof(me->last_frame[0]));
+    me->last_frame = (float *)malloc(me->nfft * sizeof(me->last_frame[0]));
 
     size_t fft_work_size;
     kiss_fftr_alloc(me->nfft, 0, 0, &fft_work_size);
@@ -136,7 +136,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     LOG(LOG_INFO, "Block size = %d\n", me->block_size);
     LOG(LOG_INFO, "Subblock size = %d\n", me->subblock_size);
     LOG(LOG_INFO, "N_FFT = %d\n", me->nfft);
-    LOG(LOG_DEBUG, "FFT work area = %lu\n", fft_work_size);
+    LOG(LOG_DEBUG, "FFT work area = %zu\n", fft_work_size);
 
     me->fft_work = malloc(fft_work_size);
     me->fft_cfg = kiss_fftr_alloc(me->nfft, 0, me->fft_work, &fft_work_size);
@@ -283,11 +283,11 @@ int main(int argc, char** argv)
     // Compute FFT over the whole signal and store it
     monitor_t mon;
     monitor_config_t mon_cfg = {
+        .f_min = 100,
+        .f_max = 3000,
         .sample_rate = sample_rate,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
-        .f_min = 100,
-        .f_max = 3000,
         .protocol = is_ft8 ? PROTO_FT8 : PROTO_FT4
     };
     monitor_init(&mon, &mon_cfg);
