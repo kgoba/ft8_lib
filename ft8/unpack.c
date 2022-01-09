@@ -391,12 +391,12 @@ int ft8_unpack77(const uint8_t *a77, char *message)
 {
     char call_to[14];
     char call_de[14];
-    char extra[7];
+    char extra[32];         // 7 was not enough for real world traffic
 
     int rc = ft8_unpack77_fields(a77, call_to, call_de, extra);
     if (rc < 0)
         return rc;
-
+    
     // int msg_sz = strlen(call_to) + strlen(call_de) + strlen(extra) + 2;
     char *dst = message;
 

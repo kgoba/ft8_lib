@@ -3,7 +3,7 @@
 #define _INCLUDE_FT8_H_
 
 // decoder callback
-typedef void (* ft8_decode_callback_t)(char *message, float frequences, float time_dev, float snr, int score, void *ctx);
+typedef void (* ft8_decode_callback_t)(char *message, float frequency, float time_dev, float snr, int score, void *ctx);
 
 // decode FT8 signal, call callback for every decoded message
 int ft8_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callback_t callback, void *ctx);
