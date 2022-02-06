@@ -383,5 +383,7 @@ int main(int argc, char** argv)
     }
     LOG(LOG_INFO, "Decoded %d messages\n", num_decoded);
 
+    monitor_free(&mon);
+
     return 0;
 }
