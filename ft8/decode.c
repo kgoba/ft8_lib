@@ -22,7 +22,7 @@ const int kTime_osr = 2;
 const float kFSK_dev = 6.25f; // tone deviation in Hz and symbol rate
 const float kFSK_width = 8 * kFSK_dev; // bandwidth of FT8 signal
 
-const float kSignalMin = 1e-12f;
+const float kSignalMin = 1e-12;
 
 const float fNoiseMinFreq = 350.0;
 const float fNoiseMaxFreq = 2850.0;
@@ -487,7 +487,7 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
     // clear pwr values
-    memset(power->pwr, 0, power->num_blocks * power->freq_osr * sizeof(float));
+    memset(power->pwr, 0, nfft / 2 * sizeof(float));
     
     int offset = 0;
     float max_mag = -120.0f;
@@ -498,7 +498,7 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
         {
             kiss_fft_scalar timedata[nfft];
             kiss_fft_cpx freqdata[nfft / 2 + 1];
-            float mag_db[nfft / 2 + 1];
+            float mag_db[nfft / 2];
 
             // Extract windowed signal block
             for (int pos = 0; pos < nfft; ++pos)
@@ -511,11 +511,11 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
             
             
             // Compute log magnitude in decibels
-            for (int idx_bin = 0; idx_bin < nfft / 2 + 1; ++idx_bin)
+            for (int idx_bin = 0; idx_bin < nfft / 2; ++idx_bin)
             {
                 float mag2 = (freqdata[idx_bin].i * freqdata[idx_bin].i) + (freqdata[idx_bin].r * freqdata[idx_bin].r);
                 mag_db[idx_bin] = 10.0f * log10f(mag2 * fft_norm * fft_norm + kSignalMin);
-                power->pwr[idx_bin] += mag2 / (nfft / 2.0);
+                power->pwr[idx_bin] += mag2 / power->num_blocks;
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
@@ -543,16 +543,15 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
     free(fft_work);
 }
 
-static float calc_avg_power(waterfall_t power, int sample_rate, float start, float end)
+static float calc_avg_power(waterfall_t *power, int sample_rate, float start, float end)
 {
-    const int start_bin = power.freq_osr * start / kFSK_dev;
-    const int end_bin = power.freq_osr * end / kFSK_dev + power.freq_osr;
+    const int start_bin = power->freq_osr * start / kFSK_dev;
+    const int end_bin = power->freq_osr * end / kFSK_dev + power->freq_osr;
     float sum = 0.0;
     
     for (int bin = start_bin; bin < end_bin; bin++) {
-        sum += power.pwr[bin];
+        sum += power->pwr[bin];
     }
-    
     return sum / (end_bin - start_bin);
 }
 
@@ -596,7 +595,7 @@ int ft8_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callb
         }
         
         // calculate noise - avoid division by 0 later
-        noise = calc_avg_power(power, sample_rate, fNoiseMinFreq, fNoiseMaxFreq) + kSignalMin;
+        noise = calc_avg_power(&power, sample_rate, fNoiseMinFreq, fNoiseMaxFreq) + kSignalMin;
         
         // Go over candidates and attempt to decode messages
         for (int idx = 0; idx < num_candidates; ++idx)
@@ -650,7 +649,7 @@ int ft8_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callb
             if (found_empty_slot)
             {
                 // calculate signal for SNR calculation
-                float signal = calc_avg_power(power, sample_rate, freq_hz, freq_hz + kFSK_width);
+                float signal = calc_avg_power(&power, sample_rate, freq_hz, freq_hz + kFSK_width);
                 
                 // fill the empty hashtable slot
                 memcpy(&decoded[idx_hash], &message, sizeof(message));
