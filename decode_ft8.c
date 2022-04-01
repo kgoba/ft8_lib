@@ -6,7 +6,7 @@
 // decode callback, called by ft8_decode() for each decoded message
 static void ft8_decode_callback(char *message, float frequency, float time_dev, float snr, int score, void *ctx)
 {
-    printf("000000 %3d %+4.2f %4.0f ~  %s\n", score, time_dev, frequency, message);
+    printf("000000 %3d %+4.2f %4.1f %4.0f ~  %s\n", score, time_dev, snr, frequency, message);
 }
 
 int main(int argc, char **argv)

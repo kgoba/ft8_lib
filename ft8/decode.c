@@ -20,6 +20,12 @@ const int kFreq_osr = 2;
 const int kTime_osr = 2;
 
 const float kFSK_dev = 6.25f; // tone deviation in Hz and symbol rate
+const float kFSK_width = 8 * kFSK_dev; // bandwidth of FT8 signal
+
+const float kSignalMin = 1e-12f;
+
+const float fNoiseMinFreq = 350.0;
+const float fNoiseMaxFreq = 2850.0;
 
 /// Input structure to find_sync() function. This structure describes stored waterfall data over the whole message slot.
 /// Fields time_osr and freq_osr specify additional oversampling rate for time and frequency resolution.
@@ -34,6 +40,7 @@ typedef struct
     int time_osr;   ///< number of time subdivisions
     int freq_osr;   ///< number of frequency subdivisions
     uint8_t *mag;   ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    float *pwr;     ///< averaged FFT power levels over all blocks
 } waterfall_t;
 
 /// Output structure of find_sync() and input structure of extract_likelihood().
@@ -479,6 +486,9 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
     void *fft_work = malloc(fft_work_size);
     kiss_fftr_cfg fft_cfg = kiss_fftr_alloc(nfft, 0, fft_work, &fft_work_size);
 
+    // clear pwr values
+    memset(power->pwr, 0, power->num_blocks * power->freq_osr * sizeof(float));
+    
     int offset = 0;
     float max_mag = -120.0f;
     for (int idx_block = 0; idx_block < power->num_blocks; ++idx_block)
@@ -498,11 +508,14 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
 
             kiss_fftr(fft_cfg, timedata, freqdata);
 
+            
+            
             // Compute log magnitude in decibels
             for (int idx_bin = 0; idx_bin < nfft / 2 + 1; ++idx_bin)
             {
                 float mag2 = (freqdata[idx_bin].i * freqdata[idx_bin].i) + (freqdata[idx_bin].r * freqdata[idx_bin].r);
-                mag_db[idx_bin] = 10.0f * log10f(1E-12f + mag2 * fft_norm * fft_norm);
+                mag_db[idx_bin] = 10.0f * log10f(mag2 * fft_norm * fft_norm + kSignalMin);
+                power->pwr[idx_bin] += mag2 / (nfft / 2.0);
             }
 
             // Loop over two possible frequency bin offsets (for averaging)
@@ -530,6 +543,19 @@ static void extract_power(const float signal[], waterfall_t *power, int block_si
     free(fft_work);
 }
 
+static float calc_avg_power(waterfall_t power, int sample_rate, float start, float end)
+{
+    const int start_bin = power.freq_osr * start / kFSK_dev;
+    const int end_bin = power.freq_osr * end / kFSK_dev + power.freq_osr;
+    float sum = 0.0;
+    
+    for (int bin = start_bin; bin < end_bin; bin++) {
+        sum += power.pwr[bin];
+    }
+    
+    return sum / (end_bin - start_bin);
+}
+
 int ft8_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callback_t callback, void *ctx)
 {
     // compute DSP parameters that depend on the sample rate
@@ -538,93 +564,104 @@ int ft8_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callb
     const int subblock_size = block_size / kTime_osr;
     const int nfft = block_size * kFreq_osr;
     const int num_blocks = (num_samples - nfft + subblock_size) / block_size;
-
+    int num_decoded = 0;
+    
     // Compute FFT over the whole signal and store it
-    uint8_t mag_power[num_blocks * kFreq_osr * kTime_osr * num_bins];
     waterfall_t power = {
         .num_blocks = num_blocks,
         .num_bins = num_bins,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
-        .mag = mag_power};
-    extract_power(signal, &power, block_size);
+        .mag = malloc(num_blocks * kFreq_osr * kTime_osr * num_bins),
+        .pwr = malloc(kFreq_osr * num_bins * sizeof(float))
+    };
+    
+    if (power.mag != NULL && power.pwr != NULL) {
+        float noise;
 
-    // Find top candidates by Costas sync score and localize them in time and frequency
-    candidate_t candidate_list[kMax_candidates];
-    int num_candidates = find_sync(&power, kMax_candidates, candidate_list, kMin_score);
-
-    // Hash table for decoded messages (to check for duplicates)
-    int num_decoded = 0;
-    message_t decoded[kMax_decoded_messages];
-    message_t *decoded_hashtable[kMax_decoded_messages];
-
-    // Initialize hash table pointers
-    for (int i = 0; i < kMax_decoded_messages; ++i)
-    {
-        decoded_hashtable[i] = NULL;
-    }
-
-    // Go over candidates and attempt to decode messages
-    for (int idx = 0; idx < num_candidates; ++idx)
-    {
-        const candidate_t *cand = &candidate_list[idx];
-        if (cand->score < kMin_score)
-            continue;
-
-        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) * kFSK_dev;
-        float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) / kFSK_dev;
-
-        message_t message;
-        decode_status_t status;
-        if (!decode(&power, cand, &message, kLDPC_iterations, &status))
+        extract_power(signal, &power, block_size);
+        
+        // Find top candidates by Costas sync score and localize them in time and frequency
+        candidate_t candidate_list[kMax_candidates];
+        int num_candidates = find_sync(&power, kMax_candidates, candidate_list, kMin_score);
+        
+        // Hash table for decoded messages (to check for duplicates)
+        message_t decoded[kMax_decoded_messages];
+        message_t *decoded_hashtable[kMax_decoded_messages];
+        
+        // Initialize hash table pointers
+        for (int i = 0; i < kMax_decoded_messages; ++i)
         {
-            if (status.ldpc_errors > 0)
-            {
-                LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
-            }
-            else if (status.crc_calculated != status.crc_extracted)
-            {
-                LOG(LOG_DEBUG, "CRC mismatch!\n");
-            }
-            else if (status.unpack_status != 0)
-            {
-                LOG(LOG_DEBUG, "Error while unpacking!\n");
-            }
-            continue;
+            decoded_hashtable[i] = NULL;
         }
         
-        int idx_hash = message.hash % kMax_decoded_messages;
-        bool found_empty_slot = false;
-        bool found_duplicate = false;
-        do
+        // calculate noise - avoid division by 0 later
+        noise = calc_avg_power(power, sample_rate, fNoiseMinFreq, fNoiseMaxFreq) + kSignalMin;
+        
+        // Go over candidates and attempt to decode messages
+        for (int idx = 0; idx < num_candidates; ++idx)
         {
-            if (decoded_hashtable[idx_hash] == NULL)
-            {
-                found_empty_slot = true;
-            }
-            else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == strcmp(decoded_hashtable[idx_hash]->text, message.text)))
-            {
-                found_duplicate = true;
-            }
-            else
-            {
-                // move on to check the next entry in hash table
-                idx_hash = (idx_hash + 1) % kMax_decoded_messages;
-            }
-        } while (!found_empty_slot && !found_duplicate);
-
-        if (found_empty_slot)
-        {
-            // fill the empty hashtable slot
-            memcpy(&decoded[idx_hash], &message, sizeof(message));
-            decoded_hashtable[idx_hash] = &decoded[idx_hash];
-            ++num_decoded;
+            const candidate_t *cand = &candidate_list[idx];
+            if (cand->score < kMin_score)
+                continue;
             
-            // report message through callback
-            // TODO: compute SNR
-            callback(message.text, freq_hz, time_sec, 0.0, cand->score, ctx);
+            float freq_hz = (cand->freq_offset + (float)cand->freq_sub / kFreq_osr) * kFSK_dev;
+            float time_sec = (cand->time_offset + (float)cand->time_sub / kTime_osr) / kFSK_dev;
+            
+            message_t message;
+            decode_status_t status;
+            if (!decode(&power, cand, &message, kLDPC_iterations, &status))
+            {
+                if (status.ldpc_errors > 0)
+                {
+                    LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
+                }
+                else if (status.crc_calculated != status.crc_extracted)
+                {
+                    LOG(LOG_DEBUG, "CRC mismatch!\n");
+                }
+                else if (status.unpack_status != 0)
+                {
+                    LOG(LOG_DEBUG, "Error while unpacking!\n");
+                }
+                continue;
+            }
+            
+            int idx_hash = message.hash % kMax_decoded_messages;
+            bool found_empty_slot = false;
+            bool found_duplicate = false;
+            do
+            {
+                if (decoded_hashtable[idx_hash] == NULL)
+                {
+                    found_empty_slot = true;
+                }
+                else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == strcmp(decoded_hashtable[idx_hash]->text, message.text)))
+                {
+                    found_duplicate = true;
+                }
+                else
+                {
+                    // move on to check the next entry in hash table
+                    idx_hash = (idx_hash + 1) % kMax_decoded_messages;
+                }
+            } while (!found_empty_slot && !found_duplicate);
+            
+            if (found_empty_slot)
+            {
+                // calculate signal for SNR calculation
+                float signal = calc_avg_power(power, sample_rate, freq_hz, freq_hz + kFSK_width);
+                
+                // fill the empty hashtable slot
+                memcpy(&decoded[idx_hash], &message, sizeof(message));
+                decoded_hashtable[idx_hash] = &decoded[idx_hash];
+                ++num_decoded;
+                
+                // report message through callback
+                callback(message.text, freq_hz, time_sec, 10.0 * log10f(signal / noise), cand->score, ctx);
+            }
         }
     }
-
+    
     return num_decoded;
 }

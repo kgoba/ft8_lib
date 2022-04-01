@@ -14,4 +14,4 @@ int ft4_encode(char *message, float *signal, int num_samples, float frequency, i
 // generate FT8 signal for message
 int ft8_encode(char *message, float *signal, int num_samples, float frequency, int sample_rate);
 
-#endif // _INCLUDE_FT(_H_
+#endif // _INCLUDE_FT8_H_
