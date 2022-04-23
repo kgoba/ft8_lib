@@ -4,34 +4,43 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Utility functions for characters and strings
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
-const char* trim_front(const char* str);
-void trim_back(char* str);
-char* trim(char* str);
+    // Utility functions for characters and strings
 
-char to_upper(char c);
-bool is_digit(char c);
-bool is_letter(char c);
-bool is_space(char c);
-bool in_range(char c, char min, char max);
-bool starts_with(const char* string, const char* prefix);
-bool equals(const char* string1, const char* string2);
+    const char* trim_front(const char* str);
+    void trim_back(char* str);
+    char* trim(char* str);
 
-int char_index(const char* string, char c);
+    char to_upper(char c);
+    bool is_digit(char c);
+    bool is_letter(char c);
+    bool is_space(char c);
+    bool in_range(char c, char min, char max);
+    bool starts_with(const char* string, const char* prefix);
+    bool equals(const char* string1, const char* string2);
 
-// Text message formatting:
-//   - replaces lowercase letters with uppercase
-//   - merges consecutive spaces into single space
-void fmtmsg(char* msg_out, const char* msg_in);
+    int char_index(const char* string, char c);
 
-// Parse a 2 digit integer from string
-int dd_to_int(const char* str, int length);
+    // Text message formatting:
+    //   - replaces lowercase letters with uppercase
+    //   - merges consecutive spaces into single space
+    void fmtmsg(char* msg_out, const char* msg_in);
 
-// Convert a 2 digit integer to string
-void int_to_dd(char* str, int value, int width, bool full_sign);
+    // Parse a 2 digit integer from string
+    int dd_to_int(const char* str, int length);
 
-char charn(int c, int table_idx);
-int nchar(char c, int table_idx);
+    // Convert a 2 digit integer to string
+    void int_to_dd(char* str, int value, int width, bool full_sign);
+
+    char charn(int c, int table_idx);
+    int nchar(char c, int table_idx);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _INCLUDE_TEXT_H_
