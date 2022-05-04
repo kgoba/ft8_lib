@@ -1,5 +1,5 @@
-#include "unpack.h"
 #include "text.h"
+#include "unpack.h"
 
 #include <string.h>
 
@@ -12,10 +12,8 @@
 static int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
 {
     // Check for special tokens DE, QRZ, CQ, CQ_nnn, CQ_aaaa
-    if (n28 < NTOKENS)
-    {
-        if (n28 <= 2)
-        {
+    if (n28 < NTOKENS) {
+        if (n28 <= 2) {
             if (n28 == 0)
                 strcpy(result, "DE");
             if (n28 == 1)
@@ -24,22 +22,19 @@ static int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
                 strcpy(result, "CQ");
             return 0; // Success
         }
-        if (n28 <= 1002)
-        {
+        if (n28 <= 1002) {
             // CQ_nnn with 3 digits
             strcpy(result, "CQ ");
             ft8_int_to_dd(result + 3, n28 - 3, 3, false);
             return 0; // Success
         }
-        if (n28 <= 532443L)
-        {
+        if (n28 <= 532443L) {
             // CQ_aaaa with 4 alphanumeric symbols
             uint32_t n = n28 - 1003;
             char aaaa[5];
 
             aaaa[4] = '\0';
-            for (int i = 3; /* */; --i)
-            {
+            for (int i = 3; /* */; --i) {
                 aaaa[i] = ft8_charn(n % 27, 4);
                 if (i == 0)
                     break;
@@ -55,8 +50,7 @@ static int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
     }
 
     n28 = n28 - NTOKENS;
-    if (n28 < MAX22)
-    {
+    if (n28 < MAX22) {
         // This is a 22-bit hash of a result
         // TODO: implement
         strcpy(result, "<...>");
@@ -90,14 +84,10 @@ static int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
         return -1;
 
     // Check if we should append /R or /P suffix
-    if (ip)
-    {
-        if (i3 == 1)
-        {
+    if (ip) {
+        if (i3 == 1) {
             strcat(result, "/R");
-        }
-        else if (i3 == 2)
-        {
+        } else if (i3 == 2) {
             strcat(result, "/P");
         }
     }
@@ -127,12 +117,10 @@ static int unpack_type1(const uint8_t *a77, uint8_t i3, char *call_to, char *cal
     igrid4 |= (a77[9] >> 6);
 
     // Unpack both callsigns
-    if (unpack_callsign(n28a >> 1, n28a & 0x01, i3, call_to) < 0)
-    {
+    if (unpack_callsign(n28a >> 1, n28a & 0x01, i3, call_to) < 0) {
         return -1;
     }
-    if (unpack_callsign(n28b >> 1, n28b & 0x01, i3, call_de) < 0)
-    {
+    if (unpack_callsign(n28b >> 1, n28b & 0x01, i3, call_de) < 0) {
         return -2;
     }
     // Fix "CQ_" to "CQ " -> already done in unpack_callsign()
@@ -145,13 +133,11 @@ static int unpack_type1(const uint8_t *a77, uint8_t i3, char *call_to, char *cal
     //     save_hash_call(call_de)
     // }
 
-    char *dst = extra;
+    char* dst = extra;
 
-    if (igrid4 <= MAXGRID4)
-    {
+    if (igrid4 <= MAXGRID4) {
         // Extract 4 symbol grid locator
-        if (ir > 0)
-        {
+        if (ir > 0) {
             // In case of ir=1 add an "R" before grid
             dst = stpcpy(dst, "R ");
         }
@@ -166,15 +152,12 @@ static int unpack_type1(const uint8_t *a77, uint8_t i3, char *call_to, char *cal
         n /= 18;
         dst[0] = 'A' + (n % 18);
         // if (ir > 0 && strncmp(call_to, "CQ", 2) == 0) return -1;
-    }
-    else
-    {
+    } else {
         // Extract report
         int irpt = igrid4 - MAXGRID4;
 
         // Check special cases first (irpt > 0 always)
-        switch (irpt)
-        {
+        switch (irpt) {
         case 1:
             extra[0] = '\0';
             break;
@@ -189,8 +172,7 @@ static int unpack_type1(const uint8_t *a77, uint8_t i3, char *call_to, char *cal
             break;
         default:
             // Extract signal report as a two digit number with a + or - sign
-            if (ir > 0)
-            {
+            if (ir > 0) {
                 *dst++ = 'R'; // Add "R" before report
             }
             ft8_int_to_dd(dst, irpt - 35, 2, true);
@@ -209,20 +191,17 @@ static int unpack_text(const uint8_t *a71, char *text)
 
     // Shift 71 bits right by 1 bit, so that it's right-aligned in the byte array
     uint8_t carry = 0;
-    for (int i = 0; i < 9; ++i)
-    {
+    for (int i = 0; i < 9; ++i) {
         b71[i] = carry | (a71[i] >> 1);
         carry = (a71[i] & 1) ? 0x80 : 0;
     }
 
     char c14[14];
     c14[13] = 0;
-    for (int idx = 12; idx >= 0; --idx)
-    {
+    for (int idx = 12; idx >= 0; --idx) {
         // Divide the long integer in b71 by 42
         uint16_t rem = 0;
-        for (int i = 0; i < 9; ++i)
-        {
+        for (int i = 0; i < 9; ++i) {
             rem = (rem << 8) | b71[i];
             b71[i] = rem / 42;
             rem = rem % 42;
@@ -240,15 +219,13 @@ static int unpack_telemetry(const uint8_t *a71, char *telemetry)
 
     // Shift bits in a71 right by 1 bit
     uint8_t carry = 0;
-    for (int i = 0; i < 9; ++i)
-    {
+    for (int i = 0; i < 9; ++i) {
         b71[i] = (carry << 7) | (a71[i] >> 1);
         carry = (a71[i] & 0x01);
     }
 
     // Convert b71 to hexadecimal string
-    for (int i = 0; i < 9; ++i)
-    {
+    for (int i = 0; i < 9; ++i) {
         uint8_t nibble1 = (b71[i] >> 4);
         uint8_t nibble2 = (b71[i] & 0x0F);
         char c1 = (nibble1 > 9) ? (nibble1 - 10 + 'A') : nibble1 + '0';
@@ -261,34 +238,33 @@ static int unpack_telemetry(const uint8_t *a71, char *telemetry)
     return 0;
 }
 
-//none standard for wsjt-x 2.0
-//by KD8CEC
+// none standard for wsjt-x 2.0
+// by KD8CEC
 static int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *extra)
 {
     uint32_t n12, iflip, nrpt, icq;
     uint64_t n58;
-    n12 = (a77[0] << 4);  //11 ~4  : 8
-    n12 |= (a77[1] >> 4); //3~0 : 12
+    n12 = (a77[0] << 4); // 11 ~4  : 8
+    n12 |= (a77[1] >> 4); // 3~0 : 12
 
-    n58 = ((uint64_t)(a77[1] & 0x0F) << 54); //57 ~ 54 : 4
-    n58 |= ((uint64_t)a77[2] << 46);         //53 ~ 46 : 12
-    n58 |= ((uint64_t)a77[3] << 38);         //45 ~ 38 : 12
-    n58 |= ((uint64_t)a77[4] << 30);         //37 ~ 30 : 12
-    n58 |= ((uint64_t)a77[5] << 22);         //29 ~ 22 : 12
-    n58 |= ((uint64_t)a77[6] << 14);         //21 ~ 14 : 12
-    n58 |= ((uint64_t)a77[7] << 6);          //13 ~ 6 : 12
-    n58 |= ((uint64_t)a77[8] >> 2);          //5 ~ 0 : 765432 10
+    n58 = ((uint64_t)(a77[1] & 0x0F) << 54); // 57 ~ 54 : 4
+    n58 |= ((uint64_t)a77[2] << 46); // 53 ~ 46 : 12
+    n58 |= ((uint64_t)a77[3] << 38); // 45 ~ 38 : 12
+    n58 |= ((uint64_t)a77[4] << 30); // 37 ~ 30 : 12
+    n58 |= ((uint64_t)a77[5] << 22); // 29 ~ 22 : 12
+    n58 |= ((uint64_t)a77[6] << 14); // 21 ~ 14 : 12
+    n58 |= ((uint64_t)a77[7] << 6); // 13 ~ 6 : 12
+    n58 |= ((uint64_t)a77[8] >> 2); // 5 ~ 0 : 765432 10
 
-    iflip = (a77[8] >> 1) & 0x01; //76543210
+    iflip = (a77[8] >> 1) & 0x01; // 76543210
     nrpt = ((a77[8] & 0x01) << 1);
-    nrpt |= (a77[9] >> 7); //76543210
+    nrpt |= (a77[9] >> 7); // 76543210
     icq = ((a77[9] >> 6) & 0x01);
 
     char c11[12];
     c11[11] = '\0';
 
-    for (int i = 10; /* no condition */; --i)
-    {
+    for (int i = 10; /* no condition */; --i) {
         c11[i] = ft8_charn(n58 % 38, 5);
         if (i == 0)
             break;
@@ -305,10 +281,9 @@ static int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, 
 
     char *call_1 = (iflip) ? c11 : call_3;
     char *call_2 = (iflip) ? call_3 : c11;
-    //save_hash_call(c11_trimmed);
+    // save_hash_call(c11_trimmed);
 
-    if (icq == 0)
-    {
+    if (icq == 0) {
         strcpy(call_to, ft8_trim(call_1));
         if (nrpt == 1)
             strcpy(extra, "RRR");
@@ -316,13 +291,10 @@ static int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, 
             strcpy(extra, "RR73");
         else if (nrpt == 3)
             strcpy(extra, "73");
-        else
-        {
+        else {
             extra[0] = '\0';
         }
-    }
-    else
-    {
+    } else {
         strcpy(call_to, "CQ");
         extra[0] = '\0';
     }
@@ -338,13 +310,11 @@ int ft8_unpack77_fields(const uint8_t *a77, char *call_to, char *call_de, char *
     // Extract i3 (bits 74..76)
     uint8_t i3 = (a77[9] >> 3) & 0x07;
 
-    if (i3 == 0)
-    {
+    if (i3 == 0) {
         // Extract n3 (bits 71..73)
         uint8_t n3 = ((a77[8] << 2) & 0x04) | ((a77[9] >> 6) & 0x03);
 
-        if (n3 == 0)
-        {
+        if (n3 == 0) {
             // 0.0  Free text
             return unpack_text(a77, extra);
         }
@@ -358,22 +328,18 @@ int ft8_unpack77_fields(const uint8_t *a77, char *call_to, char *call_de, char *
         //     // 0.3   WA9XYZ KA1ABC R 16A EMA            28 28 1 4 3 7    71   ARRL Field Day
         //     // 0.4   WA9XYZ KA1ABC R 32A EMA            28 28 1 4 3 7    71   ARRL Field Day
         // }
-        else if (n3 == 5)
-        {
+        else if (n3 == 5) {
             // 0.5   0123456789abcdef01                 71               71   Telemetry (18 hex)
             return unpack_telemetry(a77, extra);
         }
-    }
-    else if (i3 == 1 || i3 == 2)
-    {
+    } else if (i3 == 1 || i3 == 2) {
         // Type 1 (standard message) or Type 2 ("/P" form for EU VHF contest)
         return unpack_type1(a77, i3, call_to, call_de, extra);
     }
     // else if (i3 == 3) {
     //     // Type 3: ARRL RTTY Contest
     // }
-    else if (i3 == 4)
-    {
+    else if (i3 == 4) {
         //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
         //     // One hashed call or "CQ"; one compound or nonstandard call with up
         //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
@@ -391,25 +357,23 @@ int ft8_unpack77(const uint8_t *a77, char *message)
 {
     char call_to[14];
     char call_de[14];
-    char extra[32];         // 7 was not enough for real world traffic
+    char extra[32]; // 7 was not enough for real world traffic
 
     int rc = ft8_unpack77_fields(a77, call_to, call_de, extra);
     if (rc < 0)
         return rc;
-    
+
     // int msg_sz = strlen(call_to) + strlen(call_de) + strlen(extra) + 2;
     char *dst = message;
 
     dst[0] = '\0';
 
-    if (call_to[0] != '\0')
-    {
+    if (call_to[0] != '\0') {
         dst = stpcpy(dst, call_to);
         *dst++ = ' ';
     }
 
-    if (call_de[0] != '\0')
-    {
+    if (call_de[0] != '\0') {
         dst = stpcpy(dst, call_de);
         *dst++ = ' ';
     }

@@ -1,18 +1,18 @@
-#include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "ft8.h"
 
-#define FT4_SLOT_TIME 7.0f      // total length of output waveform in seconds
-#define FT8_SLOT_TIME 15.0f     // total length of output waveform in seconds
+#define FT4_SLOT_TIME 7.0f // total length of output waveform in seconds
+#define FT8_SLOT_TIME 15.0f // total length of output waveform in seconds
 
 // white noise added - decoding errors start to show up around 12.0
 #define NOISE_AMPLITUDE 0.0
 
-#define RP(x, div, mod)     ((x / div) % mod)
+#define RP(x, div, mod) ((x / div) % mod)
 
 // passed as context into decoder callback
 struct context {
@@ -20,7 +20,7 @@ struct context {
     float frequency;
 };
 
-static char *random_callsign(char *callsign)
+static char* random_callsign(char* callsign)
 {
     int x = rand();
     switch (x >> 29) {
@@ -40,14 +40,14 @@ static char *random_callsign(char *callsign)
     return callsign;
 }
 
-static char *random_locator(char *locator)
+static char* random_locator(char* locator)
 {
     int x = rand();
     sprintf(locator, "%c%c%d%d", 'A' + RP(x, 1, 18), 'A' + RP(x, 18, 18), RP(x, 180, 10), RP(x, 1800, 10));
     return locator;
 }
 
-static char *random_message(char *message)
+static char* random_message(char* message)
 {
     int x = rand();
     char callsign1[8], callsign2[8], locator[5];
@@ -95,17 +95,17 @@ int main(int argc, char *argv[])
     // run loop test
     for (int i = 0; i < 100; i++) {
         struct context ctx;
-
+        
         // generate random but valid message
         random_message(ctx.message);
         ctx.frequency = frequency;
         
         if (ft8_encode(ctx.message, signal, num_samples, frequency, sample_rate) == 0) {
             // add noise
-            for (float *fp = signal; fp < signal + num_samples; fp++) {
+            for (float* fp = signal; fp < signal + num_samples; fp++) {
                 *fp = (*fp + 2.0 * NOISE_AMPLITUDE * rand() / RAND_MAX - NOISE_AMPLITUDE) / (1.0 + NOISE_AMPLITUDE);
             }
-            if (ft8_decode(signal, num_samples, sample_rate, ft8_decode_callback, &ctx) != 1) {
+            if (ftx_decode(signal, num_samples, sample_rate, ft8_decode_callback, &ctx) != 1) {
                 printf("*** ERROR decoding (%s)\n", ctx.message);
             }
         } else {
@@ -113,3 +113,4 @@ int main(int argc, char *argv[])
         }
     }
 }
+

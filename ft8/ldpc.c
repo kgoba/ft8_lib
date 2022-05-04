@@ -21,46 +21,20 @@ static int ldpc_check(uint8_t codeword[]);
 static float fast_tanh(float x);
 static float fast_atanh(float x);
 
-// Packs a string of bits each represented as a zero/non-zero byte in plain[],
-// as a string of packed bits starting from the MSB of the first byte of packed[]
-void ft8_pack_bits(const uint8_t plain[], int num_bits, uint8_t packed[])
-{
-    int num_bytes = (num_bits + 7) / 8;
-    for (int i = 0; i < num_bytes; ++i)
-    {
-        packed[i] = 0;
-    }
-
-    uint8_t mask = 0x80;
-    int byte_idx = 0;
-    for (int i = 0; i < num_bits; ++i)
-    {
-        if (plain[i])
-        {
-            packed[byte_idx] |= mask;
-        }
-        mask >>= 1;
-        if (!mask)
-        {
-            mask = 0x80;
-            ++byte_idx;
-        }
-    }
-}
-
 // codeword is 174 log-likelihoods.
 // plain is a return value, 174 ints, to be 0 or 1.
 // max_iters is how hard to try.
 // ok == 87 means success.
-void ft8_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
+#warning return boolean! instead of ok!
+void ftx_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 {
-    float m[FT8_LDPC_M][FT8_LDPC_N]; // ~60 kB
-    float e[FT8_LDPC_M][FT8_LDPC_N]; // ~60 kB
-    int min_errors = FT8_LDPC_M;
+    float m[FTX_LDPC_M][FTX_LDPC_N]; // ~60 kB
+    float e[FTX_LDPC_M][FTX_LDPC_N]; // ~60 kB
+    int min_errors = FTX_LDPC_M;
 
-    for (int j = 0; j < FT8_LDPC_M; j++)
+    for (int j = 0; j < FTX_LDPC_M; j++)
     {
-        for (int i = 0; i < FT8_LDPC_N; i++)
+        for (int i = 0; i < FTX_LDPC_N; i++)
         {
             m[j][i] = codeword[i];
             e[j][i] = 0.0f;
@@ -69,15 +43,15 @@ void ft8_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 
     for (int iter = 0; iter < max_iters; iter++)
     {
-        for (int j = 0; j < FT8_LDPC_M; j++)
+        for (int j = 0; j < FTX_LDPC_M; j++)
         {
-            for (int ii1 = 0; ii1 < kFT8_LDPC_num_rows[j]; ii1++)
+            for (int ii1 = 0; ii1 < kFTX_LDPC_Num_rows[j]; ii1++)
             {
-                int i1 = kFT8_LDPC_Nm[j][ii1] - 1;
+                int i1 = kFTX_LDPC_Nm[j][ii1] - 1;
                 float a = 1.0f;
-                for (int ii2 = 0; ii2 < kFT8_LDPC_num_rows[j]; ii2++)
+                for (int ii2 = 0; ii2 < kFTX_LDPC_Num_rows[j]; ii2++)
                 {
-                    int i2 = kFT8_LDPC_Nm[j][ii2] - 1;
+                    int i2 = kFTX_LDPC_Nm[j][ii2] - 1;
                     if (i2 != i1)
                     {
                         a *= fast_tanh(-m[j][i2] / 2.0f);
@@ -87,11 +61,11 @@ void ft8_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
             }
         }
 
-        for (int i = 0; i < FT8_LDPC_N; i++)
+        for (int i = 0; i < FTX_LDPC_N; i++)
         {
             float l = codeword[i];
             for (int j = 0; j < 3; j++)
-                l += e[kFT8_LDPC_Mn[i][j] - 1][i];
+                l += e[kFTX_LDPC_Mn[i][j] - 1][i];
             plain[i] = (l > 0) ? 1 : 0;
         }
 
@@ -108,17 +82,17 @@ void ft8_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
             }
         }
 
-        for (int i = 0; i < FT8_LDPC_N; i++)
+        for (int i = 0; i < FTX_LDPC_N; i++)
         {
             for (int ji1 = 0; ji1 < 3; ji1++)
             {
-                int j1 = kFT8_LDPC_Mn[i][ji1] - 1;
+                int j1 = kFTX_LDPC_Mn[i][ji1] - 1;
                 float l = codeword[i];
                 for (int ji2 = 0; ji2 < 3; ji2++)
                 {
                     if (ji1 != ji2)
                     {
-                        int j2 = kFT8_LDPC_Mn[i][ji2] - 1;
+                        int j2 = kFTX_LDPC_Mn[i][ji2] - 1;
                         l += e[j2][i];
                     }
                 }
@@ -139,12 +113,12 @@ static int ldpc_check(uint8_t codeword[])
 {
     int errors = 0;
 
-    for (int m = 0; m < FT8_LDPC_M; ++m)
+    for (int m = 0; m < FTX_LDPC_M; ++m)
     {
         uint8_t x = 0;
-        for (int i = 0; i < kFT8_LDPC_num_rows[m]; ++i)
+        for (int i = 0; i < kFTX_LDPC_Num_rows[m]; ++i)
         {
-            x ^= codeword[kFT8_LDPC_Nm[m][i] - 1];
+            x ^= codeword[kFTX_LDPC_Nm[m][i] - 1];
         }
         if (x != 0)
         {
@@ -154,15 +128,15 @@ static int ldpc_check(uint8_t codeword[])
     return errors;
 }
 
-void ft8_bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
+void ftx_bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
 {
-    float tov[FT8_LDPC_N][3];
-    float toc[FT8_LDPC_M][7];
+    float tov[FTX_LDPC_N][3];
+    float toc[FTX_LDPC_M][7];
 
-    int min_errors = FT8_LDPC_M;
+    int min_errors = FTX_LDPC_M;
 
     // initialize message data
-    for (int n = 0; n < FT8_LDPC_N; ++n)
+    for (int n = 0; n < FTX_LDPC_N; ++n)
     {
         tov[n][0] = tov[n][1] = tov[n][2] = 0;
     }
@@ -171,7 +145,7 @@ void ft8_bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
     {
         // Do a hard decision guess (tov=0 in iter 0)
         int plain_sum = 0;
-        for (int n = 0; n < FT8_LDPC_N; ++n)
+        for (int n = 0; n < FTX_LDPC_N; ++n)
         {
             plain[n] = ((codeword[n] + tov[n][0] + tov[n][1] + tov[n][2]) > 0) ? 1 : 0;
             plain_sum += plain[n];
@@ -198,16 +172,16 @@ void ft8_bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         }
 
         // Send messages from bits to check nodes
-        for (int m = 0; m < FT8_LDPC_M; ++m)
+        for (int m = 0; m < FTX_LDPC_M; ++m)
         {
-            for (int n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
+            for (int n_idx = 0; n_idx < kFTX_LDPC_Num_rows[m]; ++n_idx)
             {
-                int n = kFT8_LDPC_Nm[m][n_idx] - 1;
+                int n = kFTX_LDPC_Nm[m][n_idx] - 1;
                 // for each (n, m)
                 float Tnm = codeword[n];
                 for (int m_idx = 0; m_idx < 3; ++m_idx)
                 {
-                    if ((kFT8_LDPC_Mn[n][m_idx] - 1) != m)
+                    if ((kFTX_LDPC_Mn[n][m_idx] - 1) != m)
                     {
                         Tnm += tov[n][m_idx];
                     }
@@ -217,16 +191,16 @@ void ft8_bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
         }
 
         // send messages from check nodes to variable nodes
-        for (int n = 0; n < FT8_LDPC_N; ++n)
+        for (int n = 0; n < FTX_LDPC_N; ++n)
         {
             for (int m_idx = 0; m_idx < 3; ++m_idx)
             {
-                int m = kFT8_LDPC_Mn[n][m_idx] - 1;
+                int m = kFTX_LDPC_Mn[n][m_idx] - 1;
                 // for each (n, m)
                 float Tmn = 1.0f;
-                for (int n_idx = 0; n_idx < kFT8_LDPC_num_rows[m]; ++n_idx)
+                for (int n_idx = 0; n_idx < kFTX_LDPC_Num_rows[m]; ++n_idx)
                 {
-                    if ((kFT8_LDPC_Nm[m][n_idx] - 1) != n)
+                    if ((kFTX_LDPC_Nm[m][n_idx] - 1) != n)
                     {
                         Tmn *= toc[m][n_idx];
                     }
@@ -245,6 +219,8 @@ void ft8_bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
 // * https://mathr.co.uk/blog/2017-09-06_approximating_hyperbolic_tangent.html
 // * https://math.stackexchange.com/a/446411
 
+#warning are those needed?
+#warning replace with native functions
 static float fast_tanh(float x)
 {
     if (x < -4.97f)
@@ -256,10 +232,10 @@ static float fast_tanh(float x)
         return 1.0f;
     }
     float x2 = x * x;
-    //float a = x * (135135.0f + x2 * (17325.0f + x2 * (378.0f + x2)));
-    //float b = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + x2 * 28.0f));
-    //float a = x * (10395.0f + x2 * (1260.0f + x2 * 21.0f));
-    //float b = 10395.0f + x2 * (4725.0f + x2 * (210.0f + x2));
+    // float a = x * (135135.0f + x2 * (17325.0f + x2 * (378.0f + x2)));
+    // float b = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + x2 * 28.0f));
+    // float a = x * (10395.0f + x2 * (1260.0f + x2 * 21.0f));
+    // float b = 10395.0f + x2 * (4725.0f + x2 * (210.0f + x2));
     float a = x * (945.0f + x2 * (105.0f + x2));
     float b = 945.0f + x2 * (420.0f + x2 * 15.0f);
     return a / b;
@@ -268,10 +244,10 @@ static float fast_tanh(float x)
 static float fast_atanh(float x)
 {
     float x2 = x * x;
-    //float a = x * (-15015.0f + x2 * (19250.0f + x2 * (-5943.0f + x2 * 256.0f)));
-    //float b = (-15015.0f + x2 * (24255.0f + x2 * (-11025.0f + x2 * 1225.0f)));
-    //float a = x * (-1155.0f + x2 * (1190.0f + x2 * -231.0f));
-    //float b = (-1155.0f + x2 * (1575.0f + x2 * (-525.0f + x2 * 25.0f)));
+    // float a = x * (-15015.0f + x2 * (19250.0f + x2 * (-5943.0f + x2 * 256.0f)));
+    // float b = (-15015.0f + x2 * (24255.0f + x2 * (-11025.0f + x2 * 1225.0f)));
+    // float a = x * (-1155.0f + x2 * (1190.0f + x2 * -231.0f));
+    // float b = (-1155.0f + x2 * (1575.0f + x2 * (-525.0f + x2 * 25.0f)));
     float a = x * (945.0f + x2 * (-735.0f + x2 * 64.0f));
     float b = (945.0f + x2 * (-1050.0f + x2 * 225.0f));
     return a / b;
