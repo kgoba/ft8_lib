@@ -25,8 +25,7 @@ static float fast_atanh(float x);
 // plain is a return value, 174 ints, to be 0 or 1.
 // max_iters is how hard to try.
 // ok == 87 means success.
-#warning return boolean! instead of ok!
-void ftx_ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok)
+void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
 {
     float m[FTX_LDPC_M][FTX_LDPC_N]; // ~60 kB
     float e[FTX_LDPC_M][FTX_LDPC_N]; // ~60 kB
@@ -128,7 +127,7 @@ static int ldpc_check(uint8_t codeword[])
     return errors;
 }
 
-void ftx_bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
+void bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
 {
     float tov[FTX_LDPC_N][3];
     float toc[FTX_LDPC_M][7];
@@ -219,8 +218,6 @@ void ftx_bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
 // * https://mathr.co.uk/blog/2017-09-06_approximating_hyperbolic_tangent.html
 // * https://math.stackexchange.com/a/446411
 
-#warning are those needed?
-#warning replace with native functions
 static float fast_tanh(float x)
 {
     if (x < -4.97f)
@@ -252,3 +249,4 @@ static float fast_atanh(float x)
     float b = (945.0f + x2 * (-1050.0f + x2 * 225.0f));
     return a / b;
 }
+

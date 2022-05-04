@@ -390,3 +390,4 @@ const uint8_t kFTX_LDPC_Num_rows[FTX_LDPC_M] = {
     6, 6, 6, 7, 7, 6, 6, 7, 6, 6, 6, 6, 6, 6, 6, 7,
     6, 6, 6
 };
+

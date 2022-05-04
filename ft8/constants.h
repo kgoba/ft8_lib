@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define FT8_SYMBOL_PERIOD (0.160f) ///< FT8 symbol duration, defines tone deviation in Hz and symbol rate
 #define FT8_SLOT_TIME     (15.0f)  ///< FT8 slot period
 
@@ -44,7 +49,6 @@
 #define FT8_CRC_POLYNOMIAL ((uint16_t)0x2757u) ///< CRC-14 polynomial without the leading (MSB) 1
 #define FT8_CRC_WIDTH      (14)
 
-
 /// Costas 7x7 tone pattern for synchronization
 extern const uint8_t kFT8_Costas_pattern[7];
 extern const uint8_t kFT4_Costas_pattern[4][4];
@@ -72,5 +76,9 @@ extern const uint8_t kFTX_LDPC_Mn[FTX_LDPC_N][3];
 
 /// Number of rows (columns in C/C++) in the array Nm.
 extern const uint8_t kFTX_LDPC_Num_rows[FTX_LDPC_M];
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _INCLUDE_CONSTANTS_H_
