@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,7 +9,7 @@
 #define FT4_SLOT_TIME 6.0f // total length of output waveform in seconds
 #define FT8_SLOT_TIME 15.0f // total length of output waveform in seconds
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     int sample_rate = 8000;
     
@@ -43,3 +43,4 @@ int main(int argc, char **argv)
     printf("(Note that you might have to enclose your message in quote marks if it contains spaces)\n");
     return -1;
 }
+

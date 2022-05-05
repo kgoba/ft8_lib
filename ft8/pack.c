@@ -1,14 +1,14 @@
 #include "pack.h"
 #include "text.h"
 
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 #include <stdio.h>
-#include <ctype.h>
+#include <string.h>
 
-#define NTOKENS  ((uint32_t)2063592L)
-#define MAX22    ((uint32_t)4194304L)
+#define NTOKENS ((uint32_t)2063592L)
+#define MAX22 ((uint32_t)4194304L)
 #define MAXGRID4 ((uint16_t)32400)
 
 // TODO: This is wasteful, should figure out something more elegant
@@ -30,8 +30,7 @@ int32_t pack28(const char* callsign)
     if (starts_with(callsign, "CQ "))
         return 2;
 
-    if (starts_with(callsign, "CQ_"))
-    {
+    if (starts_with(callsign, "CQ_")) {
         int nnum = 0, nlet = 0;
 
         // TODO:
@@ -42,33 +41,24 @@ int32_t pack28(const char* callsign)
     char c6[6] = { ' ', ' ', ' ', ' ', ' ', ' ' };
 
     int length = 0; // strlen(callsign);  // We will need it later
-    while (callsign[length] != ' ' && callsign[length] != 0)
-    {
+    while (callsign[length] != ' ' && callsign[length] != 0) {
         length++;
     }
 
     // Copy callsign to 6 character buffer
-    if (starts_with(callsign, "3DA0") && length <= 7)
-    {
+    if (starts_with(callsign, "3DA0") && length <= 7) {
         // Work-around for Swaziland prefix: 3DA0XYZ -> 3D0XYZ
         memcpy(c6, "3D0", 3);
         memcpy(c6 + 3, callsign + 4, length - 4);
-    }
-    else if (starts_with(callsign, "3X") && isalpha(callsign[2]) && length <= 7)
-    {
+    } else if (starts_with(callsign, "3X") && isalpha(callsign[2]) && length <= 7) {
         // Work-around for Guinea prefixes: 3XA0XYZ -> QA0XYZ
         memcpy(c6, "Q", 1);
         memcpy(c6 + 1, callsign + 2, length - 2);
-    }
-    else
-    {
-        if (isdigit(callsign[2]) && length <= 6)
-        {
+    } else {
+        if (isdigit(callsign[2]) && length <= 6) {
             // AB0XYZ
             memcpy(c6, callsign, length);
-        }
-        else if (isdigit(callsign[1]) && length <= 5)
-        {
+        } else if (isdigit(callsign[1]) && length <= 5) {
             // A0XYZ -> " A0XYZ"
             memcpy(c6 + 1, callsign, length);
         }
@@ -76,8 +66,7 @@ int32_t pack28(const char* callsign)
 
     // Check for standard callsign
     int i0, i1, i2, i3, i4, i5;
-    if ((i0 = char_index(A1, c6[0])) >= 0 && (i1 = char_index(A2, c6[1])) >= 0 && (i2 = char_index(A3, c6[2])) >= 0 && (i3 = char_index(A4, c6[3])) >= 0 && (i4 = char_index(A4, c6[4])) >= 0 && (i5 = char_index(A4, c6[5])) >= 0)
-    {
+    if ((i0 = char_index(A1, c6[0])) >= 0 && (i1 = char_index(A2, c6[1])) >= 0 && (i2 = char_index(A3, c6[2])) >= 0 && (i3 = char_index(A4, c6[3])) >= 0 && (i4 = char_index(A4, c6[4])) >= 0 && (i5 = char_index(A4, c6[5])) >= 0) {
         // This is a standard callsign
         int32_t n28 = i0;
         n28 = n28 * 36 + i1;
@@ -88,8 +77,8 @@ int32_t pack28(const char* callsign)
         return NTOKENS + MAX22 + n28;
     }
 
-    //char text[13];
-    //if (length > 13) return -1;
+    // char text[13];
+    // if (length > 13) return -1;
 
     // TODO:
     // Treat this as a nonstandard callsign: compute its 22-bit hash
@@ -122,8 +111,7 @@ bool chkcall(const char* call, char* bc)
 
 uint16_t packgrid(const char* grid4)
 {
-    if (grid4 == 0)
-    {
+    if (grid4 == 0) {
         // Two callsigns only, no report/grid
         return MAXGRID4 + 1;
     }
@@ -136,10 +124,9 @@ uint16_t packgrid(const char* grid4)
     } else if (strcmp(grid4, "73") == 0) {
         return MAXGRID4 + 4;
     }
-    
+
     // Check for standard 4 letter grid
-    if (in_range(grid4[0], 'A', 'R') && in_range(grid4[1], 'A', 'R') && isdigit(grid4[2]) && isdigit(grid4[3]))
-    {
+    if (in_range(grid4[0], 'A', 'R') && in_range(grid4[1], 'A', 'R') && isdigit(grid4[2]) && isdigit(grid4[3])) {
         uint16_t igrid4 = (grid4[0] - 'A');
         igrid4 = igrid4 * 18 + (grid4[1] - 'A');
         igrid4 = igrid4 * 10 + (grid4[2] - '0');
@@ -149,14 +136,11 @@ uint16_t packgrid(const char* grid4)
 
     // Parse report: +dd / -dd / R+dd / R-dd
     // TODO: check the range of dd
-    if (grid4[0] == 'R')
-    {
+    if (grid4[0] == 'R') {
         int dd = dd_to_int(grid4 + 1, 3);
         uint16_t irpt = 35 + dd;
         return (MAXGRID4 + irpt) | 0x8000; // ir = 1
-    }
-    else
-    {
+    } else {
         int dd = dd_to_int(grid4, 3);
         uint16_t irpt = 35 + dd;
         return (MAXGRID4 + irpt); // ir = 0
@@ -186,12 +170,9 @@ int pack77_1(const char* msg, uint8_t* b77)
 
     // Locate the second delimiter
     const char* s2 = strchr(s1 + 1, ' ');
-    if (s2 != 0)
-    {
+    if (s2 != 0) {
         igrid4 = packgrid(s2 + 1);
-    }
-    else
-    {
+    } else {
         // Two callsigns, no grid/report
         igrid4 = packgrid(0);
     }
@@ -224,43 +205,35 @@ void packtext77(const char* text, uint8_t* b77)
     int length = strlen(text);
 
     // Skip leading and trailing spaces
-    while (*text == ' ' && *text != 0)
-    {
+    while (*text == ' ' && *text != 0) {
         ++text;
         --length;
     }
-    while (length > 0 && text[length - 1] == ' ')
-    {
+    while (length > 0 && text[length - 1] == ' ') {
         --length;
     }
 
     // Clear the first 72 bits representing a long number
-    for (int i = 0; i < 9; ++i)
-    {
+    for (int i = 0; i < 9; ++i) {
         b77[i] = 0;
     }
 
     // Now express the text as base-42 number stored
     // in the first 72 bits of b77
-    for (int j = 0; j < 13; ++j)
-    {
+    for (int j = 0; j < 13; ++j) {
         // Multiply the long integer in b77 by 42
         uint16_t x = 0;
-        for (int i = 8; i >= 0; --i)
-        {
+        for (int i = 8; i >= 0; --i) {
             x += b77[i] * (uint16_t)42;
             b77[i] = (x & 0xFF);
             x >>= 8;
         }
 
         // Get the index of the current char
-        if (j < length)
-        {
+        if (j < length) {
             int q = char_index(A0, text[j]);
             x = (q > 0) ? q : 0;
-        }
-        else
-        {
+        } else {
             x = 0;
         }
         // Here we double each added number in order to have the result multiplied
@@ -268,8 +241,7 @@ void packtext77(const char* text, uint8_t* b77)
         x <<= 1;
 
         // Now add the number to our long number
-        for (int i = 8; i >= 0; --i)
-        {
+        for (int i = 8; i >= 0; --i) {
             if (x == 0)
                 break;
             x += b77[i];
@@ -286,8 +258,7 @@ void packtext77(const char* text, uint8_t* b77)
 int pack77(const char* msg, uint8_t* c77)
 {
     // Check Type 1 (Standard 77-bit message) or Type 2, with optional "/P"
-    if (0 == pack77_1(msg, c77))
-    {
+    if (0 == pack77_1(msg, c77)) {
         return 0;
     }
 
@@ -301,69 +272,3 @@ int pack77(const char* msg, uint8_t* c77)
     packtext77(msg, c77);
     return 0;
 }
-
-#ifdef UNIT_TEST
-
-#include <iostream>
-
-bool test1()
-{
-    const char* inputs[] = {
-        "",
-        " ",
-        "ABC",
-        "A9",
-        "L9A",
-        "L7BC",
-        "L0ABC",
-        "LL3JG",
-        "LL3AJG",
-        "CQ ",
-        0
-    };
-
-    for (int i = 0; inputs[i]; ++i)
-    {
-        int32_t result = ft8_v2::pack28(inputs[i]);
-        printf("pack28(\"%s\") = %d\n", inputs[i], result);
-    }
-
-    return true;
-}
-
-bool test2()
-{
-    const char* inputs[] = {
-        "CQ LL3JG",
-        "CQ LL3JG KO26",
-        "L0UAA LL3JG KO26",
-        "L0UAA LL3JG +02",
-        "L0UAA LL3JG RRR",
-        "L0UAA LL3JG 73",
-        0
-    };
-
-    for (int i = 0; inputs[i]; ++i)
-    {
-        uint8_t result[10];
-        int rc = ft8_v2::pack77_1(inputs[i], result);
-        printf("pack77_1(\"%s\") = %d\t[", inputs[i], rc);
-        for (int j = 0; j < 10; ++j)
-        {
-            printf("%02x ", result[j]);
-        }
-        printf("]\n");
-    }
-
-    return true;
-}
-
-int main()
-{
-    test1();
-    test2();
-    return 0;
-}
-
-#endif
-

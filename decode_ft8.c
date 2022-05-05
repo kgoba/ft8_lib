@@ -1,18 +1,18 @@
-#include <stdio.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
-#include "ft8.h"
 #include "common/wave.h"
+#include "ft8.h"
 
-static FILE *reference;
+static FILE* reference;
 static bool identical;
 
 // decode callback, called by ft8_decode() for each decoded message
-static void ft8_decode_callback(char *message, float frequency, float time_dev, float snr, int score, void *ctx)
+static void ft8_decode_callback(char* message, float frequency, float time_dev, float snr, int score, void* ctx)
 {
     char buf[256], buf2[256];
     printf("000000 %3d %+4.2f %4.1f %4.0f ~  %s\n", score, time_dev, snr, frequency, message);
@@ -24,7 +24,7 @@ static void ft8_decode_callback(char *message, float frequency, float time_dev, 
     }
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
 #if 0
     // Expect one command-line argument
@@ -59,13 +59,12 @@ int main(int argc, char **argv)
         int16_t pcm[num_samples];
         char buf[256];
         
-        
         int fd = open(argv[1], O_RDONLY);
         if (fd == -1) {
             printf("Could not load PCM (16 bit little endian) file (check format and size)\n");
             return -1;
         }
- 
+        
         reference = fopen("/Users/nadig/Desktop/reference.txt", "r");
         identical = true;
         
@@ -91,3 +90,4 @@ int main(int argc, char **argv)
 #endif
     return 0;
 }
+

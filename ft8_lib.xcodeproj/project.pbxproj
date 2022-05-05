@@ -28,7 +28,6 @@
 				6598F2272737F0A80060A608 /* PBXTargetDependency */,
 				6598F2292737F0AA0060A608 /* PBXTargetDependency */,
 				6598F22B2737F0AB0060A608 /* PBXTargetDependency */,
-				6598F22D2737F0AE0060A608 /* PBXTargetDependency */,
 			);
 			name = "Demos and Tests";
 			productName = "Demos and Tests";
@@ -53,9 +52,7 @@
 		6552D4772735B68E00EE69E8 /* libft8.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 659888982731363800F64B3C /* libft8.dylib */; };
 		6552D4782735B6D500EE69E8 /* libft8.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 659888982731363800F64B3C /* libft8.dylib */; };
 		6552D4792735B6DE00EE69E8 /* libft8.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 659888982731363800F64B3C /* libft8.dylib */; };
-		6552D47A2735B6E200EE69E8 /* libft8.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 659888982731363800F64B3C /* libft8.dylib */; };
 		6590878C2731487E007667A1 /* gen_ft8.c in Sources */ = {isa = PBXBuildFile; fileRef = 659888B4273147F400F64B3C /* gen_ft8.c */; };
-		6590878D27314881007667A1 /* test.c in Sources */ = {isa = PBXBuildFile; fileRef = 659888B2273147F400F64B3C /* test.c */; };
 		6598883B27312EB100F64B3C /* kiss_fft.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598883627312EB100F64B3C /* kiss_fft.c */; };
 		6598883D27312EB100F64B3C /* kiss_fftr.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598883727312EB100F64B3C /* kiss_fftr.c */; };
 		6598883F27312EB100F64B3C /* _kiss_fft_guts.h in Headers */ = {isa = PBXBuildFile; fileRef = 6598883827312EB100F64B3C /* _kiss_fft_guts.h */; };
@@ -97,7 +94,6 @@
 		659888B127313A5C00F64B3C /* wave.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598887827312ECE00F64B3C /* wave.c */; };
 		659888B72731481500F64B3C /* decode_ft8.c in Sources */ = {isa = PBXBuildFile; fileRef = 659888B3273147F400F64B3C /* decode_ft8.c */; };
 		659888BB2731482C00F64B3C /* wave.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598887827312ECE00F64B3C /* wave.c */; };
-		659888C52731483800F64B3C /* wave.c in Sources */ = {isa = PBXBuildFile; fileRef = 6598887827312ECE00F64B3C /* wave.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -135,13 +131,6 @@
 			proxyType = 1;
 			remoteGlobalIDString = 650D013227355AB800811CC1;
 			remoteInfo = looptest;
-		};
-		6598F22C2737F0AE0060A608 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 652CE595273127D200C91652 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 659888C22731483800F64B3C;
-			remoteInfo = test;
 		};
 		6598F22E2737F0B00060A608 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -187,15 +176,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
-		659888C72731483800F64B3C /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -226,11 +206,9 @@
 		6598887927312ECE00F64B3C /* wave.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = wave.h; sourceTree = "<group>"; };
 		659888842731305000F64B3C /* decode_ft8 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = decode_ft8; sourceTree = BUILT_PRODUCTS_DIR; };
 		659888982731363800F64B3C /* libft8.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libft8.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
-		659888B2273147F400F64B3C /* test.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = test.c; sourceTree = "<group>"; };
 		659888B3273147F400F64B3C /* decode_ft8.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = decode_ft8.c; sourceTree = "<group>"; };
 		659888B4273147F400F64B3C /* gen_ft8.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = gen_ft8.c; sourceTree = "<group>"; };
 		659888C12731482C00F64B3C /* gen_ft8 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = gen_ft8; sourceTree = BUILT_PRODUCTS_DIR; };
-		659888CB2731483800F64B3C /* test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = test; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -272,14 +250,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		659888C62731483800F64B3C /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				6552D47A2735B6E200EE69E8 /* libft8.dylib in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -302,7 +272,6 @@
 				659888842731305000F64B3C /* decode_ft8 */,
 				659888982731363800F64B3C /* libft8.dylib */,
 				659888C12731482C00F64B3C /* gen_ft8 */,
-				659888CB2731483800F64B3C /* test */,
 				650D013B27355AB800811CC1 /* looptest */,
 			);
 			name = Products;
@@ -364,7 +333,6 @@
 				659888B3273147F400F64B3C /* decode_ft8.c */,
 				659888B4273147F400F64B3C /* gen_ft8.c */,
 				650D012D2735596F00811CC1 /* looptest.c */,
-				659888B2273147F400F64B3C /* test.c */,
 			);
 			name = "Demos and Tests";
 			sourceTree = "<group>";
@@ -492,23 +460,6 @@
 			productReference = 659888C12731482C00F64B3C /* gen_ft8 */;
 			productType = "com.apple.product-type.tool";
 		};
-		659888C22731483800F64B3C /* test */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 659888C82731483800F64B3C /* Build configuration list for PBXNativeTarget "test" */;
-			buildPhases = (
-				659888C32731483800F64B3C /* Sources */,
-				659888C62731483800F64B3C /* Frameworks */,
-				659888C72731483800F64B3C /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = test;
-			productName = decode_ft8;
-			productReference = 659888CB2731483800F64B3C /* test */;
-			productType = "com.apple.product-type.tool";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -558,7 +509,6 @@
 				659888832731305000F64B3C /* decode_ft8 */,
 				659888B82731482C00F64B3C /* gen_ft8 */,
 				650D013227355AB800811CC1 /* looptest */,
-				659888C22731483800F64B3C /* test */,
 			);
 		};
 /* End PBXProject section */
@@ -625,15 +575,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		659888C32731483800F64B3C /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				659888C52731483800F64B3C /* wave.c in Sources */,
-				6590878D27314881007667A1 /* test.c in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -661,11 +602,6 @@
 			isa = PBXTargetDependency;
 			target = 650D013227355AB800811CC1 /* looptest */;
 			targetProxy = 6598F22A2737F0AB0060A608 /* PBXContainerItemProxy */;
-		};
-		6598F22D2737F0AE0060A608 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 659888C22731483800F64B3C /* test */;
-			targetProxy = 6598F22C2737F0AE0060A608 /* PBXContainerItemProxy */;
 		};
 		6598F22F2737F0B00060A608 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -948,26 +884,6 @@
 			};
 			name = Release;
 		};
-		659888C92731483800F64B3C /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = DVX9JXSKVT;
-				ENABLE_HARDENED_RUNTIME = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Debug;
-		};
-		659888CA2731483800F64B3C /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = DVX9JXSKVT;
-				ENABLE_HARDENED_RUNTIME = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Release;
-		};
 		6598F2202737EFC40060A608 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1057,15 +973,6 @@
 			buildConfigurations = (
 				659888BF2731482C00F64B3C /* Debug */,
 				659888C02731482C00F64B3C /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		659888C82731483800F64B3C /* Build configuration list for PBXNativeTarget "test" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				659888C92731483800F64B3C /* Debug */,
-				659888CA2731483800F64B3C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

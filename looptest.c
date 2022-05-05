@@ -6,7 +6,6 @@
 
 #include "ft8.h"
 
-
 #warning remove again
 #include <fcntl.h>
 #include <unistd.h>
@@ -25,7 +24,7 @@ struct context {
     float frequency;
 };
 
-static char *random_callsign(char *callsign)
+static char* random_callsign(char* callsign)
 {
     int x = rand();
     switch (x >> 29) {
@@ -45,14 +44,14 @@ static char *random_callsign(char *callsign)
     return callsign;
 }
 
-static char *random_locator(char* locator)
+static char* random_locator(char* locator)
 {
     int x = rand();
     sprintf(locator, "%c%c%d%d", 'A' + RP(x, 1, 18), 'A' + RP(x, 18, 18), RP(x, 180, 10), RP(x, 1800, 10));
     return locator;
 }
 
-static char *random_message(char* message)
+static char* random_message(char* message)
 {
     int x = rand();
     char callsign1[8], callsign2[8], locator[5];
@@ -80,14 +79,14 @@ static char *random_message(char* message)
 }
 
 // decode callback, called by ft8_decode() for each decoded message
-static void ft8_decode_callback(char *message, float frequency, float time_dev, float snr, int score, void *ctx)
+static void ft8_decode_callback(char* message, float frequency, float time_dev, float snr, int score, void* ctx)
 {
-    struct context *context = ctx;
+    struct context* context = ctx;
     bool ok = strcmp(context->message, message) == 0;
- //   printf("%-8s000000 %3d %+4.2f %4.0f ~  %s (%s)\n", ok ? "OK" : "ERROR", score, time_dev, frequency, message, context->message);
+    printf("%-8s000000 %3d %+4.2f %4.0f ~  %s (%s)\n", ok ? "OK" : "ERROR", score, time_dev, frequency, message, context->message);
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int iterations = 1000;
     int sample_rate = 8000;
@@ -95,14 +94,13 @@ int main(int argc, char *argv[])
     ftx_protocol_t protocol = PROTO_FT4;
     int num_samples = (protocol == PROTO_FT4 ? FT4_SLOT_TIME : FT8_SLOT_TIME) * sample_rate;
     float signal[num_samples];
-
+    
     // start time measurement
     clock_t start = clock();
-
+    
     // initialize random number generator
     srand((unsigned int)time(NULL));
     
-
     // run loop test
     for (int i = 0; i < iterations; i++) {
         struct context ctx;
