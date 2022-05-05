@@ -6,7 +6,7 @@
 #include "common/wave.h"
 #include "ft8.h"
 
-#define FT4_SLOT_TIME 7.0f // total length of output waveform in seconds
+#define FT4_SLOT_TIME 6.0f // total length of output waveform in seconds
 #define FT8_SLOT_TIME 15.0f // total length of output waveform in seconds
 
 int main(int argc, char **argv)
@@ -25,7 +25,7 @@ int main(int argc, char **argv)
             frequency = atof(argv[3]);
         }
         
-        int rc = is_ft4 ? ft4_encode(argv[1], signal, num_samples, frequency, sample_rate) : ft8_encode(argv[1], signal, num_samples, 1000.0, 8000.0);
+        int rc = ftx_encode(argv[1], signal, num_samples, frequency, sample_rate, is_ft4 ? PROTO_FT4 : PROTO_FT8);
         if (rc == 0) {
             save_wav(signal, num_samples, sample_rate, argv[2]);
         } else {

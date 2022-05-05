@@ -227,12 +227,6 @@ static void monitor_process(monitor_t* me, const float* frame)
     ++me->wf.num_blocks;
 }
 
-static void monitor_reset(monitor_t* me)
-{
-    me->wf.num_blocks = 0;
-    me->max_mag = 0;
-}
-
 static int get_index(const waterfall_t* wf, const candidate_t* candidate)
 {
     int offset = candidate->time_offset;
@@ -696,20 +690,20 @@ static void ft8_extract_symbol(const uint8_t* wf, float* logl)
     logl[2] = max4(s2[1], s2[3], s2[5], s2[7]) - max4(s2[0], s2[2], s2[4], s2[6]);
 }
 
-// decode FT8 signal, call callback for every decoded message
-int ftx_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callback_t callback, void *ctx)
+// decode FT4 or FT8 signal, call callback for every decoded message
+int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t protocol, ftx_decode_callback_t callback, void *ctx)
 {
-    bool is_ft8 = true;
+    bool is_ft8 = false;
 
     // Compute FFT over the whole signal and store it
     monitor_t mon;
     monitor_config_t mon_cfg = {
-        .f_min = 100,
-        .f_max = 3000,
+        .f_min = 0.0,
+        .f_max = 4000.0,
         .sample_rate = sample_rate,
         .time_osr = kTime_osr,
         .freq_osr = kFreq_osr,
-        .protocol = is_ft8 ? PROTO_FT8 : PROTO_FT4
+        .protocol = protocol
     };
     monitor_init(&mon, &mon_cfg);
     LOG(LOG_DEBUG, "Waterfall allocated %d symbols\n", mon.wf.max_blocks);
@@ -740,8 +734,6 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callb
     for (int idx = 0; idx < num_candidates; ++idx)
     {
         const candidate_t* cand = &candidate_list[idx];
-        if (cand->score < kMin_score)
-            continue;
 
         float freq_hz = (cand->freq_offset + (float)cand->freq_sub / mon.wf.freq_osr) / mon.symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / mon.wf.time_osr) * mon.symbol_period;
@@ -803,7 +795,6 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ft8_decode_callb
             callback(message.text, freq_hz, time_sec, 10.0 * log10f(signal / noise), cand->score, ctx);
         }
     }
-    LOG(LOG_INFO, "Decoded %d messages\n", num_decoded);
 
     monitor_free(&mon);
 

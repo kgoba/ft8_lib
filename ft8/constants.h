@@ -3,11 +3,6 @@
 
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 #define FT8_SYMBOL_PERIOD (0.160f) ///< FT8 symbol duration, defines tone deviation in Hz and symbol rate
 #define FT8_SLOT_TIME     (15.0f)  ///< FT8 slot period
 
@@ -63,22 +58,12 @@ extern const uint8_t kFT4_XOR_sequence[10];
 extern const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES];
 
 /// LDPC(174,91) parity check matrix, containing 83 rows,
-/// each row describes one parity check,
-/// each number is an index into the codeword (1-origin).
-/// The codeword bits mentioned in each row must xor to zero.
-/// From WSJT-X's ldpc_174_91_c_reordered_parity.f90.
 extern const uint8_t kFTX_LDPC_Nm[FTX_LDPC_M][7];
 
-/// Mn from WSJT-X's bpdecode174.f90. Each row corresponds to a codeword bit.
 /// The numbers indicate which three parity checks (rows in Nm) refer to the codeword bit.
-/// The numbers use 1 as the origin (first entry).
 extern const uint8_t kFTX_LDPC_Mn[FTX_LDPC_N][3];
 
 /// Number of rows (columns in C/C++) in the array Nm.
 extern const uint8_t kFTX_LDPC_Num_rows[FTX_LDPC_M];
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // _INCLUDE_CONSTANTS_H_

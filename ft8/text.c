@@ -1,6 +1,6 @@
 #include "text.h"
-
 #include <string.h>
+#include <ctype.h>
 
 const char* trim_front(const char* str)
 {
@@ -15,7 +15,7 @@ const char* trim_front(const char* str)
 void trim_back(char* str)
 {
     // Skip trailing whitespace by replacing it with '\0' characters
-    int idx = strlen(str) - 1;
+    size_t idx = strlen(str) - 1;
     while (idx >= 0 && str[idx] == ' ')
     {
         str[idx--] = '\0';
@@ -32,26 +32,6 @@ char* trim(char* str)
     return str;
 }
 
-char to_upper(char c)
-{
-    return (c >= 'a' && c <= 'z') ? (c - 'a' + 'A') : c;
-}
-
-bool is_digit(char c)
-{
-    return (c >= '0') && (c <= '9');
-}
-
-bool is_letter(char c)
-{
-    return ((c >= 'A') && (c <= 'Z')) || ((c >= 'a') && (c <= 'z'));
-}
-
-bool is_space(char c)
-{
-    return (c == ' ');
-}
-
 bool in_range(char c, char min, char max)
 {
     return (c >= min) && (c <= max);
@@ -60,11 +40,6 @@ bool in_range(char c, char min, char max)
 bool starts_with(const char* string, const char* prefix)
 {
     return 0 == memcmp(string, prefix, strlen(prefix));
-}
-
-bool equals(const char* string1, const char* string2)
-{
-    return 0 == strcmp(string1, string2);
 }
 
 int char_index(const char* string, char c)
@@ -77,26 +52,6 @@ int char_index(const char* string, char c)
         }
     }
     return -1; // Not found
-}
-
-// Text message formatting:
-//   - replaces lowercase letters with uppercase
-//   - merges consecutive spaces into single space
-void format_message(char* msg_out, const char* msg_in)
-{
-    char c;
-    char last_out = 0;
-    while ((c = *msg_in))
-    {
-        if (c != ' ' || last_out != ' ')
-        {
-            last_out = to_upper(c);
-            *msg_out = last_out;
-            ++msg_out;
-        }
-        ++msg_in;
-    }
-    *msg_out = 0; // Add zero termination
 }
 
 // Parse a 2 digit integer from string
@@ -120,7 +75,7 @@ int dd_to_int(const char* str, int length)
     {
         if (str[i] == 0)
             break;
-        if (!is_digit(str[i]))
+        if (!isdigit(str[i]))
             break;
         result *= 10;
         result += (str[i] - '0');

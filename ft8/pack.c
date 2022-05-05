@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #define NTOKENS  ((uint32_t)2063592L)
 #define MAX22    ((uint32_t)4194304L)
@@ -53,7 +54,7 @@ int32_t pack28(const char* callsign)
         memcpy(c6, "3D0", 3);
         memcpy(c6 + 3, callsign + 4, length - 4);
     }
-    else if (starts_with(callsign, "3X") && is_letter(callsign[2]) && length <= 7)
+    else if (starts_with(callsign, "3X") && isalpha(callsign[2]) && length <= 7)
     {
         // Work-around for Guinea prefixes: 3XA0XYZ -> QA0XYZ
         memcpy(c6, "Q", 1);
@@ -61,12 +62,12 @@ int32_t pack28(const char* callsign)
     }
     else
     {
-        if (is_digit(callsign[2]) && length <= 6)
+        if (isdigit(callsign[2]) && length <= 6)
         {
             // AB0XYZ
             memcpy(c6, callsign, length);
         }
-        else if (is_digit(callsign[1]) && length <= 5)
+        else if (isdigit(callsign[1]) && length <= 5)
         {
             // A0XYZ -> " A0XYZ"
             memcpy(c6 + 1, callsign, length);
@@ -128,15 +129,16 @@ uint16_t packgrid(const char* grid4)
     }
 
     // Take care of special cases
-    if (equals(grid4, "RRR"))
+    if (strcmp(grid4, "RRR") == 0) {
         return MAXGRID4 + 2;
-    if (equals(grid4, "RR73"))
+    } else if (strcmp(grid4, "RR73") == 0) {
         return MAXGRID4 + 3;
-    if (equals(grid4, "73"))
+    } else if (strcmp(grid4, "73") == 0) {
         return MAXGRID4 + 4;
-
+    }
+    
     // Check for standard 4 letter grid
-    if (in_range(grid4[0], 'A', 'R') && in_range(grid4[1], 'A', 'R') && is_digit(grid4[2]) && is_digit(grid4[3]))
+    if (in_range(grid4[0], 'A', 'R') && in_range(grid4[1], 'A', 'R') && isdigit(grid4[2]) && isdigit(grid4[3]))
     {
         uint16_t igrid4 = (grid4[0] - 'A');
         igrid4 = igrid4 * 18 + (grid4[1] - 'A');

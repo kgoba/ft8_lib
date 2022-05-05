@@ -74,7 +74,7 @@ int main(int argc, char **argv)
             for (int i = 0; i < num_samples; i++) {
                 signal[i] = pcm[i] / 32768.0f;
             }
-            n += ftx_decode(signal, num_samples, sample_rate, ft8_decode_callback, NULL);
+            n += ftx_decode(signal, num_samples, sample_rate, PROTO_FT8, ft8_decode_callback, NULL);
         }
         printf("Decoded %d messages\n", n);
         
