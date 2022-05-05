@@ -8,7 +8,6 @@
 #include "ft8/pack.h"
 #include "ft8/text.h"
 
-#include "common/debug.h"
 #include "fft/kiss_fftr.h"
 
 void convert_8bit_to_6bit(uint8_t *dst, const uint8_t *src, int nBits)

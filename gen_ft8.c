@@ -1,8 +1,8 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "common/debug.h"
 #include "common/wave.h"
 #include "ft8.h"
 
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
         if (rc == 0) {
             save_wav(signal, num_samples, sample_rate, argv[2]);
         } else {
-            LOG(LOG_ERROR, "Could not generate signal, rc = %d\n", rc);
+            fprintf(stderr, "Could not generate signal, rc = %d\n", rc);
         }
         return rc;
     }

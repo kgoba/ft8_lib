@@ -222,7 +222,6 @@
 		6598885127312EC200F64B3C /* unpack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = unpack.h; sourceTree = "<group>"; };
 		6598885227312EC200F64B3C /* crc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = crc.c; sourceTree = "<group>"; };
 		6598885427312EC200F64B3C /* ldpc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ldpc.c; sourceTree = "<group>"; };
-		6598887727312ECE00F64B3C /* debug.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = debug.h; sourceTree = "<group>"; };
 		6598887827312ECE00F64B3C /* wave.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = wave.c; sourceTree = "<group>"; };
 		6598887927312ECE00F64B3C /* wave.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = wave.h; sourceTree = "<group>"; };
 		659888842731305000F64B3C /* decode_ft8 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = decode_ft8; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -348,7 +347,6 @@
 			children = (
 				6598887827312ECE00F64B3C /* wave.c */,
 				6598887927312ECE00F64B3C /* wave.h */,
-				6598887727312ECE00F64B3C /* debug.h */,
 			);
 			path = common;
 			sourceTree = "<group>";

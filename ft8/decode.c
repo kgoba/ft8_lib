@@ -4,7 +4,6 @@
 #include "ldpc.h"
 #include "unpack.h"
 
-#include "common/debug.h"
 #include "fft/kiss_fftr.h"
 
 #include <stdbool.h>
@@ -142,11 +141,6 @@ static void monitor_init(monitor_t* me, const monitor_config_t* cfg)
 
     size_t fft_work_size;
     kiss_fftr_alloc(me->nfft, 0, 0, &fft_work_size);
-
-    LOG(LOG_INFO, "Block size = %d\n", me->block_size);
-    LOG(LOG_INFO, "Subblock size = %d\n", me->subblock_size);
-    LOG(LOG_INFO, "N_FFT = %d\n", me->nfft);
-    LOG(LOG_DEBUG, "FFT work area = %zu\n", fft_work_size);
 
     me->fft_work = calloc(1, fft_work_size);
     me->fft_cfg = kiss_fftr_alloc(me->nfft, 0, me->fft_work, &fft_work_size);
@@ -389,8 +383,9 @@ static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
         }
     }
 
-    if (num_average > 0)
+    if (num_average > 0) {
         score /= num_average;
+    }
 
     return score;
 }
@@ -693,8 +688,6 @@ static void ft8_extract_symbol(const uint8_t* wf, float* logl)
 // decode FT4 or FT8 signal, call callback for every decoded message
 int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t protocol, ftx_decode_callback_t callback, void *ctx)
 {
-    bool is_ft8 = false;
-
     // Compute FFT over the whole signal and store it
     monitor_t mon;
     monitor_config_t mon_cfg = {
@@ -706,14 +699,12 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t p
         .protocol = protocol
     };
     monitor_init(&mon, &mon_cfg);
-    LOG(LOG_DEBUG, "Waterfall allocated %d symbols\n", mon.wf.max_blocks);
+
     for (int frame_pos = 0; frame_pos + mon.block_size <= num_samples; frame_pos += mon.block_size)
     {
         // Process the waveform data frame by frame - you could have a live loop here with data from an audio device
         monitor_process(&mon, signal + frame_pos);
     }
-    LOG(LOG_DEBUG, "Waterfall accumulated %d symbols\n", mon.wf.num_blocks);
-    LOG(LOG_INFO, "Max magnitude: %.1f dB\n", mon.max_mag);
 
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
@@ -742,23 +733,21 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t p
         decode_status_t status;
         if (!ft8_decode(&mon.wf, cand, &message, kLDPC_iterations, &status))
         {
+#if 0
             // printf("000000 %3d %+4.2f %4.0f ~  ---\n", cand->score, time_sec, freq_hz);
             if (status.ldpc_errors > 0)
             {
-                LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
             }
             else if (status.crc_calculated != status.crc_extracted)
             {
-                LOG(LOG_DEBUG, "CRC mismatch!\n");
             }
             else if (status.unpack_status != 0)
             {
-                LOG(LOG_DEBUG, "Error while unpacking!\n");
             }
+#endif
             continue;
         }
 
-        LOG(LOG_DEBUG, "Checking hash table for %4.1fs / %4.1fHz [%d]...\n", time_sec, freq_hz, cand->score);
         int idx_hash = message.hash % kMax_decoded_messages;
         bool found_empty_slot = false;
         bool found_duplicate = false;
@@ -766,17 +755,14 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t p
         {
             if (decoded_hashtable[idx_hash] == NULL)
             {
-                LOG(LOG_DEBUG, "Found an empty slot\n");
                 found_empty_slot = true;
             }
             else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == strcmp(decoded_hashtable[idx_hash]->text, message.text)))
             {
-                LOG(LOG_DEBUG, "Found a duplicate [%s]\n", message.text);
                 found_duplicate = true;
             }
             else
             {
-                LOG(LOG_DEBUG, "Hash table clash!\n");
                 // Move on to check the next entry in hash table
                 idx_hash = (idx_hash + 1) % kMax_decoded_messages;
             }
