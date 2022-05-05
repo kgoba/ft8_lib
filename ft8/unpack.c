@@ -9,7 +9,7 @@
 
 // n28 is a 28-bit integer, e.g. n28a or n28b, containing all the
 // call sign bits from a packed message.
-int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
+static int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char *result)
 {
     // Check for special tokens DE, QRZ, CQ, CQ_nnn, CQ_aaaa
     if (n28 < NTOKENS) {
@@ -34,7 +34,7 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
             char aaaa[5];
 
             aaaa[4] = '\0';
-            for (int i = 3; /* */; --i) {
+            for (int i = 3;; --i) {
                 aaaa[i] = charn(n % 27, 4);
                 if (i == 0)
                     break;
@@ -95,7 +95,7 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
     return 0; // Success
 }
 
-int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, char* extra)
+static int unpack_type1(const uint8_t *a77, uint8_t i3, char *call_to, char *call_de, char *extra)
 {
     uint32_t n28a, n28b;
     uint16_t igrid4;
@@ -133,7 +133,7 @@ int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, c
     //     save_hash_call(call_de)
     // }
 
-    char* dst = extra;
+    char *dst = extra;
 
     if (igrid4 <= MAXGRID4) {
         // Extract 4 symbol grid locator
@@ -184,7 +184,7 @@ int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, c
     return 0; // Success
 }
 
-int unpack_text(const uint8_t* a71, char* text)
+static int unpack_text(const uint8_t *a71, char *text)
 {
     // TODO: test
     uint8_t b71[9];
@@ -213,7 +213,7 @@ int unpack_text(const uint8_t* a71, char* text)
     return 0; // Success
 }
 
-int unpack_telemetry(const uint8_t* a71, char* telemetry)
+static int unpack_telemetry(const uint8_t *a71, char *telemetry)
 {
     uint8_t b71[9];
 
@@ -240,7 +240,7 @@ int unpack_telemetry(const uint8_t* a71, char* telemetry)
 
 // none standard for wsjt-x 2.0
 // by KD8CEC
-int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* extra)
+static int unpack_nonstandard(const uint8_t *a77, char *call_to, char *call_de, char *extra)
 {
     uint32_t n12, iflip, nrpt, icq;
     uint64_t n58;
@@ -264,7 +264,7 @@ int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* e
     char c11[12];
     c11[11] = '\0';
 
-    for (int i = 10; /* no condition */; --i) {
+    for (int i = 10;; --i) {
         c11[i] = charn(n58 % 38, 5);
         if (i == 0)
             break;
@@ -279,8 +279,8 @@ int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* e
     // call_3[5] = '>';
     // call_3[6] = '\0';
 
-    char* call_1 = (iflip) ? c11 : call_3;
-    char* call_2 = (iflip) ? call_3 : c11;
+    char *call_1 = (iflip) ? c11 : call_3;
+    char *call_2 = (iflip) ? call_3 : c11;
     // save_hash_call(c11_trimmed);
 
     if (icq == 0) {
@@ -303,7 +303,7 @@ int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* e
     return 0;
 }
 
-int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extra)
+static int unpack77_fields(const uint8_t *a77, char *call_to, char *call_de, char *extra)
 {
     call_to[0] = call_de[0] = extra[0] = '\0';
 
@@ -353,7 +353,7 @@ int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extr
     return -1;
 }
 
-int unpack77(const uint8_t* a77, char* message)
+int unpack77(const uint8_t *a77, char *message)
 {
     char call_to[14];
     char call_de[14];
@@ -364,7 +364,7 @@ int unpack77(const uint8_t* a77, char* message)
         return rc;
 
     // int msg_sz = strlen(call_to) + strlen(call_de) + strlen(extra) + 2;
-    char* dst = message;
+    char *dst = message;
 
     dst[0] = '\0';
 

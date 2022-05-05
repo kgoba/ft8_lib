@@ -7,9 +7,11 @@
 // plain is a return value, 174 ints, to be 0 or 1.
 // iters is how hard to try.
 // ok == 87 means success.
-void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int *ok);
+#warning remove OK and return value
+void ldpc_decode(float *codeword, int max_iters, uint8_t *plain, int *ok);
 
-void bp_decode(float codeword[], int max_iters, uint8_t plain[], int *ok);
+#warning remove OK and return value
+void bp_decode(float *codeword, int max_iters, uint8_t *plain, int *ok);
 
 #endif // _INCLUDE_LDPC_H_
 

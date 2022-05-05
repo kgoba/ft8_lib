@@ -31,7 +31,7 @@ typedef struct {
     int num_bins; ///< number of FFT bins in terms of 6.25 Hz
     int time_osr; ///< number of time subdivisions
     int freq_osr; ///< number of frequency subdivisions
-    uint8_t* mag; ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    uint8_t *mag; ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
     int block_stride; ///< Helper value = time_osr * freq_osr * num_bins
     ftx_protocol_t protocol; ///< Indicate if using FT4 or FT8
 } waterfall_t;
@@ -79,13 +79,13 @@ typedef struct {
     int subblock_size; ///< Analysis shift size (number of samples)
     int nfft; ///< FFT size
     float fft_norm; ///< FFT normalization factor
-    float* window; ///< Window function for STFT analysis (nfft samples)
-    float* last_frame; ///< Current STFT analysis frame (nfft samples)
+    float *window; ///< Window function for STFT analysis (nfft samples)
+    float *last_frame; ///< Current STFT analysis frame (nfft samples)
     waterfall_t wf; ///< Waterfall object
     float max_mag; ///< Maximum detected magnitude (debug stats)
 
     // KISS FFT housekeeping variables
-    void* fft_work; ///< Work area required by Kiss FFT
+    void *fft_work; ///< Work area required by Kiss FFT
     kiss_fftr_cfg fft_cfg; ///< Kiss FFT housekeeping object
 } monitor_t;
 
@@ -94,11 +94,11 @@ static float max4(float a, float b, float c, float d);
 static void heapify_down(candidate_t heap[], int heap_size);
 static void heapify_up(candidate_t heap[], int heap_size);
 
-static void ftx_normalize_logl(float* log174);
-static void ft4_extract_symbol(const uint8_t* wf, float* logl);
-static void ft8_extract_symbol(const uint8_t* wf, float* logl);
+static void ftx_normalize_logl(float *log174);
+static void ft4_extract_symbol(const uint8_t *wf, float *logl);
+static void ft8_extract_symbol(const uint8_t *wf, float *logl);
 
-static void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int time_osr, int freq_osr)
+static void waterfall_init(waterfall_t *me, int max_blocks, int num_bins, int time_osr, int freq_osr)
 {
     me->max_blocks = max_blocks;
     me->num_blocks = 0;
@@ -109,9 +109,12 @@ static void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int ti
     me->mag = calloc(max_blocks * time_osr * freq_osr * num_bins, sizeof(me->mag[0]));
 }
 
-static void waterfall_free(waterfall_t* me) { free(me->mag); }
+static void waterfall_free(waterfall_t *me)
+{
+    free(me->mag);
+}
 
-static void monitor_init(monitor_t* me, const monitor_config_t* cfg)
+static void monitor_init(monitor_t *me, const monitor_config_t *cfg)
 {
     float slot_time = (cfg->protocol == PROTO_FT4) ? FT4_SLOT_TIME : FT8_SLOT_TIME;
     float symbol_period = (cfg->protocol == PROTO_FT4) ? FT4_SYMBOL_PERIOD : FT8_SYMBOL_PERIOD;
@@ -120,8 +123,6 @@ static void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->subblock_size = me->block_size / cfg->time_osr;
     me->nfft = me->block_size * cfg->freq_osr;
     me->fft_norm = 2.0f / me->nfft;
-    // const int len_window = 1.8f * me->block_size; // hand-picked and optimized
-
     me->window = calloc(me->nfft, sizeof(me->window[0]));
     for (int i = 0; i < me->nfft; ++i) {
         // hann window
@@ -144,7 +145,7 @@ static void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->max_mag = -120.0f;
 }
 
-static void monitor_free(monitor_t* me)
+static void monitor_free(monitor_t *me)
 {
     waterfall_free(&me->wf);
     free(me->fft_work);
@@ -153,7 +154,7 @@ static void monitor_free(monitor_t* me)
 }
 
 // Compute FFT magnitudes (log wf) for a frame in the signal and update waterfall data
-static void monitor_process(monitor_t* me, const float* frame)
+static void monitor_process(monitor_t *me, const float *frame)
 {
     // Check if we can still store more waterfall data
     if (me->wf.num_blocks >= me->wf.max_blocks)
@@ -205,7 +206,7 @@ static void monitor_process(monitor_t* me, const float* frame)
     ++me->wf.num_blocks;
 }
 
-static int get_index(const waterfall_t* wf, const candidate_t* candidate)
+static int get_index(const waterfall_t *wf, const candidate_t *candidate)
 {
     int offset = candidate->time_offset;
     offset = (offset * wf->time_osr) + candidate->time_sub;
@@ -237,13 +238,13 @@ static void pack_bits(const uint8_t bit_array[], int num_bits, uint8_t packed[])
     }
 }
 
-static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
+static int ft8_sync_score(const waterfall_t *wf, const candidate_t *candidate)
 {
     int score = 0;
     int num_average = 0;
 
     // Get the pointer to symbol 0 of the candidate
-    const uint8_t* mag_cand = wf->mag + get_index(wf, candidate);
+    const uint8_t *mag_cand = wf->mag + get_index(wf, candidate);
 
     // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
     for (int m = 0; m < FT8_NUM_SYNC; ++m) {
@@ -257,7 +258,7 @@ static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
                 break;
 
             // Get the pointer to symbol 'block' of the candidate
-            const uint8_t* p8 = mag_cand + (block * wf->block_stride);
+            const uint8_t *p8 = mag_cand + (block * wf->block_stride);
 
 #if 0
             // Weighted difference between the expected and all other symbols
@@ -300,13 +301,13 @@ static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
     return score;
 }
 
-static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
+static int ft4_sync_score(const waterfall_t *wf, const candidate_t *candidate)
 {
     int score = 0;
     int num_average = 0;
 
     // Get the pointer to symbol 0 of the candidate
-    const uint8_t* mag_cand = wf->mag + get_index(wf, candidate);
+    const uint8_t *mag_cand = wf->mag + get_index(wf, candidate);
 
     // Compute average score over sync symbols (block = 1-4, 34-37, 67-70, 100-103)
     for (int m = 0; m < FT4_NUM_SYNC; ++m) {
@@ -320,7 +321,7 @@ static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
                 break;
 
             // Get the pointer to symbol 'block' of the candidate
-            const uint8_t* p4 = mag_cand + (block * wf->block_stride);
+            const uint8_t *p4 = mag_cand + (block * wf->block_stride);
 
             int sm = kFT4_Costas_pattern[m][k]; // Index of the expected bin
 
@@ -358,7 +359,7 @@ static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
     return score;
 }
 
-int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[], int min_score)
+int ft8_find_sync(const waterfall_t *wf, int num_candidates, candidate_t *heap, int min_score)
 {
     int heap_size = 0;
     candidate_t candidate;
@@ -411,9 +412,9 @@ int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
     return heap_size;
 }
 
-static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174)
+static void ft4_extract_likelihood(const waterfall_t *wf, const candidate_t *cand, float *log174)
 {
-    const uint8_t* mag_cand = wf->mag + get_index(wf, cand);
+    const uint8_t *mag_cand = wf->mag + get_index(wf, cand);
 
     // Go over FSK tones and skip Costas sync symbols
     for (int k = 0; k < FT4_ND; ++k) {
@@ -429,16 +430,16 @@ static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* can
             log174[bit_idx + 1] = 0;
         } else {
             // Pointer to 4 bins of the current symbol
-            const uint8_t* ps = mag_cand + (sym_idx * wf->block_stride);
+            const uint8_t *ps = mag_cand + (sym_idx * wf->block_stride);
 
             ft4_extract_symbol(ps, log174 + bit_idx);
         }
     }
 }
 
-static void ft8_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174)
+static void ft8_extract_likelihood(const waterfall_t *wf, const candidate_t *cand, float *log174)
 {
-    const uint8_t* mag_cand = wf->mag + get_index(wf, cand);
+    const uint8_t *mag_cand = wf->mag + get_index(wf, cand);
 
     // Go over FSK tones and skip Costas sync symbols
     for (int k = 0; k < FT8_ND; ++k) {
@@ -455,14 +456,14 @@ static void ft8_extract_likelihood(const waterfall_t* wf, const candidate_t* can
             log174[bit_idx + 2] = 0;
         } else {
             // Pointer to 8 bins of the current symbol
-            const uint8_t* ps = mag_cand + (sym_idx * wf->block_stride);
+            const uint8_t *ps = mag_cand + (sym_idx * wf->block_stride);
 
             ft8_extract_symbol(ps, log174 + bit_idx);
         }
     }
 }
 
-static void ftx_normalize_logl(float* log174)
+static void ftx_normalize_logl(float *log174)
 {
     // Compute the variance of log174
     float sum = 0;
@@ -481,7 +482,7 @@ static void ftx_normalize_logl(float* log174)
     }
 }
 
-bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* message, int max_iterations, decode_status_t* status)
+bool ft8_decode(const waterfall_t *wf, const candidate_t *cand, message_t *message, int max_iterations, decode_status_t *status)
 {
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
     if (wf->protocol == PROTO_FT4) {
@@ -583,7 +584,7 @@ static void heapify_up(candidate_t heap[], int heap_size)
 }
 
 // Compute unnormalized log likelihood log(p(1) / p(0)) of 2 message bits (1 FSK symbol)
-static void ft4_extract_symbol(const uint8_t* wf, float* logl)
+static void ft4_extract_symbol(const uint8_t *wf, float *logl)
 {
     // Cleaned up code for the simple case of n_syms==1
     float s2[4];
@@ -597,7 +598,7 @@ static void ft4_extract_symbol(const uint8_t* wf, float* logl)
 }
 
 // Compute unnormalized log likelihood log(p(1) / p(0)) of 3 message bits (1 FSK symbol)
-static void ft8_extract_symbol(const uint8_t* wf, float* logl)
+static void ft8_extract_symbol(const uint8_t *wf, float *logl)
 {
     // Cleaned up code for the simple case of n_syms==1
     float s2[8];
@@ -612,7 +613,7 @@ static void ft8_extract_symbol(const uint8_t* wf, float* logl)
 }
 
 // decode FT4 or FT8 signal, call callback for every decoded message
-int ftx_decode(float* signal, int num_samples, int sample_rate, ftx_protocol_t protocol, ftx_decode_callback_t callback, void* ctx)
+int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t protocol, ftx_decode_callback_t callback, void *ctx)
 {
     // Compute FFT over the whole signal and store it
     monitor_t mon;
@@ -631,7 +632,7 @@ int ftx_decode(float* signal, int num_samples, int sample_rate, ftx_protocol_t p
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
     message_t decoded[kMax_decoded_messages];
-    message_t* decoded_hashtable[kMax_decoded_messages];
+    message_t *decoded_hashtable[kMax_decoded_messages];
 
     // Initialize hash table pointers
     for (int i = 0; i < kMax_decoded_messages; ++i) {
@@ -640,7 +641,7 @@ int ftx_decode(float* signal, int num_samples, int sample_rate, ftx_protocol_t p
 
     // Go over candidates and attempt to decode messages
     for (int idx = 0; idx < num_candidates; ++idx) {
-        const candidate_t* cand = &candidate_list[idx];
+        const candidate_t *cand = &candidate_list[idx];
 
         float freq_hz = (cand->freq_offset + (float)cand->freq_sub / mon.wf.freq_osr) / mon.symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / mon.wf.time_osr) * mon.symbol_period;

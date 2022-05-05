@@ -7,7 +7,7 @@
 // Adapted from https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code
 // [IN] message  - byte sequence (MSB first)
 // [IN] num_bits - number of bits in the sequence
-uint16_t ftx_compute_crc(const uint8_t message[], int num_bits)
+uint16_t ftx_compute_crc(const uint8_t *message, int num_bits)
 {
     uint16_t remainder = 0;
     int idx_byte = 0;
@@ -31,13 +31,13 @@ uint16_t ftx_compute_crc(const uint8_t message[], int num_bits)
     return remainder & ((TOPBIT << 1) - 1u);
 }
 
-uint16_t ftx_extract_crc(const uint8_t a91[])
+uint16_t ftx_extract_crc(const uint8_t *a91)
 {
     uint16_t chksum = ((a91[9] & 0x07) << 11) | (a91[10] << 3) | (a91[11] >> 5);
     return chksum;
 }
 
-void ftx_add_crc(const uint8_t payload[], uint8_t a91[])
+void ftx_add_crc(const uint8_t *payload, uint8_t *a91)
 {
     // Copy 77 bits of payload data
     for (int i = 0; i < 10; i++)

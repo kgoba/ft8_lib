@@ -8,11 +8,11 @@
 #include "common/wave.h"
 #include "ft8.h"
 
-static FILE* reference;
+static FILE *reference;
 static bool identical;
 
 // decode callback, called by ft8_decode() for each decoded message
-static void ft8_decode_callback(char* message, float frequency, float time_dev, float snr, int score, void* ctx)
+static void ft8_decode_callback(char *message, float frequency, float time_dev, float snr, int score, void *ctx)
 {
     char buf[256], buf2[256];
     printf("000000 %3d %+4.2f %4.1f %4.0f ~  %s\n", score, time_dev, snr, frequency, message);
@@ -24,7 +24,7 @@ static void ft8_decode_callback(char* message, float frequency, float time_dev, 
     }
 }
 
-int main(int argc, char** argv)
+int main(int argc, char *argv[])
 {
 #if 0
     // Expect one command-line argument

@@ -2,7 +2,7 @@
 #include <ctype.h>
 #include <string.h>
 
-const char* trim_front(const char* str)
+const char *trim_front(const char *str)
 {
     // Skip leading whitespace
     while (*str == ' ') {
@@ -11,7 +11,7 @@ const char* trim_front(const char* str)
     return str;
 }
 
-void trim_back(char* str)
+void trim_back(char *str)
 {
     // Skip trailing whitespace by replacing it with '\0' characters
     size_t idx = strlen(str) - 1;
@@ -22,7 +22,7 @@ void trim_back(char* str)
 
 // 1) trims a string from the back by changing whitespaces to '\0'
 // 2) trims a string from the front by skipping whitespaces
-char* trim(char* str)
+char *trim(char *str)
 {
     str = (char*)trim_front(str);
     trim_back(str);
@@ -30,11 +30,17 @@ char* trim(char* str)
     return str;
 }
 
-bool in_range(char c, char min, char max) { return (c >= min) && (c <= max); }
+bool in_range(char c, char min, char max)
+{
+    return c >= min && c <= max;
+}
 
-bool starts_with(const char* string, const char* prefix) { return 0 == memcmp(string, prefix, strlen(prefix)); }
+bool starts_with(const char *string, const char *prefix)
+{
+    return memcmp(string, prefix, strlen(prefix)) == 0;
+}
 
-int char_index(const char* string, char c)
+int char_index(const char *string, char c)
 {
     for (int i = 0; *string; ++i, ++string) {
         if (c == *string) {
@@ -45,7 +51,7 @@ int char_index(const char* string, char c)
 }
 
 // Parse a 2 digit integer from string
-int dd_to_int(const char* str, int length)
+int dd_to_int(const char *str, int length)
 {
     int result = 0;
     bool negative;
@@ -72,7 +78,7 @@ int dd_to_int(const char* str, int length)
 }
 
 // Convert a 2 digit integer to string
-void int_to_dd(char* str, int value, int width, bool full_sign)
+void int_to_dd(char *str, int value, int width, bool full_sign)
 {
     if (value < 0) {
         *str = '-';

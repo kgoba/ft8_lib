@@ -19,7 +19,7 @@
 /// @param[in] symbol_bt Shape parameter (values defined for FT8/FT4)
 /// @param[out] pulse Output array of pulse samples
 ///
-void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
+void gfsk_pulse(int n_spsym, float symbol_bt, float *pulse)
 {
     for (int i = 0; i < 3 * n_spsym; ++i) {
         float t = i / (float)n_spsym - 1.5f;
@@ -39,7 +39,7 @@ void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
 /// @param[in] signal_rate Sample rate of synthesized signal, Hertz
 /// @param[out] signal Output array of signal waveform samples (should have space for n_sym*n_spsym samples)
 ///
-void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, float symbol_period, int signal_rate, float* signal)
+void synth_gfsk(const uint8_t *symbols, int n_sym, float f0, float symbol_bt, float symbol_period, int signal_rate, float *signal)
 {
     int n_spsym = (int)(0.5f + signal_rate * symbol_period); // Samples per symbol
     int n_wave = n_sym * n_spsym; // Number of output samples
@@ -47,7 +47,7 @@ void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, fl
 
     // Compute the smoothed frequency waveform.
     // Length = (nsym+2)*n_spsym samples, first and last symbols extended
-    float* dphi = malloc((n_wave + 2 * n_spsym) * sizeof(float));
+    float *dphi = malloc((n_wave + 2 * n_spsym) * sizeof(float));
     if (dphi != NULL) {
         float dphi_peak = 2 * M_PI * hmod / n_spsym;
 
@@ -105,7 +105,7 @@ static uint8_t parity8(uint8_t x)
 // Arguments:
 // [IN] message   - array of 91 bits stored as 12 bytes (MSB first)
 // [OUT] codeword - array of 174 bits stored as 22 bytes (MSB first)
-static void encode174(const uint8_t* message, uint8_t* codeword)
+static void encode174(const uint8_t *message, uint8_t *codeword)
 {
     // This implementation accesses the generator bits straight from the packed binary representation in kFTX_LDPC_generator
 
@@ -143,7 +143,7 @@ static void encode174(const uint8_t* message, uint8_t* codeword)
     }
 }
 
-void ft8_encode(const uint8_t* payload, uint8_t* tones)
+void ft8_encode(const uint8_t *payload, uint8_t *tones)
 {
     uint8_t a91[FTX_LDPC_K_BYTES]; // Store 77 bits of payload + 14 bits CRC
 
@@ -194,7 +194,7 @@ void ft8_encode(const uint8_t* payload, uint8_t* tones)
     }
 }
 
-void ft4_encode(const uint8_t* payload, uint8_t* tones)
+void ft4_encode(const uint8_t *payload, uint8_t *tones)
 {
     uint8_t a91[FTX_LDPC_K_BYTES]; // Store 77 bits of payload + 14 bits CRC
     uint8_t payload_xor[10]; // Encoded payload data
@@ -250,7 +250,7 @@ void ft4_encode(const uint8_t* payload, uint8_t* tones)
 }
 
 // generate FT4 or FT8 signal for message
-int ftx_encode(char* message, float* signal, int num_samples, float frequency, int sample_rate, ftx_protocol_t protocol)
+int ftx_encode(char *message, float *signal, int num_samples, float frequency, int sample_rate, ftx_protocol_t protocol)
 {
     // First, pack the text data into binary message
     uint8_t packed[FTX_LDPC_K_BYTES];

@@ -9,7 +9,7 @@
 #define FT4_SLOT_TIME 6.0f // total length of output waveform in seconds
 #define FT8_SLOT_TIME 15.0f // total length of output waveform in seconds
 
-int main(int argc, char** argv)
+int main(int argc, char *argv[])
 {
     int sample_rate = 8000;
     
