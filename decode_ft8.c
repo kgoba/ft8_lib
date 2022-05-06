@@ -17,20 +17,20 @@ static void ft8_decode_callback(char *message, float frequency, float time_dev, 
     char buf[256], buf2[256];
     printf("000000 %3d %+4.2f %4.1f %4.0f ~  %s\n", score, time_dev, snr, frequency, message);
     sprintf(buf, "000000 %3d %+4.2f %4.1f %4.0f ~  %s\n", score, time_dev, snr, frequency, message);
-    fgets(buf2, sizeof(buf2) - 1, reference);
+//    fgets(buf2, sizeof(buf2) - 1, reference);
     if (strcmp(buf, buf2) != 0) {
         identical = false;
-        printf("ERROR: %s\n", buf2);
+//        printf("ERROR: %s\n", buf2);
     }
 }
 
 int main(int argc, char *argv[])
 {
-#if 0
+#if 1
     // Expect one command-line argument
     if (argc == 2)
     {
-        int sample_rate = 8000;
+        int sample_rate = 12000;
         int num_samples = 15 * sample_rate;
         float signal[num_samples];
         
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
             return -1;
         }
         
-        int n = ft8_decode(signal, num_samples, sample_rate, ft8_decode_callback, NULL);
+        int n = ftx_decode(signal, num_samples, sample_rate, PROTO_FT8, ft8_decode_callback, NULL);
         
         printf("Decoded %d messages\n", n);
     }

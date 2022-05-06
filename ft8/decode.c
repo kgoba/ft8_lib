@@ -12,9 +12,17 @@
 
 const int kMin_score = 10; // Minimum sync score threshold for candidates
 const int kMax_candidates = 120;
-const int kLDPC_iterations = 20;
+const int kLDPC_iterations = 50;
 
-const int kMax_decoded_messages = 50;
+const int kMax_decoded_messages = 101;
+
+const float fNoiseMinFreq = 350.0;
+const float fNoiseMaxFreq = 2850.0;
+
+const float kFSK_FT8_width = 50.0;
+const float kFSK_FT4_width = 90.0;
+
+const float kSignalMin = 1e-12f;
 
 const int kFreq_osr = 2; // Frequency oversampling rate (bin subdivision)
 const int kTime_osr = 2; // Time oversampling rate (symbol subdivision)
@@ -32,6 +40,7 @@ typedef struct {
     int time_osr; ///< number of time subdivisions
     int freq_osr; ///< number of frequency subdivisions
     uint8_t *mag; ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    float *pwr;   ///< FFT average magnitudes stored as float[num_bins]
     int block_stride; ///< Helper value = time_osr * freq_osr * num_bins
     ftx_protocol_t protocol; ///< Indicate if using FT4 or FT8
 } waterfall_t;
@@ -107,6 +116,7 @@ static void waterfall_init(waterfall_t *me, int max_blocks, int num_bins, int ti
     me->freq_osr = freq_osr;
     me->block_stride = (time_osr * freq_osr * num_bins);
     me->mag = calloc(max_blocks * time_osr * freq_osr * num_bins, sizeof(me->mag[0]));
+    me->pwr = calloc(num_bins, sizeof(float));
 }
 
 static void waterfall_free(waterfall_t *me)
@@ -190,6 +200,12 @@ static void monitor_process(monitor_t *me, const float *frame)
                 int src_bin = (bin * me->wf.freq_osr) + freq_sub;
                 float mag2 = (freqdata[src_bin].i * freqdata[src_bin].i) + (freqdata[src_bin].r * freqdata[src_bin].r);
                 float db = 10.0f * log10f(1E-12f + mag2);
+                
+                // store magnitude for SNR calculation later
+                if (freq_sub == 0) {
+                    me->wf.pwr[bin] += mag2;
+                }
+                
                 // Scale decibels to unsigned 8-bit range and clamp the value
                 // Range 0-240 covers -120..0 dB in 0.5 dB steps
                 int scaled = (int)(2 * db + 240);
@@ -612,10 +628,25 @@ static void ft8_extract_symbol(const uint8_t *wf, float *logl)
     logl[2] = max4(s2[1], s2[3], s2[5], s2[7]) - max4(s2[0], s2[2], s2[4], s2[6]);
 }
 
+static float calc_avg_power(waterfall_t *wf, int sample_rate, float start, float end)
+{
+    const float hzPerBin = sample_rate / wf->num_bins / 2.0;
+    const int start_bin = start / hzPerBin;
+    const int end_bin = end / hzPerBin;
+    float sum = 0.0;
+    
+    for (int bin = start_bin; bin < end_bin; bin++) {
+        sum += wf->pwr[bin];
+    }
+    
+    return sum / (end_bin - start_bin);
+}
+
 // decode FT4 or FT8 signal, call callback for every decoded message
 int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t protocol, ftx_decode_callback_t callback, void *ctx)
 {
     // Compute FFT over the whole signal and store it
+    float noise;
     monitor_t mon;
     monitor_config_t mon_cfg = { .f_min = 0.0, .f_max = 4000.0, .sample_rate = sample_rate, .time_osr = kTime_osr, .freq_osr = kFreq_osr, .protocol = protocol };
     monitor_init(&mon, &mon_cfg);
@@ -638,6 +669,9 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t p
     for (int i = 0; i < kMax_decoded_messages; ++i) {
         decoded_hashtable[i] = NULL;
     }
+
+    // calculate noise - avoid division by 0 later
+    noise = calc_avg_power(&mon.wf, sample_rate, fNoiseMinFreq, fNoiseMaxFreq) + kSignalMin;
 
     // Go over candidates and attempt to decode messages
     for (int idx = 0; idx < num_candidates; ++idx) {
@@ -679,13 +713,14 @@ int ftx_decode(float *signal, int num_samples, int sample_rate, ftx_protocol_t p
         } while (!found_empty_slot && !found_duplicate);
 
         if (found_empty_slot) {
+            // calculate signal for SNR calculation
+            float signal = calc_avg_power(&mon.wf, sample_rate, freq_hz, freq_hz + (protocol == PROTO_FT4 ? kFSK_FT4_width : kFSK_FT8_width));
+
             // Fill the empty hashtable slot
             memcpy(&decoded[idx_hash], &message, sizeof(message));
             decoded_hashtable[idx_hash] = &decoded[idx_hash];
             ++num_decoded;
-
-            float signal = 1.0, noise = 1.0;
-
+            
             // report message through callback
             callback(message.text, freq_hz, time_sec, 10.0 * log10f(signal / noise), cand->score, ctx);
         }
