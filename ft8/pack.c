@@ -10,16 +10,9 @@
 #define MAX22    ((uint32_t)4194304L)
 #define MAXGRID4 ((uint16_t)32400)
 
-// TODO: This is wasteful, should figure out something more elegant
-const char A0[] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
-const char A1[] = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const char A2[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const char A3[] = "0123456789";
-const char A4[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
 // Pack a special token, a 22-bit hash code, or a valid base call
 // into a 28-bit integer.
-int32_t pack28(const char* callsign)
+static int32_t pack28(const char* callsign)
 {
     // Check for special tokens first
     if (starts_with(callsign, "DE "))
@@ -74,8 +67,13 @@ int32_t pack28(const char* callsign)
     }
 
     // Check for standard callsign
-    int i0, i1, i2, i3, i4, i5;
-    if ((i0 = char_index(A1, c6[0])) >= 0 && (i1 = char_index(A2, c6[1])) >= 0 && (i2 = char_index(A3, c6[2])) >= 0 && (i3 = char_index(A4, c6[3])) >= 0 && (i4 = char_index(A4, c6[4])) >= 0 && (i5 = char_index(A4, c6[5])) >= 0)
+    int i0 = nchar(c6[0], FT8_CHAR_TABLE_ALPHANUM_SPACE);
+    int i1 = nchar(c6[1], FT8_CHAR_TABLE_ALPHANUM);
+    int i2 = nchar(c6[2], FT8_CHAR_TABLE_NUMERIC);
+    int i3 = nchar(c6[3], FT8_CHAR_TABLE_LETTERS_SPACE);
+    int i4 = nchar(c6[4], FT8_CHAR_TABLE_LETTERS_SPACE);
+    int i5 = nchar(c6[5], FT8_CHAR_TABLE_LETTERS_SPACE);
+    if ((i0 >= 0) && (i1 >= 0) && (i2 >= 0) && (i3 >= 0) && (i4 >= 0) && (i5 >= 0))
     {
         // This is a standard callsign
         int32_t n28 = i0;
@@ -87,8 +85,8 @@ int32_t pack28(const char* callsign)
         return NTOKENS + MAX22 + n28;
     }
 
-    //char text[13];
-    //if (length > 13) return -1;
+    // char text[13];
+    // if (length > 13) return -1;
 
     // TODO:
     // Treat this as a nonstandard callsign: compute its 22-bit hash
@@ -98,7 +96,7 @@ int32_t pack28(const char* callsign)
 // Check if a string could be a valid standard callsign or a valid
 // compound callsign.
 // Return base call "bc" and a logical "cok" indicator.
-bool chkcall(const char* call, char* bc)
+static bool chkcall(const char* call, char* bc)
 {
     int length = strlen(call); // n1=len_trim(w)
     if (length > 11)
@@ -119,7 +117,7 @@ bool chkcall(const char* call, char* bc)
     return true;
 }
 
-uint16_t packgrid(const char* grid4)
+static uint16_t packgrid(const char* grid4)
 {
     if (grid4 == 0)
     {
@@ -164,14 +162,14 @@ uint16_t packgrid(const char* grid4)
 }
 
 // Pack Type 1 (Standard 77-bit message) and Type 2 (ditto, with a "/P" call)
-int pack77_1(const char* msg, uint8_t* b77)
+static int pack77_1(const char* msg, uint8_t* b77)
 {
     // Locate the first delimiter
     const char* s1 = strchr(msg, ' ');
     if (s1 == 0)
         return -1;
 
-    const char* call1 = msg; // 1st call
+    const char* call1 = msg;    // 1st call
     const char* call2 = s1 + 1; // 2nd call
 
     int32_t n28a = pack28(call1);
@@ -217,7 +215,7 @@ int pack77_1(const char* msg, uint8_t* b77)
     return 0;
 }
 
-void packtext77(const char* text, uint8_t* b77)
+static void packtext77(const char* text, uint8_t* b77)
 {
     int length = strlen(text);
 
@@ -254,7 +252,7 @@ void packtext77(const char* text, uint8_t* b77)
         // Get the index of the current char
         if (j < length)
         {
-            int q = char_index(A0, text[j]);
+            int q = nchar(text[j], FT8_CHAR_TABLE_FULL);
             x = (q > 0) ? q : 0;
         }
         else

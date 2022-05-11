@@ -49,39 +49,39 @@ extern "C"
 #define FT8_CRC_POLYNOMIAL ((uint16_t)0x2757u) ///< CRC-14 polynomial without the leading (MSB) 1
 #define FT8_CRC_WIDTH      (14)
 
-    typedef enum
-    {
-        PROTO_FT4,
-        PROTO_FT8
-    } ftx_protocol_t;
+typedef enum
+{
+    PROTO_FT4,
+    PROTO_FT8
+} ftx_protocol_t;
 
-    /// Costas 7x7 tone pattern for synchronization
-    extern const uint8_t kFT8_Costas_pattern[7];
-    extern const uint8_t kFT4_Costas_pattern[4][4];
+/// Costas 7x7 tone pattern for synchronization
+extern const uint8_t kFT8_Costas_pattern[7];
+extern const uint8_t kFT4_Costas_pattern[4][4];
 
-    /// Gray code map to encode 8 symbols (tones)
-    extern const uint8_t kFT8_Gray_map[8];
-    extern const uint8_t kFT4_Gray_map[4];
+/// Gray code map to encode 8 symbols (tones)
+extern const uint8_t kFT8_Gray_map[8];
+extern const uint8_t kFT4_Gray_map[4];
 
-    extern const uint8_t kFT4_XOR_sequence[10];
+extern const uint8_t kFT4_XOR_sequence[10];
 
-    /// Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
-    extern const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES];
+/// Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
+extern const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES];
 
-    /// LDPC(174,91) parity check matrix, containing 83 rows,
-    /// each row describes one parity check,
-    /// each number is an index into the codeword (1-origin).
-    /// The codeword bits mentioned in each row must xor to zero.
-    /// From WSJT-X's ldpc_174_91_c_reordered_parity.f90.
-    extern const uint8_t kFTX_LDPC_Nm[FTX_LDPC_M][7];
+/// LDPC(174,91) parity check matrix, containing 83 rows,
+/// each row describes one parity check,
+/// each number is an index into the codeword (1-origin).
+/// The codeword bits mentioned in each row must xor to zero.
+/// From WSJT-X's ldpc_174_91_c_reordered_parity.f90.
+extern const uint8_t kFTX_LDPC_Nm[FTX_LDPC_M][7];
 
-    /// Mn from WSJT-X's bpdecode174.f90. Each row corresponds to a codeword bit.
-    /// The numbers indicate which three parity checks (rows in Nm) refer to the codeword bit.
-    /// The numbers use 1 as the origin (first entry).
-    extern const uint8_t kFTX_LDPC_Mn[FTX_LDPC_N][3];
+/// Mn from WSJT-X's bpdecode174.f90. Each row corresponds to a codeword bit.
+/// The numbers indicate which three parity checks (rows in Nm) refer to the codeword bit.
+/// The numbers use 1 as the origin (first entry).
+extern const uint8_t kFTX_LDPC_Mn[FTX_LDPC_N][3];
 
-    /// Number of rows (columns in C/C++) in the array Nm.
-    extern const uint8_t kFTX_LDPC_Num_rows[FTX_LDPC_M];
+/// Number of rows (columns in C/C++) in the array Nm.
+extern const uint8_t kFTX_LDPC_Num_rows[FTX_LDPC_M];
 
 #ifdef __cplusplus
 }

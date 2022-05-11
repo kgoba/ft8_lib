@@ -67,18 +67,6 @@ bool equals(const char* string1, const char* string2)
     return 0 == strcmp(string1, string2);
 }
 
-int char_index(const char* string, char c)
-{
-    for (int i = 0; *string; ++i, ++string)
-    {
-        if (c == *string)
-        {
-            return i;
-        }
-    }
-    return -1; // Not found
-}
-
 // Text message formatting:
 //   - replaces lowercase letters with uppercase
 //   - merges consecutive spaces into single space
@@ -164,40 +152,33 @@ void int_to_dd(char* str, int value, int width, bool full_sign)
     *str = 0; // Add zero terminator
 }
 
-// convert integer index to ASCII character according to one of 6 tables:
-// table 0: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?"
-// table 1: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 2: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 3: "0123456789"
-// table 4: " ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-// table 5: " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/"
-char charn(int c, int table_idx)
+char charn(int c, ft8_char_table_e table)
 {
-    if (table_idx != 2 && table_idx != 3)
+    if ((table != FT8_CHAR_TABLE_ALPHANUM) && (table != FT8_CHAR_TABLE_NUMERIC))
     {
         if (c == 0)
             return ' ';
         c -= 1;
     }
-    if (table_idx != 4)
+    if (table != FT8_CHAR_TABLE_LETTERS_SPACE)
     {
         if (c < 10)
             return '0' + c;
         c -= 10;
     }
-    if (table_idx != 3)
+    if (table != FT8_CHAR_TABLE_NUMERIC)
     {
         if (c < 26)
             return 'A' + c;
         c -= 26;
     }
 
-    if (table_idx == 0)
+    if (table == FT8_CHAR_TABLE_FULL)
     {
         if (c < 5)
             return "+-./?"[c];
     }
-    else if (table_idx == 5)
+    else if (table == FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH)
     {
         if (c == 0)
             return '/';
@@ -207,29 +188,29 @@ char charn(int c, int table_idx)
 }
 
 // Convert character to its index (charn in reverse) according to a table
-int nchar(char c, int table_idx)
+int nchar(char c, ft8_char_table_e table)
 {
     int n = 0;
-    if (table_idx != 2 && table_idx != 3)
+    if ((table != FT8_CHAR_TABLE_ALPHANUM) && (table != FT8_CHAR_TABLE_NUMERIC))
     {
         if (c == ' ')
             return n + 0;
         n += 1;
     }
-    if (table_idx != 4)
+    if (table != FT8_CHAR_TABLE_LETTERS_SPACE)
     {
         if (c >= '0' && c <= '9')
             return n + (c - '0');
         n += 10;
     }
-    if (table_idx != 3)
+    if (table != FT8_CHAR_TABLE_NUMERIC)
     {
         if (c >= 'A' && c <= 'Z')
             return n + (c - 'A');
         n += 26;
     }
 
-    if (table_idx == 0)
+    if (table == FT8_CHAR_TABLE_FULL)
     {
         if (c == '+')
             return n + 0;
@@ -242,7 +223,7 @@ int nchar(char c, int table_idx)
         if (c == '?')
             return n + 4;
     }
-    else if (table_idx == 5)
+    else if (table == FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH)
     {
         if (c == '/')
             return n + 0;

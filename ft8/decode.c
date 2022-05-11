@@ -32,13 +32,70 @@ static void ft4_extract_symbol(const uint8_t* wf, float* logl);
 static void ft8_extract_symbol(const uint8_t* wf, float* logl);
 static void ft8_decode_multi_symbols(const uint8_t* wf, int num_bins, int n_syms, int bit_idx, float* log174);
 
-static int get_index(const waterfall_t* wf, const candidate_t* candidate)
+static const uint8_t* get_cand_mag(const waterfall_t* wf, const candidate_t* candidate)
 {
     int offset = candidate->time_offset;
     offset = (offset * wf->time_osr) + candidate->time_sub;
     offset = (offset * wf->freq_osr) + candidate->freq_sub;
     offset = (offset * wf->num_bins) + candidate->freq_offset;
-    return offset;
+    return wf->mag + offset;
+}
+
+int ft8_snr(const waterfall_t* wf, const candidate_t* candidate)
+{
+    int sum_signal = 0;
+    int sum_noise = 0;
+    int num_average = 0;
+
+    // Get the pointer to symbol 0 of the candidate
+    const uint8_t* mag_cand = get_cand_mag(wf, candidate);
+
+    if (wf->protocol == PROTO_FT4)
+    {
+    }
+
+    // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
+    for (int block = 0; block < FT8_NN; ++block)
+    {
+        int block_abs = candidate->time_offset + block; // relative to the captured signal
+        // Check for time boundaries
+        if (block_abs < 0)
+            continue;
+        if (block_abs >= wf->num_blocks)
+            break;
+
+        // Get the pointer to symbol 'block' of the candidate
+        const uint8_t* p8 = mag_cand + (block * wf->block_stride);
+
+        int k = block % FT8_SYNC_OFFSET;
+        int sm = -1;
+        if (k < 7)
+        {
+            // Check only the neighbors of the expected symbol frequency- and time-wise
+            sm = kFT8_Costas_pattern[k]; // Index of the expected bin
+        }
+        else
+        {
+            int max;
+            for (int m = 0; m < 8; ++m)
+            {
+                if ((sm == -1) || (p8[m] > max))
+                {
+                    sm = m;
+                    max = p8[m];
+                }
+            }
+        }
+
+        if (sm != -1)
+        {
+            sum_signal += p8[sm];
+            sum_noise += (3 + (int)p8[0] + (int)p8[1] + (int)p8[2] + (int)p8[3] + (int)p8[4] + (int)p8[5] + (int)p8[6] + (int)p8[7] - (int)p8[sm]) / 7;
+            ++num_average;
+        }
+    }
+    // return num_average;
+    return (sum_signal - sum_noise) / num_average;
 }
 
 static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
@@ -47,7 +104,7 @@ static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
     int num_average = 0;
 
     // Get the pointer to symbol 0 of the candidate
-    const uint8_t* mag_cand = wf->mag + get_index(wf, candidate);
+    const uint8_t* mag_cand = get_cand_mag(wf, candidate);
 
     // Compute average score over sync symbols (m+k = 0-7, 36-43, 72-79)
     for (int m = 0; m < FT8_NUM_SYNC; ++m)
@@ -113,7 +170,7 @@ static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
     int num_average = 0;
 
     // Get the pointer to symbol 0 of the candidate
-    const uint8_t* mag_cand = wf->mag + get_index(wf, candidate);
+    const uint8_t* mag_cand = get_cand_mag(wf, candidate);
 
     // Compute average score over sync symbols (block = 1-4, 34-37, 67-70, 100-103)
     for (int m = 0; m < FT4_NUM_SYNC; ++m)
@@ -193,6 +250,7 @@ int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
                     else
                     {
                         candidate.score = ft8_sync_score(wf, &candidate);
+                        // candidate.score = ft8_snr(wf, &candidate);
                     }
 
                     if (candidate.score < min_score)
@@ -235,7 +293,7 @@ int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
 
 static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174)
 {
-    const uint8_t* mag_cand = wf->mag + get_index(wf, cand);
+    const uint8_t* mag_cand = get_cand_mag(wf, cand);
 
     // Go over FSK tones and skip Costas sync symbols
     for (int k = 0; k < FT4_ND; ++k)
@@ -264,7 +322,7 @@ static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* can
 
 static void ft8_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174)
 {
-    const uint8_t* mag_cand = wf->mag + get_index(wf, cand);
+    const uint8_t* mag_cand = get_cand_mag(wf, cand);
 
     // Go over FSK tones and skip Costas sync symbols
     for (int k = 0; k < FT8_ND; ++k)
@@ -313,7 +371,7 @@ static void ftx_normalize_logl(float* log174)
     }
 }
 
-bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* message, int max_iterations, decode_status_t* status)
+bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* message, int max_iterations, const unpack_hash_interface_t* hash_if, decode_status_t* status)
 {
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
     if (wf->protocol == PROTO_FT4)
@@ -362,7 +420,7 @@ bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* messa
         }
     }
 
-    status->unpack_status = unpack77(a91, message->text);
+    status->unpack_status = unpack77(a91, message->text, hash_if);
 
     if (status->unpack_status < 0)
     {

@@ -15,7 +15,7 @@
 
 // n28 is a 28-bit integer, e.g. n28a or n28b, containing all the
 // call sign bits from a packed message.
-int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
+static int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result, const unpack_hash_interface_t* hash_if)
 {
     // Check for special tokens DE, QRZ, CQ, CQ_nnn, CQ_aaaa
     if (n28 < NTOKENS)
@@ -46,7 +46,7 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
             aaaa[4] = '\0';
             for (int i = 3; /* */; --i)
             {
-                aaaa[i] = charn(n % 27, 4);
+                aaaa[i] = charn(n % 27, FT8_CHAR_TABLE_LETTERS_SPACE);
                 if (i == 0)
                     break;
                 n /= 27;
@@ -64,12 +64,14 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
     if (n28 < MAX22)
     {
         // This is a 22-bit hash of a result
-        // TODO: implement
-        strcpy(result, "<...>");
-        // result[0] = '<';
-        // int_to_dd(result + 1, n28, 7, false);
-        // result[8] = '>';
-        // result[9] = '\0';
+        if (hash_if != NULL)
+        {
+            hash_if->hash22(n28, result);
+        }
+        else
+        {
+            strcpy(result, "<...>");
+        }
         return 0;
     }
 
@@ -78,17 +80,17 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
 
     char callsign[7];
     callsign[6] = '\0';
-    callsign[5] = charn(n % 27, 4);
+    callsign[5] = charn(n % 27, FT8_CHAR_TABLE_LETTERS_SPACE);
     n /= 27;
-    callsign[4] = charn(n % 27, 4);
+    callsign[4] = charn(n % 27, FT8_CHAR_TABLE_LETTERS_SPACE);
     n /= 27;
-    callsign[3] = charn(n % 27, 4);
+    callsign[3] = charn(n % 27, FT8_CHAR_TABLE_LETTERS_SPACE);
     n /= 27;
-    callsign[2] = charn(n % 10, 3);
+    callsign[2] = charn(n % 10, FT8_CHAR_TABLE_NUMERIC);
     n /= 10;
-    callsign[1] = charn(n % 36, 2);
+    callsign[1] = charn(n % 36, FT8_CHAR_TABLE_ALPHANUM);
     n /= 36;
-    callsign[0] = charn(n % 37, 1);
+    callsign[0] = charn(n % 37, FT8_CHAR_TABLE_ALPHANUM_SPACE);
 
     // Skip trailing and leading whitespace in case of a short callsign
     strcpy(result, trim(callsign));
@@ -111,7 +113,7 @@ int unpack_callsign(uint32_t n28, uint8_t ip, uint8_t i3, char* result)
     return 0; // Success
 }
 
-int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, char* extra)
+static int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, char* extra, const unpack_hash_interface_t* hash_if)
 {
     uint32_t n28a, n28b;
     uint16_t igrid4;
@@ -133,23 +135,25 @@ int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, c
     igrid4 |= (a77[9] >> 6);
 
     // Unpack both callsigns
-    if (unpack_callsign(n28a >> 1, n28a & 0x01, i3, call_to) < 0)
+    if (unpack_callsign(n28a >> 1, n28a & 0x01, i3, call_to, hash_if) < 0)
     {
         return -1;
     }
-    if (unpack_callsign(n28b >> 1, n28b & 0x01, i3, call_de) < 0)
+    if (unpack_callsign(n28b >> 1, n28b & 0x01, i3, call_de, hash_if) < 0)
     {
         return -2;
     }
     // Fix "CQ_" to "CQ " -> already done in unpack_callsign()
 
     // TODO: add to recent calls
-    // if (call_to[0] != '<' && strlen(call_to) >= 4) {
-    //     save_hash_call(call_to)
-    // }
-    // if (call_de[0] != '<' && strlen(call_de) >= 4) {
-    //     save_hash_call(call_de)
-    // }
+    if ((call_to[0] != '<') && (strlen(call_to) >= 4) && (hash_if != NULL))
+    {
+        hash_if->save_hash(call_to);
+    }
+    if ((call_de[0] != '<') && (strlen(call_de) >= 4) && (hash_if != NULL))
+    {
+        hash_if->save_hash(call_de);
+    }
 
     char* dst = extra;
 
@@ -208,7 +212,7 @@ int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* call_de, c
     return 0; // Success
 }
 
-int unpack_text(const uint8_t* a71, char* text)
+static int unpack_text(const uint8_t* a71, char* text)
 {
     // TODO: test
     uint8_t b71[9];
@@ -233,14 +237,14 @@ int unpack_text(const uint8_t* a71, char* text)
             b71[i] = rem / 42;
             rem = rem % 42;
         }
-        c14[idx] = charn(rem, 0);
+        c14[idx] = charn(rem, FT8_CHAR_TABLE_FULL);
     }
 
     strcpy(text, trim(c14));
     return 0; // Success
 }
 
-int unpack_telemetry(const uint8_t* a71, char* telemetry)
+static int unpack_telemetry(const uint8_t* a71, char* telemetry)
 {
     uint8_t b71[9];
 
@@ -267,27 +271,27 @@ int unpack_telemetry(const uint8_t* a71, char* telemetry)
     return 0;
 }
 
-//none standard for wsjt-x 2.0
-//by KD8CEC
-int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* extra)
+// none standard for wsjt-x 2.0
+// by KD8CEC
+static int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* extra, const unpack_hash_interface_t* hash_if)
 {
     uint32_t n12, iflip, nrpt, icq;
     uint64_t n58;
-    n12 = (a77[0] << 4); //11 ~4  : 8
-    n12 |= (a77[1] >> 4); //3~0 : 12
+    n12 = (a77[0] << 4);  // 11 ~4  : 8
+    n12 |= (a77[1] >> 4); // 3~0 : 12
 
-    n58 = ((uint64_t)(a77[1] & 0x0F) << 54); //57 ~ 54 : 4
-    n58 |= ((uint64_t)a77[2] << 46); //53 ~ 46 : 12
-    n58 |= ((uint64_t)a77[3] << 38); //45 ~ 38 : 12
-    n58 |= ((uint64_t)a77[4] << 30); //37 ~ 30 : 12
-    n58 |= ((uint64_t)a77[5] << 22); //29 ~ 22 : 12
-    n58 |= ((uint64_t)a77[6] << 14); //21 ~ 14 : 12
-    n58 |= ((uint64_t)a77[7] << 6); //13 ~ 6 : 12
-    n58 |= ((uint64_t)a77[8] >> 2); //5 ~ 0 : 765432 10
+    n58 = ((uint64_t)(a77[1] & 0x0F) << 54); // 57 ~ 54 : 4
+    n58 |= ((uint64_t)a77[2] << 46);         // 53 ~ 46 : 12
+    n58 |= ((uint64_t)a77[3] << 38);         // 45 ~ 38 : 12
+    n58 |= ((uint64_t)a77[4] << 30);         // 37 ~ 30 : 12
+    n58 |= ((uint64_t)a77[5] << 22);         // 29 ~ 22 : 12
+    n58 |= ((uint64_t)a77[6] << 14);         // 21 ~ 14 : 12
+    n58 |= ((uint64_t)a77[7] << 6);          // 13 ~ 6 : 12
+    n58 |= ((uint64_t)a77[8] >> 2);          // 5 ~ 0 : 765432 10
 
-    iflip = (a77[8] >> 1) & 0x01; //76543210
+    iflip = (a77[8] >> 1) & 0x01; // 76543210
     nrpt = ((a77[8] & 0x01) << 1);
-    nrpt |= (a77[9] >> 7); //76543210
+    nrpt |= (a77[9] >> 7); // 76543210
     icq = ((a77[9] >> 6) & 0x01);
 
     char c11[12];
@@ -295,27 +299,32 @@ int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* e
 
     for (int i = 10; /* no condition */; --i)
     {
-        c11[i] = charn(n58 % 38, 5);
+        c11[i] = charn(n58 % 38, FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
         if (i == 0)
             break;
         n58 /= 38;
     }
 
     char call_3[15];
-    // should replace with hash12(n12, call_3);
-    strcpy(call_3, "<...>");
-    // call_3[0] = '<';
-    // int_to_dd(call_3 + 1, n12, 4, false);
-    // call_3[5] = '>';
-    // call_3[6] = '\0';
+    if (hash_if != NULL)
+    {
+        hash_if->hash12(n12, call_3);
+    }
+    else
+    {
+        strcpy(call_3, "<...>");
+    }
 
-    char* call_1 = (iflip) ? c11 : call_3;
-    char* call_2 = (iflip) ? call_3 : c11;
-    //save_hash_call(c11_trimmed);
+    char* call_1 = trim((iflip) ? c11 : call_3);
+    char* call_2 = trim((iflip) ? call_3 : c11);
+    if (hash_if != NULL)
+    {
+        hash_if->save_hash(c11);
+    }
 
     if (icq == 0)
     {
-        strcpy(call_to, trim(call_1));
+        strcpy(call_to, call_1);
         if (nrpt == 1)
             strcpy(extra, "RRR");
         else if (nrpt == 2)
@@ -332,12 +341,12 @@ int unpack_nonstandard(const uint8_t* a77, char* call_to, char* call_de, char* e
         strcpy(call_to, "CQ");
         extra[0] = '\0';
     }
-    strcpy(call_de, trim(call_2));
+    strcpy(call_de, call_2);
 
     return 0;
 }
 
-int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extra)
+int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extra, const unpack_hash_interface_t* hash_if)
 {
     call_to[0] = call_de[0] = extra[0] = '\0';
 
@@ -373,7 +382,7 @@ int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extr
     else if (i3 == 1 || i3 == 2)
     {
         // Type 1 (standard message) or Type 2 ("/P" form for EU VHF contest)
-        return unpack_type1(a77, i3, call_to, call_de, extra);
+        return unpack_type1(a77, i3, call_to, call_de, extra, hash_if);
     }
     // else if (i3 == 3) {
     //     // Type 3: ARRL RTTY Contest
@@ -383,7 +392,7 @@ int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extr
         //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
         //     // One hashed call or "CQ"; one compound or nonstandard call with up
         //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
-        return unpack_nonstandard(a77, call_to, call_de, extra);
+        return unpack_nonstandard(a77, call_to, call_de, extra, hash_if);
     }
     // else if (i3 == 5) {
     //     // Type 5: TU; W9XYZ K1ABC R-09 FN             1 28 28 1 7 9       74   WWROF contest
@@ -393,13 +402,13 @@ int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extr
     return -1;
 }
 
-int unpack77(const uint8_t* a77, char* message)
+int unpack77(const uint8_t* a77, char* message, const unpack_hash_interface_t* hash_if)
 {
     char call_to[14];
     char call_de[14];
     char extra[19];
 
-    int rc = unpack77_fields(a77, call_to, call_de, extra);
+    int rc = unpack77_fields(a77, call_to, call_de, extra, hash_if);
     if (rc < 0)
         return rc;
 

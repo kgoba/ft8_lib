@@ -69,7 +69,7 @@ void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int time_osr,
     me->time_osr = time_osr;
     me->freq_osr = freq_osr;
     me->block_stride = (time_osr * freq_osr * num_bins);
-    me->mag = (uint8_t  *)malloc(mag_size);
+    me->mag = (uint8_t*)malloc(mag_size);
     LOG(LOG_DEBUG, "Waterfall size = %zu\n", mag_size);
 }
 
@@ -94,14 +94,16 @@ typedef struct
 typedef struct
 {
     float symbol_period; ///< FT4/FT8 symbol period in seconds
-    int block_size;      ///< Number of samples per symbol (block)
-    int subblock_size;   ///< Analysis shift size (number of samples)
-    int nfft;            ///< FFT size
-    float fft_norm;      ///< FFT normalization factor
-    float* window;       ///< Window function for STFT analysis (nfft samples)
-    float* last_frame;   ///< Current STFT analysis frame (nfft samples)
-    waterfall_t wf;      ///< Waterfall object
-    float max_mag;       ///< Maximum detected magnitude (debug stats)
+    int min_bin;
+    int max_bin;
+    int block_size;    ///< Number of samples per symbol (block)
+    int subblock_size; ///< Analysis shift size (number of samples)
+    int nfft;          ///< FFT size
+    float fft_norm;    ///< FFT normalization factor
+    float* window;     ///< Window function for STFT analysis (nfft samples)
+    float* last_frame; ///< Current STFT analysis frame (nfft samples)
+    waterfall_t wf;    ///< Waterfall object
+    float max_mag;     ///< Maximum detected magnitude (debug stats)
 
     // KISS FFT housekeeping variables
     void* fft_work;        ///< Work area required by Kiss FFT
@@ -119,7 +121,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->fft_norm = 2.0f / me->nfft;
     // const int len_window = 1.8f * me->block_size; // hand-picked and optimized
 
-    me->window = (float *)malloc(me->nfft * sizeof(me->window[0]));
+    me->window = (float*)malloc(me->nfft * sizeof(me->window[0]));
     for (int i = 0; i < me->nfft; ++i)
     {
         // window[i] = 1;
@@ -128,7 +130,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
         // me->window[i] = hamming_i(i, me->nfft);
         // me->window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
     }
-    me->last_frame = (float *)malloc(me->nfft * sizeof(me->last_frame[0]));
+    me->last_frame = (float*)malloc(me->nfft * sizeof(me->last_frame[0]));
 
     size_t fft_work_size;
     kiss_fftr_alloc(me->nfft, 0, 0, &fft_work_size);
@@ -141,10 +143,16 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->fft_work = malloc(fft_work_size);
     me->fft_cfg = kiss_fftr_alloc(me->nfft, 0, me->fft_work, &fft_work_size);
 
+    // Allocate enough blocks to fit the entire FT8/FT4 slot in memory
     const int max_blocks = (int)(slot_time / symbol_period);
-    const int num_bins = (int)(cfg->sample_rate * symbol_period / 2);
+    // Keep only FFT bins in the specified frequency range (f_min/f_max)
+    me->min_bin = (int)(cfg->f_min * symbol_period);
+    me->max_bin = (int)(cfg->f_max * symbol_period) + 1;
+    const int num_bins = me->max_bin - me->min_bin;
+
     waterfall_init(&me->wf, max_blocks, num_bins, cfg->time_osr, cfg->freq_osr);
     me->wf.protocol = cfg->protocol;
+
     me->symbol_period = symbol_period;
 
     me->max_mag = -120.0f;
@@ -196,7 +204,7 @@ void monitor_process(monitor_t* me, const float* frame)
         // Loop over two possible frequency bin offsets (for averaging)
         for (int freq_sub = 0; freq_sub < me->wf.freq_osr; ++freq_sub)
         {
-            for (int bin = 0; bin < me->wf.num_bins; ++bin)
+            for (int bin = me->min_bin; bin < me->max_bin; ++bin)
             {
                 int src_bin = (bin * me->wf.freq_osr) + freq_sub;
                 float mag2 = (freqdata[src_bin].i * freqdata[src_bin].i) + (freqdata[src_bin].r * freqdata[src_bin].r);
@@ -322,12 +330,12 @@ int main(int argc, char** argv)
         if (cand->score < kMin_score)
             continue;
 
-        float freq_hz = (cand->freq_offset + (float)cand->freq_sub / mon.wf.freq_osr) / mon.symbol_period;
+        float freq_hz = (mon.min_bin + cand->freq_offset + (float)cand->freq_sub / mon.wf.freq_osr) / mon.symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / mon.wf.time_osr) * mon.symbol_period;
 
         message_t message;
         decode_status_t status;
-        if (!ft8_decode(&mon.wf, cand, &message, kLDPC_iterations, &status))
+        if (!ft8_decode(&mon.wf, cand, &message, kLDPC_iterations, NULL, &status))
         {
             // printf("000000 %3d %+4.2f %4.0f ~  ---\n", cand->score, time_sec, freq_hz);
             if (status.ldpc_errors > 0)
@@ -377,8 +385,8 @@ int main(int argc, char** argv)
             ++num_decoded;
 
             // Fake WSJT-X-like output for now
-            int snr = 0; // TODO: compute SNR
-            printf("000000 %3d %+4.2f %4.0f ~  %s\n", cand->score, time_sec, freq_hz, message.text);
+            float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
+            printf("000000 %2.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, message.text);
         }
     }
     LOG(LOG_INFO, "Decoded %d messages\n", num_decoded);
