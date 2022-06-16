@@ -7,6 +7,9 @@
 #include <stdbool.h>
 #include <math.h>
 
+// #define LOG_LEVEL LOG_DEBUG
+// #include "debug.h"
+
 /// Compute log likelihood log(p(1) / p(0)) of 174 message bits for later use in soft-decision LDPC decoding
 /// @param[in] wf Waterfall data collected during message slot
 /// @param[in] cand Candidate to extract the message from
@@ -420,6 +423,7 @@ bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* messa
         }
     }
 
+    // LOG(LOG_DEBUG, "Decoded message (CRC %04x), trying to unpack...\n", status->crc_extracted);
     status->unpack_status = unpack77(a91, message->text, hash_if);
 
     if (status->unpack_status < 0)

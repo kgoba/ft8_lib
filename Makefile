@@ -1,27 +1,46 @@
+BUILD_DIR = .build
+
+FT8_SRC = $(wildcard ft8/*.c)
+FT8_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FT8_SRC))
+
+COMMON_SRC = $(wildcard common/*.c)
+COMMON_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(COMMON_SRC))
+
+FFT_SRC = $(wildcard fft/*.c)
+FFT_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FFT_SRC))
+
+TARGETS = gen_ft8 decode_ft8 test_ft8
+
 CFLAGS = -O3 -ggdb3 -fsanitize=address
-CPPFLAGS = -std=c11 -I.
-LDFLAGS = -lm -fsanitize=address
+CPPFLAGS = -std=c11 -I. -I/opt/local/include
+LDFLAGS = -lm -fsanitize=address -lportaudio -L/opt/local/lib 
 
-TARGETS = gen_ft8 decode_ft8 test
+CPPFLAGS += -DUSE_PORTAUDIO -I/opt/local/include
+LDFLAGS  += -lportaudio -L/opt/local/lib 
 
-.PHONY: run_tests all clean
+.PHONY: all clean run_tests install
 
 all: $(TARGETS)
 
-run_tests: test
-	@./test
-
-gen_ft8: gen_ft8.o ft8/constants.o ft8/text.o ft8/pack.o ft8/encode.o ft8/crc.o common/wave.o
-	$(CXX) $(LDFLAGS) -o $@ $^
-
-test:  test.o ft8/pack.o ft8/encode.o ft8/crc.o ft8/text.o ft8/constants.o fft/kiss_fftr.o fft/kiss_fft.o
-	$(CXX) $(LDFLAGS) -o $@ $^
-
-decode_ft8: decode_ft8.o fft/kiss_fftr.o fft/kiss_fft.o ft8/decode.o ft8/encode.o ft8/crc.o ft8/ldpc.o ft8/unpack.o ft8/text.o ft8/constants.o common/wave.o
-	$(CXX) $(LDFLAGS) -o $@ $^
-
 clean:
-	rm -f *.o ft8/*.o common/*.o fft/*.o $(TARGETS)
+	rm -rf $(BUILD_DIR) $(TARGETS) 
+
+run_tests: test_ft8
+	@./test_ft8
+
 install:
-	$(AR) rc libft8.a ft8/constants.o ft8/encode.o ft8/pack.o ft8/text.o common/wave.o
+	$(AR) rc libft8.a $(FT8_OBJ) $(COMMON_OBJ)
 	install libft8.a /usr/lib/libft8.a
+
+gen_ft8: $(BUILD_DIR)/demo/gen_ft8.o $(FT8_OBJ) $(COMMON_OBJ) $(FFT_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+decode_ft8: $(BUILD_DIR)/demo/decode_ft8.o $(FT8_OBJ) $(COMMON_OBJ) $(FFT_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+test_ft8: $(BUILD_DIR)/test/test.o $(FT8_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $^

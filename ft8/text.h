@@ -5,15 +5,22 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 // Utility functions for characters and strings
 
 const char* trim_front(const char* str);
 void trim_back(char* str);
+
+/// In-place whitespace trim from front and back:
+/// 1) trims the back by changing whitespaces to '\0'
+/// 2) trims the front by skipping whitespaces
+/// @return trimmed string (pointer to first non-whitespace character)
 char* trim(char* str);
+
+/// Trim whitespace from start and end of string
+void trim_copy(char* trimmed, const char* str);
 
 char to_upper(char c);
 bool is_digit(char c);
@@ -21,12 +28,21 @@ bool is_letter(char c);
 bool is_space(char c);
 bool in_range(char c, char min, char max);
 bool starts_with(const char* string, const char* prefix);
+bool ends_with(const char* string, const char* suffix);
 bool equals(const char* string1, const char* string2);
 
 // Text message formatting:
 //   - replaces lowercase letters with uppercase
 //   - merges consecutive spaces into single space
 void fmtmsg(char* msg_out, const char* msg_in);
+
+/// Extract and copy a space-delimited token from a string.
+/// When the last token has been extracted, the return value points to the terminating zero character.
+/// @param[out] token Buffer to receive the extracted token
+/// @param[in] length Length of the token buffer (number of characters)
+/// @param[in] string Pointer to the string
+/// @return Pointer to the next token (can be passed to copy_token to extract the next token)
+const char* copy_token(char* token, int length, const char* string);
 
 // Parse a 2 digit integer from string
 int dd_to_int(const char* str, int length);

@@ -4,8 +4,7 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 /// Parse and pack FT8/FT4 text message into 77 bit binary payload

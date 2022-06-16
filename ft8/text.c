@@ -22,14 +22,24 @@ void trim_back(char* str)
     }
 }
 
-// 1) trims a string from the back by changing whitespaces to '\0'
-// 2) trims a string from the front by skipping whitespaces
 char* trim(char* str)
 {
     str = (char*)trim_front(str);
     trim_back(str);
     // return a pointer to the first non-whitespace character
     return str;
+}
+
+void trim_copy(char* trimmed, const char* str)
+{
+    str = (char*)trim_front(str);
+    int len = strlen(str) - 1;
+    while (len >= 0 && str[len] == ' ')
+    {
+        len--;
+    }
+    strncpy(trimmed, str, len + 1);
+    trimmed[len + 1] = '\0';
 }
 
 char to_upper(char c)
@@ -62,6 +72,16 @@ bool starts_with(const char* string, const char* prefix)
     return 0 == memcmp(string, prefix, strlen(prefix));
 }
 
+bool ends_with(const char* string, const char* suffix)
+{
+    int pos = strlen(string) - strlen(suffix);
+    if (pos >= 0)
+    {
+        return 0 == memcmp(string + pos, suffix, strlen(suffix));
+    }
+    return false;
+}
+
 bool equals(const char* string1, const char* string2)
 {
     return 0 == strcmp(string1, string2);
@@ -85,6 +105,34 @@ void fmtmsg(char* msg_out, const char* msg_in)
         ++msg_in;
     }
     *msg_out = 0; // Add zero termination
+}
+
+const char* copy_token(char* token, int length, const char* string)
+{
+    // Copy characters until a whitespace character or the end of string
+    while (*string != ' ' && *string != '\0')
+    {
+        if (length > 0)
+        {
+            *token = *string;
+            token++;
+            length--;
+        }
+        string++;
+    }
+    // Fill up the rest of token with \0 terminators
+    while (length > 0)
+    {
+        *token = '\0';
+        token++;
+        length--;
+    }
+    // Skip whitespace characters
+    while (*string == ' ')
+    {
+        string++;
+    }
+    return string;
 }
 
 // Parse a 2 digit integer from string

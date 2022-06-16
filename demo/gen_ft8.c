@@ -6,7 +6,7 @@
 
 #include "common/common.h"
 #include "common/wave.h"
-#include "common/debug.h"
+#include "ft8/debug.h"
 #include "ft8/pack.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"

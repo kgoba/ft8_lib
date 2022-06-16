@@ -54,6 +54,7 @@ static int32_t pack28(const char* callsign)
     }
     else
     {
+        // Check the position of callsign digit and make a right-aligned copy into c6
         if (is_digit(callsign[2]) && length <= 6)
         {
             // AB0XYZ

@@ -214,7 +214,6 @@ static int unpack_type1(const uint8_t* a77, uint8_t i3, char* call_to, char* cal
 
 static int unpack_text(const uint8_t* a71, char* text)
 {
-    // TODO: test
     uint8_t b71[9];
 
     // Shift 71 bits right by 1 bit, so that it's right-aligned in the byte array
@@ -389,9 +388,9 @@ int unpack77_fields(const uint8_t* a77, char* call_to, char* call_de, char* extr
     // }
     else if (i3 == 4)
     {
-        //     // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
-        //     // One hashed call or "CQ"; one compound or nonstandard call with up
-        //     // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
+        // Type 4: Nonstandard calls, e.g. <WA9XYZ> PJ4/KA1ABC RR73
+        // One hashed call or "CQ"; one compound or nonstandard call with up
+        // to 11 characters; and (if not "CQ") an optional RRR, RR73, or 73.
         return unpack_nonstandard(a77, call_to, call_de, extra, hash_if);
     }
     // else if (i3 == 5) {

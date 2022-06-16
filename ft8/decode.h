@@ -12,6 +12,8 @@ extern "C"
 {
 #endif
 
+#define FTX_MAX_MESSAGE_LENGTH 35 ///< max message length = callsign[13] + space + callsign[13] + space + report[6] + terminator
+
 /// Input structure to ft8_find_sync() function. This structure describes stored waterfall data over the whole message slot.
 /// Fields time_osr and freq_osr specify additional oversampling rate for time and frequency resolution.
 /// If time_osr=1, FFT magnitude data is collected once for every symbol transmitted, i.e. every 1/6.25 = 0.16 seconds.
@@ -45,9 +47,8 @@ typedef struct
 /// Structure that holds the decoded message
 typedef struct
 {
-    // TODO: check again that this size is enough
-    char text[25]; ///< Plain text
-    uint16_t hash; ///< Hash value to be used in hash table and quick checking for duplicates
+    char text[FTX_MAX_MESSAGE_LENGTH]; ///< Plain text
+    uint16_t hash;                     ///< Hash value to be used in hash table and quick checking for duplicates
 } message_t;
 
 /// Structure that contains the status of various steps during decoding of a message
