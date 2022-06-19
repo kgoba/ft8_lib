@@ -5,14 +5,12 @@
 #include <stdbool.h>
 
 #include "constants.h"
-#include "unpack.h"
+#include "message.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-
-#define FTX_MAX_MESSAGE_LENGTH 35 ///< max message length = callsign[13] + space + callsign[13] + space + report[6] + terminator
 
 /// Input structure to ft8_find_sync() function. This structure describes stored waterfall data over the whole message slot.
 /// Fields time_osr and freq_osr specify additional oversampling rate for time and frequency resolution.
@@ -44,20 +42,13 @@ typedef struct
     int16_t snr;
 } candidate_t;
 
-/// Structure that holds the decoded message
-typedef struct
-{
-    char text[FTX_MAX_MESSAGE_LENGTH]; ///< Plain text
-    uint16_t hash;                     ///< Hash value to be used in hash table and quick checking for duplicates
-} message_t;
-
 /// Structure that contains the status of various steps during decoding of a message
 typedef struct
 {
     int ldpc_errors;         ///< Number of LDPC errors during decoding
     uint16_t crc_extracted;  ///< CRC value recovered from the message
     uint16_t crc_calculated; ///< CRC value calculated over the payload
-    int unpack_status;       ///< Return value of the unpack routine
+    // int unpack_status;       ///< Return value of the unpack routine
 } decode_status_t;
 
 /// Localize top N candidates in frequency and time according to their sync strength (looking at Costas symbols)
@@ -73,11 +64,11 @@ int ft8_find_sync(const waterfall_t* power, int num_candidates, candidate_t heap
 /// Attempt to decode a message candidate. Extracts the bit probabilities, runs LDPC decoder, checks CRC and unpacks the message in plain text.
 /// @param[in] power Waterfall data collected during message slot
 /// @param[in] cand Candidate to decode
-/// @param[out] message message_t structure that will receive the decoded message
 /// @param[in] max_iterations Maximum allowed LDPC iterations (lower number means faster decode, but less precise)
+/// @param[out] message ftx_message_t structure that will receive the decoded message
 /// @param[out] status decode_status_t structure that will be filled with the status of various decoding steps
 /// @return True if the decoding was successful, false otherwise (check status for details)
-bool ft8_decode(const waterfall_t* power, const candidate_t* cand, message_t* message, int max_iterations, const unpack_hash_interface_t* hash_if, decode_status_t* status);
+bool ft8_decode(const waterfall_t* power, const candidate_t* cand, int max_iterations, ftx_message_t* message, decode_status_t* status);
 
 #ifdef __cplusplus
 }

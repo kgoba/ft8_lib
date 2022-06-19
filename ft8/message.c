@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define LOG_LEVEL LOG_DEBUG
+#define LOG_LEVEL LOG_WARN
 #include "debug.h"
 
 #define MAX22    ((uint32_t)4194304ul)
@@ -53,10 +53,19 @@ void ftx_message_init(ftx_message_t* msg)
     memset((void*)msg, 0, sizeof(ftx_message_t));
 }
 
-// bool ftx_message_check_recipient(const ftx_message_t* msg, const char* callsign)
-// {
-//     return false;
-// }
+uint8_t ftx_message_get_i3(const ftx_message_t* msg)
+{
+    // Extract i3 (bits 74..76)
+    uint8_t i3 = (msg->payload[9] >> 3) & 0x07u;
+    return i3;
+}
+
+uint8_t ftx_message_get_n3(const ftx_message_t* msg)
+{
+    // Extract n3 (bits 71..73)
+    uint8_t n3 = ((msg->payload[8] << 2) & 0x04u) | ((msg->payload[9] >> 6) & 0x03u);
+    return n3;
+}
 
 ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg)
 {
@@ -288,10 +297,10 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
 {
     ftx_message_rc_t rc;
 
-    char buf[31]; // 12 + 12 + 7 (std/nonstd) / 14 (free text) / 19 (telemetry)
+    char buf[35]; // 13 + 13 + 6 (std/nonstd) / 14 (free text) / 19 (telemetry)
     char* field1 = buf;
-    char* field2 = buf + 12;
-    char* field3 = buf + 12 + 12;
+    char* field2 = buf + 14;
+    char* field3 = buf + 14 + 14;
 
     message[0] = '\0';
 
@@ -306,18 +315,38 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
         break;
     case FTX_MESSAGE_TYPE_FREE_TEXT:
         ftx_message_decode_free(msg, field1);
+        field2 = NULL;
+        field3 = NULL;
         rc = FTX_MESSAGE_RC_OK;
         break;
     case FTX_MESSAGE_TYPE_TELEMETRY:
         ftx_message_decode_telemetry_hex(msg, field1);
+        field2 = NULL;
+        field3 = NULL;
         rc = FTX_MESSAGE_RC_OK;
         break;
     default:
         // not handled yet
+        field1 = NULL;
         rc = FTX_MESSAGE_RC_ERROR_TYPE;
         break;
     }
-    // TODO join fields via whitespace
+
+    if (field1 != NULL)
+    {
+        // TODO join fields via whitespace
+        message = append_string(message, field1);
+        if (field2 != NULL)
+        {
+            message = append_string(message, " ");
+            message = append_string(message, field2);
+            if (field3 != NULL)
+            {
+                message = append_string(message, " ");
+                message = append_string(message, field3);
+            }
+        }
+    }
 
     return rc;
 }
@@ -398,7 +427,7 @@ ftx_message_rc_t ftx_message_decode_nonstd(const ftx_message_t* msg, ftx_callsig
     unpack58(n58, hash_if, call_decoded);
 
     // Decode the other call from hash lookup table
-    char call_3[12];
+    char call_3[14];
     lookup_callsign(hash_if, FTX_CALLSIGN_HASH_12_BITS, n12, call_3);
 
     // Possibly flip them around
@@ -462,7 +491,7 @@ void ftx_message_decode_telemetry_hex(const ftx_message_t* msg, char* telemetry_
     for (int i = 0; i < 9; ++i)
     {
         uint8_t nibble1 = (b71[i] >> 4);
-        uint8_t nibble2 = (b71[i] & 0x0F);
+        uint8_t nibble2 = (b71[i] & 0x0Fu);
         char c1 = (nibble1 > 9) ? (nibble1 - 10 + 'A') : nibble1 + '0';
         char c2 = (nibble2 > 9) ? (nibble2 - 10 + 'A') : nibble2 + '0';
         telemetry_hex[i * 2] = c1;
@@ -479,7 +508,7 @@ void ftx_message_decode_telemetry(const ftx_message_t* msg, uint8_t* telemetry)
     for (int i = 0; i < 9; ++i)
     {
         telemetry[i] = (carry << 7) | (msg->payload[i] >> 1);
-        carry = (msg->payload[i] & 0x01);
+        carry = (msg->payload[i] & 0x01u);
     }
 }
 
@@ -544,7 +573,7 @@ static bool save_callsign(const ftx_callsign_hash_interface_t* hash_if, const ch
         i++;
     }
 
-    uint32_t n22 = (47055833459ull * n58) >> (64 - 22);
+    uint32_t n22 = ((47055833459ull * n58) >> (64 - 22)) & (0x3FFFFFul);
     uint32_t n12 = n22 >> 10;
     uint32_t n10 = n22 >> 12;
     LOG(LOG_DEBUG, "save_callsign('%s') = [n22=%d, n12=%d, n10=%d]\n", callsign, n22, n12, n10);

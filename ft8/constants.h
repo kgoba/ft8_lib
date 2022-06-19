@@ -51,8 +51,8 @@ extern "C"
 
 typedef enum
 {
-    PROTO_FT4,
-    PROTO_FT8
+    FTX_PROTOCOL_FT4,
+    FTX_PROTOCOL_FT8
 } ftx_protocol_t;
 
 /// Costas 7x7 tone pattern for synchronization

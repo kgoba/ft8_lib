@@ -7,11 +7,11 @@
 #include <stdint.h>
 
 // Save signal in floating point format (-1 .. +1) as a WAVE file using 16-bit signed integers.
-void save_wav(const float* signal, int num_samples, int sample_rate, const char* path)
+int save_wav(const float* signal, int num_samples, int sample_rate, const char* path)
 {
     char subChunk1ID[4] = { 'f', 'm', 't', ' ' };
     uint32_t subChunk1Size = 16; // 16 for PCM
-    uint16_t audioFormat = 1; // PCM = 1
+    uint16_t audioFormat = 1;    // PCM = 1
     uint16_t numChannels = 1;
     uint16_t bitsPerSample = 16;
     uint32_t sampleRate = sample_rate;
@@ -37,6 +37,8 @@ void save_wav(const float* signal, int num_samples, int sample_rate, const char*
     }
 
     FILE* f = fopen(path, "wb");
+    if (f == NULL)
+        return -1;
 
     // NOTE: works only on little-endian architecture
     fwrite(chunkID, sizeof(chunkID), 1, f);
@@ -60,28 +62,31 @@ void save_wav(const float* signal, int num_samples, int sample_rate, const char*
     fclose(f);
 
     free(raw_data);
+    return 0;
 }
 
 // Load signal in floating point format (-1 .. +1) as a WAVE file using 16-bit signed integers.
 int load_wav(float* signal, int* num_samples, int* sample_rate, const char* path)
 {
-    char subChunk1ID[4]; // = {'f', 'm', 't', ' '};
+    char subChunk1ID[4];    // = {'f', 'm', 't', ' '};
     uint32_t subChunk1Size; // = 16;    // 16 for PCM
-    uint16_t audioFormat; // = 1;     // PCM = 1
-    uint16_t numChannels; // = 1;
+    uint16_t audioFormat;   // = 1;     // PCM = 1
+    uint16_t numChannels;   // = 1;
     uint16_t bitsPerSample; // = 16;
     uint32_t sampleRate;
     uint16_t blockAlign; // = numChannels * bitsPerSample / 8;
-    uint32_t byteRate; // = sampleRate * blockAlign;
+    uint32_t byteRate;   // = sampleRate * blockAlign;
 
-    char subChunk2ID[4]; // = {'d', 'a', 't', 'a'};
+    char subChunk2ID[4];    // = {'d', 'a', 't', 'a'};
     uint32_t subChunk2Size; // = num_samples * blockAlign;
 
-    char chunkID[4]; // = {'R', 'I', 'F', 'F'};
+    char chunkID[4];    // = {'R', 'I', 'F', 'F'};
     uint32_t chunkSize; // = 4 + (8 + subChunk1Size) + (8 + subChunk2Size);
-    char format[4]; // = {'W', 'A', 'V', 'E'};
+    char format[4];     // = {'W', 'A', 'V', 'E'};
 
     FILE* f = fopen(path, "rb");
+    if (f == NULL)
+        return -1;
 
     // NOTE: works only on little-endian architecture
     fread((void*)chunkID, sizeof(chunkID), 1, f);
@@ -91,7 +96,7 @@ int load_wav(float* signal, int* num_samples, int* sample_rate, const char* path
     fread((void*)subChunk1ID, sizeof(subChunk1ID), 1, f);
     fread((void*)&subChunk1Size, sizeof(subChunk1Size), 1, f);
     if (subChunk1Size != 16)
-        return -1;
+        return -2;
 
     fread((void*)&audioFormat, sizeof(audioFormat), 1, f);
     fread((void*)&numChannels, sizeof(numChannels), 1, f);
@@ -101,13 +106,13 @@ int load_wav(float* signal, int* num_samples, int* sample_rate, const char* path
     fread((void*)&bitsPerSample, sizeof(bitsPerSample), 1, f);
 
     if (audioFormat != 1 || numChannels != 1 || bitsPerSample != 16)
-        return -1;
+        return -3;
 
     fread((void*)subChunk2ID, sizeof(subChunk2ID), 1, f);
     fread((void*)&subChunk2Size, sizeof(subChunk2Size), 1, f);
 
     if (subChunk2Size / blockAlign > *num_samples)
-        return -2;
+        return -4;
 
     *num_samples = subChunk2Size / blockAlign;
     *sample_rate = sampleRate;

@@ -107,6 +107,18 @@ void fmtmsg(char* msg_out, const char* msg_in)
     *msg_out = 0; // Add zero termination
 }
 
+char* append_string(char* string, const char* token)
+{
+    while (*token != '\0')
+    {
+        *string = *token;
+        string++;
+        token++;
+    }
+    *string = '\0';
+    return string;
+}
+
 const char* copy_token(char* token, int length, const char* string)
 {
     // Copy characters until a whitespace character or the end of string

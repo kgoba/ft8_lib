@@ -3,266 +3,141 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <ft8/decode.h>
 #include <ft8/encode.h>
+#include <ft8/unpack.h>
+#include <ft8/message.h>
 
 #include <common/common.h>
 #include <common/wave.h>
 #include <common/monitor.h>
+#include <common/audio.h>
 
 #define LOG_LEVEL LOG_INFO
 #include <ft8/debug.h>
 
 const int kMin_score = 10; // Minimum sync score threshold for candidates
-const int kMax_candidates = 120;
-const int kLDPC_iterations = 20;
+const int kMax_candidates = 140;
+const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
 
 const int kFreq_osr = 2; // Frequency oversampling rate (bin subdivision)
 const int kTime_osr = 2; // Time oversampling rate (symbol subdivision)
 
-void usage(void)
+void usage(const char* error_msg)
 {
+    if (error_msg != NULL)
+    {
+        fprintf(stderr, "ERROR: %s\n", error_msg);
+    }
+    fprintf(stderr, "Usage: decode_ft8 [-list|-ft4] INPUT\n\n");
     fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
 }
 
-#ifdef USE_PORTAUDIO
-#include "portaudio.h"
+#define CALLSIGN_HASHTABLE_SIZE 256
 
-typedef struct
+static struct
 {
-    PaTime startTime;
-} audio_cb_context_t;
+    char callsign[12];
+    uint32_t hash;
+} callsign_hashtable[CALLSIGN_HASHTABLE_SIZE];
 
-static audio_cb_context_t audio_cb_context;
+static int callsign_hashtable_size;
 
-static int audio_cb(void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer,
-    const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void* userData)
+void hashtable_init(void)
 {
-    audio_cb_context_t* context = (audio_cb_context_t*)userData;
-    int16_t* samples_in = (int16_t*)inputBuffer;
-
-    // PaTime time = data->startTime + timeInfo->inputBufferAdcTime;
-    return 0;
+    callsign_hashtable_size = 0;
+    memset(callsign_hashtable, 0, sizeof(callsign_hashtable));
 }
 
-void audio_list(void)
+void hashtable_cleanup(uint8_t max_age)
 {
-    PaError pa_rc;
-
-    pa_rc = Pa_Initialize(); // Initialize PortAudio
-    if (pa_rc != paNoError)
+    for (int idx_hash = 0; idx_hash < CALLSIGN_HASHTABLE_SIZE; ++idx_hash)
     {
-        printf("Error initializing PortAudio.\n");
-        printf("\tErrortext: %s\n\tNumber: %d\n", Pa_GetErrorText(pa_rc), pa_rc);
-        return;
-    }
-
-    int numDevices;
-    numDevices = Pa_GetDeviceCount();
-    if (numDevices < 0)
-    {
-        printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
-        return;
-    }
-
-    printf("%d audio devices found:\n", numDevices);
-    for (int i = 0; i < numDevices; i++)
-    {
-        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
-
-        PaStreamParameters inputParameters = {
-            .device = i,
-            .channelCount = 1, // 1 = mono, 2 = stereo
-            .sampleFormat = paInt16,
-            .suggestedLatency = 0.2,
-            .hostApiSpecificStreamInfo = NULL
-        };
-        double sample_rate = 12000; // sample rate (frames per second)
-        pa_rc = Pa_IsFormatSupported(&inputParameters, NULL, sample_rate);
-
-        printf("%d: [%s] [%s]\n", (i + 1), deviceInfo->name, (pa_rc == paNoError) ? "OK" : "NOT SUPPORTED");
-    }
-}
-
-int audio_open(const char* name)
-{
-    PaError pa_rc;
-
-    pa_rc = Pa_Initialize(); // Initialize PortAudio
-    if (pa_rc != paNoError)
-    {
-        printf("Error initializing PortAudio.\n");
-        printf("\tErrortext: %s\n\tNumber: %d\n", Pa_GetErrorText(pa_rc), pa_rc);
-        Pa_Terminate(); // I don't think we need this but...
-        return -1;
-    }
-
-    PaDeviceIndex ndevice_in = -1;
-    int numDevices = Pa_GetDeviceCount();
-    for (int i = 0; i < numDevices; i++)
-    {
-        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
-        if (0 == strcmp(deviceInfo->name, name))
+        if (callsign_hashtable[idx_hash].callsign[0] != '\0')
         {
-            ndevice_in = i;
-            break;
-        }
-    }
-
-    if (ndevice_in < 0)
-    {
-        printf("Could not find device [%s].\n", name);
-        audio_list();
-        return -1;
-    }
-
-    PaStream* instream;
-    unsigned long nfpb = 1920 / 4; // frames per buffer
-    double sample_rate = 12000;    // sample rate (frames per second)
-
-    PaStreamParameters inputParameters = {
-        .device = ndevice_in,
-        .channelCount = 1, // 1 = mono, 2 = stereo
-        .sampleFormat = paInt16,
-        .suggestedLatency = 0.2,
-        .hostApiSpecificStreamInfo = NULL
-    };
-
-    // Test if this configuration actually works, so we do not run into an ugly assertion
-    pa_rc = Pa_IsFormatSupported(&inputParameters, NULL, sample_rate);
-    if (pa_rc != paNoError)
-    {
-        printf("Error opening input audio stream.\n");
-        printf("\tErrortext: %s\n\tNumber: %d\n", Pa_GetErrorText(pa_rc), pa_rc);
-        return -2;
-    }
-
-    pa_rc = Pa_OpenStream(
-        &instream, // address of stream
-        &inputParameters,
-        NULL,
-        sample_rate, // Sample rate
-        nfpb,        // Frames per buffer
-        paNoFlag,
-        (PaStreamCallback*)audio_cb, // Callback routine
-        (void*)&audio_cb_context);   // address of data structure
-    if (pa_rc != paNoError)
-    { // We should have no error here usually
-        printf("Error opening input audio stream:\n");
-        printf("\tErrortext: %s\n\tNumber: %d\n", Pa_GetErrorText(pa_rc), pa_rc);
-        return -3;
-    }
-    // printf("Successfully opened audio input.\n");
-
-    pa_rc = Pa_StartStream(instream); // Start input stream
-    if (pa_rc != paNoError)
-    {
-        printf("Error starting input audio stream!\n");
-        printf("\tErrortext: %s\n\tNumber: %d\n", Pa_GetErrorText(pa_rc), pa_rc);
-        return -4;
-    }
-
-    // while (Pa_IsStreamActive(instream))
-    // {
-    //     Pa_Sleep(100);
-    // }
-    // Pa_AbortStream(instream); // Abort stream
-    // Pa_CloseStream(instream); // Close stream, we're done.
-
-    return 0;
-}
-#endif
-
-int main(int argc, char** argv)
-{
-    // Accepted arguments
-    const char* wav_path = NULL;
-    bool is_ft8 = true;
-
-    // Parse arguments one by one
-    int arg_idx = 1;
-    while (arg_idx < argc)
-    {
-        // Check if the current argument is an option (-xxx)
-        if (argv[arg_idx][0] == '-')
-        {
-            // Check agaist valid options
-            if (0 == strcmp(argv[arg_idx], "-ft4"))
+            uint8_t age = (uint8_t)(callsign_hashtable[idx_hash].hash >> 24);
+            if (age > max_age)
             {
-                is_ft8 = false;
+                LOG(LOG_INFO, "Removing [%s] from hash table, age = %d\n", callsign_hashtable[idx_hash].callsign, age);
+                // free the hash entry
+                callsign_hashtable[idx_hash].callsign[0] = '\0';
+                callsign_hashtable[idx_hash].hash = 0;
+                callsign_hashtable_size--;
             }
             else
             {
-                usage();
-                return -1;
+                // increase callsign age
+                callsign_hashtable[idx_hash].hash = (((uint32_t)age + 1u) << 24) | (callsign_hashtable[idx_hash].hash & 0x3FFFFFu);
             }
+        }
+    }
+}
+
+void hashtable_add(const char* callsign, uint32_t hash)
+{
+    uint16_t hash10 = (hash >> 12) & 0x3FFu;
+    int idx_hash = (hash10 * 23) % CALLSIGN_HASHTABLE_SIZE;
+    while (callsign_hashtable[idx_hash].callsign[0] != '\0')
+    {
+        if (((callsign_hashtable[idx_hash].hash & 0x3FFFFFu) == hash) && (0 == strcmp(callsign_hashtable[idx_hash].callsign, callsign)))
+        {
+            // reset age
+            callsign_hashtable[idx_hash].hash &= 0x3FFFFFu;
+            LOG(LOG_DEBUG, "Found a duplicate [%s]\n", callsign);
+            return;
         }
         else
         {
-            if (wav_path == NULL)
-            {
-                wav_path = argv[arg_idx];
-            }
-            else
-            {
-                usage();
-                return -1;
-            }
+            LOG(LOG_DEBUG, "Hash table clash!\n");
+            // Move on to check the next entry in hash table
+            idx_hash = (idx_hash + 1) % CALLSIGN_HASHTABLE_SIZE;
         }
-        ++arg_idx;
     }
-    // Check if all mandatory arguments have been received
-    if (wav_path == NULL)
+    callsign_hashtable_size++;
+    strncpy(callsign_hashtable[idx_hash].callsign, callsign, 11);
+    callsign_hashtable[idx_hash].callsign[11] = '\0';
+    callsign_hashtable[idx_hash].hash = hash;
+}
+
+bool hashtable_lookup(ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign)
+{
+    uint8_t hash_shift = (hash_type == FTX_CALLSIGN_HASH_10_BITS) ? 12 : (hash_type == FTX_CALLSIGN_HASH_12_BITS ? 10 : 0);
+    uint16_t hash10 = (hash >> (12 - hash_shift)) & 0x3FF;
+    int idx_hash = (hash10 * 23) % CALLSIGN_HASHTABLE_SIZE;
+    while (callsign_hashtable[idx_hash].callsign[0] != '\0')
     {
-        usage();
-        return -1;
+        if (((callsign_hashtable[idx_hash].hash & 0x3FFFFFu) >> hash_shift) == hash)
+        {
+            strcpy(callsign, callsign_hashtable[idx_hash].callsign);
+            return true;
+        }
+        // Move on to check the next entry in hash table
+        idx_hash = (idx_hash + 1) % CALLSIGN_HASHTABLE_SIZE;
     }
+    callsign[0] = '\0';
+    return false;
+}
 
-    audio_list();
+ftx_callsign_hash_interface_t hash_if = {
+    .lookup_hash = hashtable_lookup,
+    .save_hash = hashtable_add
+};
 
-    int sample_rate = 12000;
-    int num_samples = 15 * sample_rate;
-    float signal[num_samples];
-
-    int rc = load_wav(signal, &num_samples, &sample_rate, wav_path);
-    if (rc < 0)
-    {
-        return -1;
-    }
-
-    LOG(LOG_INFO, "Sample rate %d Hz, %d samples, %.3f seconds\n", sample_rate, num_samples, (double)num_samples / sample_rate);
-
-    // Compute FFT over the whole signal and store it
-    monitor_t mon;
-    monitor_config_t mon_cfg = {
-        .f_min = 200,
-        .f_max = 3000,
-        .sample_rate = sample_rate,
-        .time_osr = kTime_osr,
-        .freq_osr = kFreq_osr,
-        .protocol = is_ft8 ? PROTO_FT8 : PROTO_FT4
-    };
-    monitor_init(&mon, &mon_cfg);
-    LOG(LOG_DEBUG, "Waterfall allocated %d symbols\n", mon.wf.max_blocks);
-    for (int frame_pos = 0; frame_pos + mon.block_size <= num_samples; frame_pos += mon.block_size)
-    {
-        // Process the waveform data frame by frame - you could have a live loop here with data from an audio device
-        monitor_process(&mon, signal + frame_pos);
-    }
-    LOG(LOG_DEBUG, "Waterfall accumulated %d symbols\n", mon.wf.num_blocks);
-    LOG(LOG_INFO, "Max magnitude: %.1f dB\n", mon.max_mag);
-
+void decode(const monitor_t* mon)
+{
+    const waterfall_t* wf = &mon->wf;
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
-    int num_candidates = ft8_find_sync(&mon.wf, kMax_candidates, candidate_list, kMin_score);
+    int num_candidates = ft8_find_sync(wf, kMax_candidates, candidate_list, kMin_score);
 
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
-    message_t decoded[kMax_decoded_messages];
-    message_t* decoded_hashtable[kMax_decoded_messages];
+    ftx_message_t decoded[kMax_decoded_messages];
+    ftx_message_t* decoded_hashtable[kMax_decoded_messages];
 
     // Initialize hash table pointers
     for (int i = 0; i < kMax_decoded_messages; ++i)
@@ -274,17 +149,16 @@ int main(int argc, char** argv)
     for (int idx = 0; idx < num_candidates; ++idx)
     {
         const candidate_t* cand = &candidate_list[idx];
-        if (cand->score < kMin_score)
-            continue;
 
-        float freq_hz = (mon.min_bin + cand->freq_offset + (float)cand->freq_sub / mon.wf.freq_osr) / mon.symbol_period;
-        float time_sec = (cand->time_offset + (float)cand->time_sub / mon.wf.time_osr) * mon.symbol_period;
+        float freq_hz = (mon->min_bin + cand->freq_offset + (float)cand->freq_sub / wf->freq_osr) / mon->symbol_period;
+        float time_sec = (cand->time_offset + (float)cand->time_sub / wf->time_osr) * mon->symbol_period;
 
-        message_t message;
+        ftx_message_t message;
         decode_status_t status;
-        if (!ft8_decode(&mon.wf, cand, &message, kLDPC_iterations, NULL, &status))
+        if (!ft8_decode(wf, cand, kLDPC_iterations, &message, &status))
         {
-            // printf("000000 %3d %+4.2f %4.0f ~  ---\n", cand->score, time_sec, freq_hz);
+            // float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
+            // printf("000000 %2.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, "---");
             if (status.ldpc_errors > 0)
             {
                 LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
@@ -292,10 +166,6 @@ int main(int argc, char** argv)
             else if (status.crc_calculated != status.crc_extracted)
             {
                 LOG(LOG_DEBUG, "CRC mismatch!\n");
-            }
-            else if (status.unpack_status != 0)
-            {
-                LOG(LOG_DEBUG, "Error while unpacking!\n");
             }
             continue;
         }
@@ -311,9 +181,9 @@ int main(int argc, char** argv)
                 LOG(LOG_DEBUG, "Found an empty slot\n");
                 found_empty_slot = true;
             }
-            else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == strcmp(decoded_hashtable[idx_hash]->text, message.text)))
+            else if ((decoded_hashtable[idx_hash]->hash == message.hash) && (0 == memcmp(decoded_hashtable[idx_hash]->payload, message.payload, sizeof(message.payload))))
             {
-                LOG(LOG_DEBUG, "Found a duplicate [%s]\n", message.text);
+                LOG(LOG_DEBUG, "Found a duplicate!\n");
                 found_duplicate = true;
             }
             else
@@ -331,12 +201,180 @@ int main(int argc, char** argv)
             decoded_hashtable[idx_hash] = &decoded[idx_hash];
             ++num_decoded;
 
+            char text[FTX_MAX_MESSAGE_LENGTH];
+            // int unpack_status = unpack77(message.payload, text, NULL);
+            int unpack_status = ftx_message_decode(&message, &hash_if, text);
+            if (unpack_status != 0)
+            {
+                strcpy(text, "Error while unpacking!");
+            }
+
+            // uint8_t i3 = ftx_message_get_i3(&message);
+            // if (i3 == 0)
+            // {
+            //     uint8_t n3 = ftx_message_get_n3(&message);
+            //     printf("000000 %02d %+4.2f %4.0f [%d.%d] ~  %s\n", cand->score, time_sec, freq_hz, i3, n3, text);
+            // }
+            // else
+            //     printf("000000 %02d %+4.2f %4.0f [%d  ] ~  %s\n", cand->score, time_sec, freq_hz, i3, text);
+
             // Fake WSJT-X-like output for now
             float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
-            printf("000000 %2.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, message.text);
+            printf("000000 %+05.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, text);
         }
     }
-    LOG(LOG_INFO, "Decoded %d messages\n", num_decoded);
+    LOG(LOG_INFO, "Decoded %d messages, callsign hashtable size %d\n", num_decoded, callsign_hashtable_size);
+    hashtable_cleanup(10);
+}
+
+int main(int argc, char** argv)
+{
+    // Accepted arguments
+    const char* wav_path = NULL;
+    const char* dev_name = NULL;
+    ftx_protocol_t protocol = FTX_PROTOCOL_FT8;
+    float time_shift = 0.8;
+
+    // Parse arguments one by one
+    int arg_idx = 1;
+    while (arg_idx < argc)
+    {
+        // Check if the current argument is an option (-xxx)
+        if (argv[arg_idx][0] == '-')
+        {
+            // Check agaist valid options
+            if (0 == strcmp(argv[arg_idx], "-ft4"))
+            {
+                protocol = FTX_PROTOCOL_FT4;
+            }
+            else if (0 == strcmp(argv[arg_idx], "-list"))
+            {
+                audio_init();
+                audio_list();
+                return 0;
+            }
+            else if (0 == strcmp(argv[arg_idx], "-dev"))
+            {
+                if (arg_idx + 1 < argc)
+                {
+                    ++arg_idx;
+                    dev_name = argv[arg_idx];
+                }
+                else
+                {
+                    usage("Expected an audio device name after -dev");
+                    return -1;
+                }
+            }
+            else
+            {
+                usage("Unknown command line option");
+                return -1;
+            }
+        }
+        else
+        {
+            if (wav_path == NULL)
+            {
+                wav_path = argv[arg_idx];
+            }
+            else
+            {
+                usage("Multiple positional arguments");
+                return -1;
+            }
+        }
+        ++arg_idx;
+    }
+    // Check if all mandatory arguments have been received
+    if (wav_path == NULL && dev_name == NULL)
+    {
+        usage("Expected either INPUT file path or DEVICE name");
+        return -1;
+    }
+
+    float slot_time = ((protocol == FTX_PROTOCOL_FT8) ? FT8_SLOT_TIME : FT4_SLOT_TIME);
+    int sample_rate = 12000;
+    int num_samples = slot_time * sample_rate;
+    float signal[num_samples];
+    bool isContinuous = false;
+
+    if (wav_path != NULL)
+    {
+        int rc = load_wav(signal, &num_samples, &sample_rate, wav_path);
+        if (rc < 0)
+        {
+            LOG(LOG_ERROR, "ERROR: cannot load wave file %s\n", wav_path);
+            return -1;
+        }
+        LOG(LOG_INFO, "Sample rate %d Hz, %d samples, %.3f seconds\n", sample_rate, num_samples, (double)num_samples / sample_rate);
+    }
+    else if (dev_name != NULL)
+    {
+        audio_init();
+        audio_open(dev_name);
+        num_samples = (slot_time - 0.4f) * sample_rate;
+        isContinuous = true;
+    }
+
+    // Compute FFT over the whole signal and store it
+    monitor_t mon;
+    monitor_config_t mon_cfg = {
+        .f_min = 200,
+        .f_max = 3000,
+        .sample_rate = sample_rate,
+        .time_osr = kTime_osr,
+        .freq_osr = kFreq_osr,
+        .protocol = protocol
+    };
+
+    hashtable_init();
+
+    monitor_init(&mon, &mon_cfg);
+    LOG(LOG_DEBUG, "Waterfall allocated %d symbols\n", mon.wf.max_blocks);
+
+    do
+    {
+        if (dev_name != NULL)
+        {
+            // Wait for the start of time slot
+            while (true)
+            {
+                struct timespec spec;
+                clock_gettime(CLOCK_REALTIME, &spec);
+                float time_within_slot = fmod((double)spec.tv_sec + (spec.tv_nsec * 1e-9) - time_shift, slot_time);
+                if (time_within_slot > slot_time / 3)
+                    audio_read(signal, mon.block_size);
+                else
+                {
+                    LOG(LOG_INFO, "Time within slot: %.3f s\n", time_within_slot);
+                    break;
+                }
+            }
+        }
+
+        // Process and accumulate audio data in a monitor/waterfall instance
+        for (int frame_pos = 0; frame_pos + mon.block_size <= num_samples; frame_pos += mon.block_size)
+        {
+            if (dev_name != NULL)
+            {
+                audio_read(signal + frame_pos, mon.block_size);
+            }
+            // LOG(LOG_DEBUG, "Frame pos: %.3fs\n", (float)(frame_pos + mon.block_size) / sample_rate);
+            fprintf(stderr, "#");
+            // Process the waveform data frame by frame - you could have a live loop here with data from an audio device
+            monitor_process(&mon, signal + frame_pos);
+        }
+        fprintf(stderr, "\n");
+        LOG(LOG_DEBUG, "Waterfall accumulated %d symbols\n", mon.wf.num_blocks);
+        LOG(LOG_INFO, "Max magnitude: %.1f dB\n", mon.max_mag);
+
+        // Decode accumulated data (containing slightly less than a full time slot)
+        decode(&mon);
+
+        // Reset internal variables for the next time slot
+        monitor_reset(&mon);
+    } while (isContinuous);
 
     monitor_free(&mon);
 

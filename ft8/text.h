@@ -5,7 +5,8 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 // Utility functions for characters and strings
@@ -43,6 +44,8 @@ void fmtmsg(char* msg_out, const char* msg_in);
 /// @param[in] string Pointer to the string
 /// @return Pointer to the next token (can be passed to copy_token to extract the next token)
 const char* copy_token(char* token, int length, const char* string);
+
+char* append_string(char* string, const char* token);
 
 // Parse a 2 digit integer from string
 int dd_to_int(const char* str, int length);

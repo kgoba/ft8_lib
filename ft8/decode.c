@@ -53,7 +53,7 @@ int ft8_snr(const waterfall_t* wf, const candidate_t* candidate)
     // Get the pointer to symbol 0 of the candidate
     const uint8_t* mag_cand = get_cand_mag(wf, candidate);
 
-    if (wf->protocol == PROTO_FT4)
+    if (wf->protocol == FTX_PROTOCOL_FT4)
     {
     }
 
@@ -246,7 +246,7 @@ int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
             {
                 for (candidate.freq_offset = 0; (candidate.freq_offset + 7) < wf->num_bins; ++candidate.freq_offset)
                 {
-                    if (wf->protocol == PROTO_FT4)
+                    if (wf->protocol == FTX_PROTOCOL_FT4)
                     {
                         candidate.score = ft4_sync_score(wf, &candidate);
                     }
@@ -261,10 +261,10 @@ int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
 
                     // If the heap is full AND the current candidate is better than
                     // the worst in the heap, we remove the worst and make space
-                    if (heap_size == num_candidates && candidate.score > heap[0].score)
+                    if ((heap_size == num_candidates) && (candidate.score > heap[0].score))
                     {
-                        heap[0] = heap[heap_size - 1];
                         --heap_size;
+                        heap[0] = heap[heap_size];
                         heapify_down(heap, heap_size);
                     }
 
@@ -284,6 +284,10 @@ int ft8_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
     int len_unsorted = heap_size;
     while (len_unsorted > 1)
     {
+        // Take the top (index 0) element which is guaranteed to have the smallest score,
+        // exchange it with the last element in the heap, and decrease the heap size.
+        // Then restore the heap property in the new, smaller heap.
+        // At the end the elements will be sorted in descending order.
         candidate_t tmp = heap[len_unsorted - 1];
         heap[len_unsorted - 1] = heap[0];
         heap[0] = tmp;
@@ -374,10 +378,10 @@ static void ftx_normalize_logl(float* log174)
     }
 }
 
-bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* message, int max_iterations, const unpack_hash_interface_t* hash_if, decode_status_t* status)
+bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, int max_iterations, ftx_message_t* message, decode_status_t* status)
 {
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
-    if (wf->protocol == PROTO_FT4)
+    if (wf->protocol == FTX_PROTOCOL_FT4)
     {
         ft4_extract_likelihood(wf, cand, log174);
     }
@@ -413,27 +417,27 @@ bool ft8_decode(const waterfall_t* wf, const candidate_t* cand, message_t* messa
         return false;
     }
 
-    if (wf->protocol == PROTO_FT4)
+    // Reuse CRC value as a hash for the message (TODO: 14 bits only, should perhaps use full 16 or 32 bits?)
+    message->hash = status->crc_calculated;
+
+    if (wf->protocol == FTX_PROTOCOL_FT4)
     {
         // '[..] for FT4 only, in order to avoid transmitting a long string of zeros when sending CQ messages,
         // the assembled 77-bit message is bitwise exclusive-OR’ed with [a] pseudorandom sequence before computing the CRC and FEC parity bits'
         for (int i = 0; i < 10; ++i)
         {
-            a91[i] ^= kFT4_XOR_sequence[i];
+            message->payload[i] = a91[i] ^ kFT4_XOR_sequence[i];
+        }
+    }
+    else
+    {
+        for (int i = 0; i < 10; ++i)
+        {
+            message->payload[i] = a91[i];
         }
     }
 
     // LOG(LOG_DEBUG, "Decoded message (CRC %04x), trying to unpack...\n", status->crc_extracted);
-    status->unpack_status = unpack77(a91, message->text, hash_if);
-
-    if (status->unpack_status < 0)
-    {
-        return false;
-    }
-
-    // Reuse binary message CRC as hash value for the message
-    message->hash = status->crc_extracted;
-
     return true;
 }
 
@@ -450,30 +454,33 @@ static float max4(float a, float b, float c, float d)
 static void heapify_down(candidate_t heap[], int heap_size)
 {
     // heapify from the root down
-    int current = 0;
+    int current = 0; // root node
     while (true)
     {
-        int largest = current;
         int left = 2 * current + 1;
         int right = left + 1;
 
-        if (left < heap_size && heap[left].score < heap[largest].score)
+        // Find the smallest value of (parent, left child, right child)
+        int smallest = current;
+        if ((left < heap_size) && (heap[left].score < heap[smallest].score))
         {
-            largest = left;
+            smallest = left;
         }
-        if (right < heap_size && heap[right].score < heap[largest].score)
+        if ((right < heap_size) && (heap[right].score < heap[smallest].score))
         {
-            largest = right;
+            smallest = right;
         }
-        if (largest == current)
+
+        if (smallest == current)
         {
             break;
         }
 
-        candidate_t tmp = heap[largest];
-        heap[largest] = heap[current];
+        // Exchange the current node with the smallest child and move down to it
+        candidate_t tmp = heap[smallest];
+        heap[smallest] = heap[current];
         heap[current] = tmp;
-        current = largest;
+        current = smallest;
     }
 }
 
@@ -484,11 +491,12 @@ static void heapify_up(candidate_t heap[], int heap_size)
     while (current > 0)
     {
         int parent = (current - 1) / 2;
-        if (heap[current].score >= heap[parent].score)
+        if (!(heap[current].score < heap[parent].score))
         {
             break;
         }
 
+        // Exchange the current node with its parent and move up
         candidate_t tmp = heap[parent];
         heap[parent] = heap[current];
         heap[current] = tmp;

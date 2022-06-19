@@ -5,16 +5,17 @@
 #include <stdbool.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-#define PAYLOAD_LENGTH       77
-#define PAYLOAD_LENGTH_BYTES 10
+#define FTX_PAYLOAD_LENGTH_BYTES 10 ///< number of bytes to hold 77 bits of FTx payload data
+#define FTX_MAX_MESSAGE_LENGTH   35 ///< max message length = callsign[13] + space + callsign[13] + space + report[6] + terminator
 
 /// Structure that holds the decoded message
 typedef struct
 {
-    uint8_t payload[PAYLOAD_LENGTH_BYTES];
+    uint8_t payload[FTX_PAYLOAD_LENGTH_BYTES];
     uint16_t hash; ///< Hash value to be used in hash table and quick checking for duplicates
 } ftx_message_t;
 
@@ -82,8 +83,12 @@ typedef enum
 // Nonstd. call - all the rest, limited to 3-11 characters either alphanumeric or stroke (/)
 
 void ftx_message_init(ftx_message_t* msg);
-bool ftx_message_check_recipient(const ftx_message_t* msg, const char* callsign);
+
+uint8_t ftx_message_get_i3(const ftx_message_t* msg);
+uint8_t ftx_message_get_n3(const ftx_message_t* msg);
 ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg);
+
+// bool ftx_message_check_recipient(const ftx_message_t* msg, const char* callsign);
 
 /// Pack (encode) a text message
 ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, const char* message_text);
