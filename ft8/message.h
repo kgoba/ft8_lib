@@ -58,12 +58,12 @@ typedef enum
     FTX_CALLSIGN_HASH_22_BITS,
     FTX_CALLSIGN_HASH_12_BITS,
     FTX_CALLSIGN_HASH_10_BITS
-} ftx_callsign_hash_type_e;
+} ftx_callsign_hash_type_t;
 
 typedef struct
 {
     /// Called when a callsign is looked up by its 22/12/10 bit hash code
-    bool (*lookup_hash)(ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign);
+    bool (*lookup_hash)(ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign);
     /// Called when a callsign should hashed and stored (by its 22, 12 and 10 bit hash codes)
     void (*save_hash)(const char* callsign, uint32_t n22);
 } ftx_callsign_hash_interface_t;

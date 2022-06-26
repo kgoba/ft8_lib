@@ -1,22 +1,25 @@
 BUILD_DIR = .build
 
-FT8_SRC = $(wildcard ft8/*.c)
-FT8_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FT8_SRC))
+FT8_SRC  = $(wildcard ft8/*.c)
+FT8_OBJ  = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FT8_SRC))
 
 COMMON_SRC = $(wildcard common/*.c)
 COMMON_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(COMMON_SRC))
 
-FFT_SRC = $(wildcard fft/*.c)
-FFT_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FFT_SRC))
+FFT_SRC  = $(wildcard fft/*.c)
+FFT_OBJ  = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FFT_SRC))
 
-TARGETS = gen_ft8 decode_ft8 test_ft8
+TARGETS  = gen_ft8 decode_ft8 test_ft8
 
-CFLAGS = -O3 -ggdb3 -fsanitize=address
-CPPFLAGS = -std=c11 -I. -I/opt/local/include
-LDFLAGS = -lm -fsanitize=address -lportaudio -L/opt/local/lib 
+CFLAGS   = -fsanitize=address -O3 -ggdb3
+CPPFLAGS = -std=c11 -I.
+LDFLAGS  = -fsanitize=address -lm
 
-CPPFLAGS += -DUSE_PORTAUDIO -I/opt/local/include
-LDFLAGS  += -lportaudio -L/opt/local/lib 
+# Optionally, use Portaudio for live audio input
+ifdef PORTAUDIO_PREFIX
+CPPFLAGS += -DUSE_PORTAUDIO -I$(PORTAUDIO_PREFIX)/include
+LDFLAGS  += -lportaudio -L$(PORTAUDIO_PREFIX)/lib
+endif
 
 .PHONY: all clean run_tests install
 

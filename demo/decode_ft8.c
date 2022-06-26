@@ -7,7 +7,6 @@
 
 #include <ft8/decode.h>
 #include <ft8/encode.h>
-#include <ft8/unpack.h>
 #include <ft8/message.h>
 
 #include <common/common.h>
@@ -103,7 +102,7 @@ void hashtable_add(const char* callsign, uint32_t hash)
     callsign_hashtable[idx_hash].hash = hash;
 }
 
-bool hashtable_lookup(ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign)
+bool hashtable_lookup(ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign)
 {
     uint8_t hash_shift = (hash_type == FTX_CALLSIGN_HASH_10_BITS) ? 12 : (hash_type == FTX_CALLSIGN_HASH_12_BITS ? 10 : 0);
     uint16_t hash10 = (hash >> (12 - hash_shift)) & 0x3FF;
@@ -129,9 +128,9 @@ ftx_callsign_hash_interface_t hash_if = {
 
 void decode(const monitor_t* mon)
 {
-    const waterfall_t* wf = &mon->wf;
+    const ftx_waterfall_t* wf = &mon->wf;
     // Find top candidates by Costas sync score and localize them in time and frequency
-    candidate_t candidate_list[kMax_candidates];
+    ftx_candidate_t candidate_list[kMax_candidates];
     int num_candidates = ft8_find_sync(wf, kMax_candidates, candidate_list, kMin_score);
 
     // Hash table for decoded messages (to check for duplicates)
@@ -148,13 +147,13 @@ void decode(const monitor_t* mon)
     // Go over candidates and attempt to decode messages
     for (int idx = 0; idx < num_candidates; ++idx)
     {
-        const candidate_t* cand = &candidate_list[idx];
+        const ftx_candidate_t* cand = &candidate_list[idx];
 
         float freq_hz = (mon->min_bin + cand->freq_offset + (float)cand->freq_sub / wf->freq_osr) / mon->symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / wf->time_osr) * mon->symbol_period;
 
         ftx_message_t message;
-        decode_status_t status;
+        ftx_decode_status_t status;
         if (!ft8_decode(wf, cand, kLDPC_iterations, &message, &status))
         {
             // float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR

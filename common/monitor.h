@@ -25,16 +25,16 @@ typedef struct
 typedef struct
 {
     float symbol_period; ///< FT4/FT8 symbol period in seconds
-    int min_bin;
-    int max_bin;
-    int block_size;    ///< Number of samples per symbol (block)
-    int subblock_size; ///< Analysis shift size (number of samples)
-    int nfft;          ///< FFT size
-    float fft_norm;    ///< FFT normalization factor
-    float* window;     ///< Window function for STFT analysis (nfft samples)
-    float* last_frame; ///< Current STFT analysis frame (nfft samples)
-    waterfall_t wf;    ///< Waterfall object
-    float max_mag;     ///< Maximum detected magnitude (debug stats)
+    int min_bin;         ///< First FFT bin in the frequency range (begin)
+    int max_bin;         ///< First FFT bin outside the frequency range (end)
+    int block_size;      ///< Number of samples per symbol (block)
+    int subblock_size;   ///< Analysis shift size (number of samples)
+    int nfft;            ///< FFT size
+    float fft_norm;      ///< FFT normalization factor
+    float* window;       ///< Window function for STFT analysis (nfft samples)
+    float* last_frame;   ///< Current STFT analysis frame (nfft samples)
+    ftx_waterfall_t wf;  ///< Waterfall object
+    float max_mag;       ///< Maximum detected magnitude (debug stats)
 
     // KISS FFT housekeeping variables
     void* fft_work;        ///< Work area required by Kiss FFT

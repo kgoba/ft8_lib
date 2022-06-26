@@ -1,4 +1,5 @@
 #include "monitor.h"
+#include <common/common.h>
 
 #define LOG_LEVEL LOG_INFO
 #include <ft8/debug.h>
@@ -33,7 +34,7 @@ static float hann_i(int i, int N)
 //     return a0 - a1 * x1 + a2 * x2;
 // }
 
-static void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int time_osr, int freq_osr)
+static void waterfall_init(ftx_waterfall_t* me, int max_blocks, int num_bins, int time_osr, int freq_osr)
 {
     size_t mag_size = max_blocks * time_osr * freq_osr * num_bins * sizeof(me->mag[0]);
     me->max_blocks = max_blocks;
@@ -46,7 +47,7 @@ static void waterfall_init(waterfall_t* me, int max_blocks, int num_bins, int ti
     LOG(LOG_DEBUG, "Waterfall size = %zu\n", mag_size);
 }
 
-static void waterfall_free(waterfall_t* me)
+static void waterfall_free(ftx_waterfall_t* me)
 {
     free(me->mag);
 }

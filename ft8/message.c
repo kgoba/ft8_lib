@@ -23,7 +23,7 @@ static void add_brackets(char* result, const char* original, int length);
 /// @param[out] n10_out Pointer to store 10-bit hash value (can be NULL)
 /// @return True on success
 static bool save_callsign(const ftx_callsign_hash_interface_t* hash_if, const char* callsign, uint32_t* n22_out, uint16_t* n12_out, uint16_t* n10_out);
-static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign);
+static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign);
 
 static int32_t pack_basecall(const char* callsign, int length);
 
@@ -591,7 +591,7 @@ static bool save_callsign(const ftx_callsign_hash_interface_t* hash_if, const ch
     return true;
 }
 
-static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign)
+static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign)
 {
     char c11[12];
 

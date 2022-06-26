@@ -167,4 +167,25 @@ int audio_read(float* buffer, int num_samples)
     return 0;
 }
 
+#else
+
+int audio_init(void)
+{
+    return -1;
+}
+
+void audio_list(void)
+{
+}
+
+int audio_open(const char* name)
+{
+    return -1;
+}
+
+int audio_read(float* buffer, int num_samples)
+{
+    return -1;
+}
+
 #endif
