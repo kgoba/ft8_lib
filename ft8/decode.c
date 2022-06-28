@@ -229,7 +229,7 @@ static int ft4_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* cand
     return score;
 }
 
-int ft8_find_sync(const ftx_waterfall_t* wf, int num_candidates, ftx_candidate_t heap[], int min_score)
+int ftx_find_candidates(const ftx_waterfall_t* wf, int num_candidates, ftx_candidate_t heap[], int min_score)
 {
     int heap_size = 0;
     ftx_candidate_t candidate;
@@ -377,7 +377,7 @@ static void ftx_normalize_logl(float* log174)
     }
 }
 
-bool ft8_decode(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status)
+bool ftx_decode_candidate(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status)
 {
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
     if (wf->protocol == FTX_PROTOCOL_FT4)

@@ -59,7 +59,7 @@ typedef struct
 /// @param[in,out] heap Array of ftx_candidate_t type entries (with num_candidates allocated entries)
 /// @param[in] min_score Minimal score allowed for pruning unlikely candidates (can be zero for no effect)
 /// @return Number of candidates filled in the heap
-int ft8_find_sync(const ftx_waterfall_t* power, int num_candidates, ftx_candidate_t heap[], int min_score);
+int ftx_find_candidates(const ftx_waterfall_t* power, int num_candidates, ftx_candidate_t heap[], int min_score);
 
 /// Attempt to decode a message candidate. Extracts the bit probabilities, runs LDPC decoder, checks CRC and unpacks the message in plain text.
 /// @param[in] power Waterfall data collected during message slot
@@ -68,7 +68,7 @@ int ft8_find_sync(const ftx_waterfall_t* power, int num_candidates, ftx_candidat
 /// @param[out] message ftx_message_t structure that will receive the decoded message
 /// @param[out] status ftx_decode_status_t structure that will be filled with the status of various decoding steps
 /// @return True if the decoding was successful, false otherwise (check status for details)
-bool ft8_decode(const ftx_waterfall_t* power, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status);
+bool ftx_decode_candidate(const ftx_waterfall_t* power, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status);
 
 #ifdef __cplusplus
 }
