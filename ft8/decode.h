@@ -12,7 +12,25 @@ extern "C"
 {
 #endif
 
-/// Input structure to ft8_find_sync() function. This structure describes stored waterfall data over the whole message slot.
+typedef struct
+{
+    float mag;
+    float phase;
+} waterfall_cpx_t;
+
+// #define WATERFALL_USE_PHASE
+
+#ifdef WATERFALL_USE_PHASE
+#define WF_ELEM_T          waterfall_cpx_t
+#define WF_ELEM_MAG(x)     ((x).mag)
+#define WF_ELEM_MAG_INT(x) (int)(2 * ((x).mag + 120.0f))
+#else
+#define WF_ELEM_T          uint8_t
+#define WF_ELEM_MAG(x)     ((float)(x)*0.5f - 120.0f)
+#define WF_ELEM_MAG_INT(x) (int)(x)
+#endif
+
+/// Input structure to ftx_find_sync() function. This structure describes stored waterfall data over the whole message slot.
 /// Fields time_osr and freq_osr specify additional oversampling rate for time and frequency resolution.
 /// If time_osr=1, FFT magnitude data is collected once for every symbol transmitted, i.e. every 1/6.25 = 0.16 seconds.
 /// Values time_osr > 1 mean each symbol is further subdivided in time.
@@ -25,12 +43,12 @@ typedef struct
     int num_bins;            ///< number of FFT bins in terms of 6.25 Hz
     int time_osr;            ///< number of time subdivisions
     int freq_osr;            ///< number of frequency subdivisions
-    uint8_t* mag;            ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
+    WF_ELEM_T* mag;          ///< FFT magnitudes stored as uint8_t[blocks][time_osr][freq_osr][num_bins]
     int block_stride;        ///< Helper value = time_osr * freq_osr * num_bins
     ftx_protocol_t protocol; ///< Indicate if using FT4 or FT8
 } waterfall_t;
 
-/// Output structure of ft8_find_sync() and input structure of ft8_decode().
+/// Output structure of ftx_find_sync() and input structure of ftx_decode().
 /// Holds the position of potential start of a message in time and frequency.
 typedef struct
 {
@@ -39,12 +57,13 @@ typedef struct
     int16_t freq_offset; ///< Index of the frequency bin
     uint8_t time_sub;    ///< Index of the time subdivision used
     uint8_t freq_sub;    ///< Index of the frequency subdivision used
-    int16_t snr;
 } candidate_t;
 
 /// Structure that contains the status of various steps during decoding of a message
 typedef struct
 {
+    float freq;
+    float time;
     int ldpc_errors;         ///< Number of LDPC errors during decoding
     uint16_t crc_extracted;  ///< CRC value recovered from the message
     uint16_t crc_calculated; ///< CRC value calculated over the payload
@@ -59,7 +78,7 @@ typedef struct
 /// @param[in,out] heap Array of candidate_t type entries (with num_candidates allocated entries)
 /// @param[in] min_score Minimal score allowed for pruning unlikely candidates (can be zero for no effect)
 /// @return Number of candidates filled in the heap
-int ft8_find_sync(const waterfall_t* power, int num_candidates, candidate_t heap[], int min_score);
+int ftx_find_sync(const waterfall_t* power, int num_candidates, candidate_t heap[], int min_score);
 
 /// Attempt to decode a message candidate. Extracts the bit probabilities, runs LDPC decoder, checks CRC and unpacks the message in plain text.
 /// @param[in] power Waterfall data collected during message slot
@@ -68,7 +87,7 @@ int ft8_find_sync(const waterfall_t* power, int num_candidates, candidate_t heap
 /// @param[out] message ftx_message_t structure that will receive the decoded message
 /// @param[out] status decode_status_t structure that will be filled with the status of various decoding steps
 /// @return True if the decoding was successful, false otherwise (check status for details)
-bool ft8_decode(const waterfall_t* power, const candidate_t* cand, int max_iterations, ftx_message_t* message, decode_status_t* status);
+bool ftx_decode(const waterfall_t* power, const candidate_t* cand, int max_iterations, ftx_message_t* message, decode_status_t* status);
 
 #ifdef __cplusplus
 }

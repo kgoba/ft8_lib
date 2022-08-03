@@ -132,7 +132,7 @@ void decode(const monitor_t* mon)
     const waterfall_t* wf = &mon->wf;
     // Find top candidates by Costas sync score and localize them in time and frequency
     candidate_t candidate_list[kMax_candidates];
-    int num_candidates = ft8_find_sync(wf, kMax_candidates, candidate_list, kMin_score);
+    int num_candidates = ftx_find_sync(wf, kMax_candidates, candidate_list, kMin_score);
 
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
@@ -153,9 +153,22 @@ void decode(const monitor_t* mon)
         float freq_hz = (mon->min_bin + cand->freq_offset + (float)cand->freq_sub / wf->freq_osr) / mon->symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / wf->time_osr) * mon->symbol_period;
 
+#ifdef WATERFALL_USE_PHASE
+        // int resynth_len = 12000 * 16;
+        // float resynth_signal[resynth_len];
+        // for (int pos = 0; pos < resynth_len; ++pos)
+        // {
+        //     resynth_signal[pos] = 0;
+        // }
+        // monitor_resynth(mon, cand, resynth_signal);
+        // char resynth_path[80];
+        // sprintf(resynth_path, "resynth_%04f_%02.1f.wav", freq_hz, time_sec);
+        // save_wav(resynth_signal, resynth_len, 12000, resynth_path);
+#endif
+
         ftx_message_t message;
         decode_status_t status;
-        if (!ft8_decode(wf, cand, kLDPC_iterations, &message, &status))
+        if (!ftx_decode(wf, cand, kLDPC_iterations, &message, &status))
         {
             // float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
             // printf("000000 %2.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, "---");
@@ -297,7 +310,7 @@ int main(int argc, char** argv)
     int sample_rate = 12000;
     int num_samples = slot_time * sample_rate;
     float signal[num_samples];
-    bool isContinuous = false;
+    bool is_live = false;
 
     if (wav_path != NULL)
     {
@@ -314,7 +327,7 @@ int main(int argc, char** argv)
         audio_init();
         audio_open(dev_name);
         num_samples = (slot_time - 0.4f) * sample_rate;
-        isContinuous = true;
+        is_live = true;
     }
 
     // Compute FFT over the whole signal and store it
@@ -335,7 +348,7 @@ int main(int argc, char** argv)
 
     do
     {
-        if (dev_name != NULL)
+        if (is_live)
         {
             // Wait for the start of time slot
             while (true)
@@ -374,7 +387,7 @@ int main(int argc, char** argv)
 
         // Reset internal variables for the next time slot
         monitor_reset(&mon);
-    } while (isContinuous);
+    } while (is_live);
 
     monitor_free(&mon);
 

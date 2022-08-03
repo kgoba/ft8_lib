@@ -39,12 +39,21 @@ typedef struct
     // KISS FFT housekeeping variables
     void* fft_work;        ///< Work area required by Kiss FFT
     kiss_fftr_cfg fft_cfg; ///< Kiss FFT housekeeping object
+#ifdef WATERFALL_USE_PHASE
+    int nifft;             ///< iFFT size
+    void* ifft_work;       ///< Work area required by inverse Kiss FFT
+    kiss_fft_cfg ifft_cfg; ///< Inverse Kiss FFT housekeeping object
+#endif
 } monitor_t;
 
 void monitor_init(monitor_t* me, const monitor_config_t* cfg);
 void monitor_reset(monitor_t* me);
 void monitor_process(monitor_t* me, const float* frame);
 void monitor_free(monitor_t* me);
+
+#ifdef WATERFALL_USE_PHASE
+void monitor_resynth(const monitor_t* me, const candidate_t* candidate, float* signal);
+#endif
 
 #ifdef __cplusplus
 }
