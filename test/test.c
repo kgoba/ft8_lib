@@ -4,10 +4,7 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "ft8/debug.h"
-
 #include "ft8/text.h"
-#include "ft8/pack.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"
 
@@ -16,6 +13,7 @@
 #include "ft8/message.h"
 
 #define LOG_LEVEL LOG_INFO
+#include "ft8/debug.h"
 
 // void convert_8bit_to_6bit(uint8_t* dst, const uint8_t* src, int nBits)
 // {
@@ -151,7 +149,7 @@ void hashtable_add(const char* callsign, uint32_t hash)
     callsign_hashtable[idx_hash].hash = hash;
 }
 
-bool hashtable_lookup(ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign)
+bool hashtable_lookup(ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign)
 {
     uint32_t hash_mask = (hash_type == FTX_CALLSIGN_HASH_10_BITS) ? 0x3FFu : (hash_type == FTX_CALLSIGN_HASH_12_BITS ? 0xFFFu : 0x3FFFFFu);
     int idx_hash = (hash * 23) % CALLSIGN_HASHTABLE_SIZE;

@@ -58,12 +58,12 @@ typedef enum
     FTX_CALLSIGN_HASH_22_BITS,
     FTX_CALLSIGN_HASH_12_BITS,
     FTX_CALLSIGN_HASH_10_BITS
-} ftx_callsign_hash_type_e;
+} ftx_callsign_hash_type_t;
 
 typedef struct
 {
     /// Called when a callsign is looked up by its 22/12/10 bit hash code
-    bool (*lookup_hash)(ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign);
+    bool (*lookup_hash)(ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign);
     /// Called when a callsign should hashed and stored (by its 22, 12 and 10 bit hash codes)
     void (*save_hash)(const char* callsign, uint32_t n22);
 } ftx_callsign_hash_interface_t;
@@ -78,9 +78,12 @@ typedef enum
     FTX_MESSAGE_RC_ERROR_TYPE
 } ftx_message_rc_t;
 
-// Basecall - 1-2 letter/digit prefix (at least one letter), 1 digit area code, 1-3 letter suffix, total 3-6 chars (except for 7 char 3DA0- and 3X- calls)
-// Ext. basecall - basecall followed by /R or /P
-// Nonstd. call - all the rest, limited to 3-11 characters either alphanumeric or stroke (/)
+// Callsign types and sizes:
+// * Std. call (basecall) - 1-2 letter/digit prefix (at least one letter), 1 digit area code, 1-3 letter suffix,
+//                          total 3-6 chars (exception: 7 character calls with prefixes 3DA0- and 3XA..3XZ-)
+// * Ext. std. call - basecall followed by /R or /P
+// * Nonstd. call - all the rest, limited to 3-11 characters either alphanumeric or stroke (/)
+// In case a call is looked up from its hash value, the call is enclosed in angular brackets (<CA0LL>).
 
 void ftx_message_init(ftx_message_t* msg);
 

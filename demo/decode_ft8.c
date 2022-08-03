@@ -7,7 +7,6 @@
 
 #include <ft8/decode.h>
 #include <ft8/encode.h>
-#include <ft8/unpack.h>
 #include <ft8/message.h>
 
 #include <common/common.h>
@@ -33,7 +32,7 @@ void usage(const char* error_msg)
     {
         fprintf(stderr, "ERROR: %s\n", error_msg);
     }
-    fprintf(stderr, "Usage: decode_ft8 [-list|-ft4] INPUT\n\n");
+    fprintf(stderr, "Usage: decode_ft8 [-list|([-ft4] [INPUT|-dev DEVICE])]\n\n");
     fprintf(stderr, "Decode a 15-second (or slighly shorter) WAV file.\n");
 }
 
@@ -41,8 +40,8 @@ void usage(const char* error_msg)
 
 static struct
 {
-    char callsign[12];
-    uint32_t hash;
+    char callsign[12]; ///> Up to 11 symbols of callsign + trailing zeros (always filled)
+    uint32_t hash;     ///> 8 MSBs contain the age of callsign; 22 LSBs contain hash value
 } callsign_hashtable[CALLSIGN_HASHTABLE_SIZE];
 
 static int callsign_hashtable_size;
@@ -103,10 +102,10 @@ void hashtable_add(const char* callsign, uint32_t hash)
     callsign_hashtable[idx_hash].hash = hash;
 }
 
-bool hashtable_lookup(ftx_callsign_hash_type_e hash_type, uint32_t hash, char* callsign)
+bool hashtable_lookup(ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign)
 {
     uint8_t hash_shift = (hash_type == FTX_CALLSIGN_HASH_10_BITS) ? 12 : (hash_type == FTX_CALLSIGN_HASH_12_BITS ? 10 : 0);
-    uint16_t hash10 = (hash >> (12 - hash_shift)) & 0x3FF;
+    uint16_t hash10 = (hash >> (12 - hash_shift)) & 0x3FFu;
     int idx_hash = (hash10 * 23) % CALLSIGN_HASHTABLE_SIZE;
     while (callsign_hashtable[idx_hash].callsign[0] != '\0')
     {
@@ -127,12 +126,12 @@ ftx_callsign_hash_interface_t hash_if = {
     .save_hash = hashtable_add
 };
 
-void decode(const monitor_t* mon)
+void decode(const monitor_t* mon, struct tm* tm_slot_start)
 {
-    const waterfall_t* wf = &mon->wf;
+    const ftx_waterfall_t* wf = &mon->wf;
     // Find top candidates by Costas sync score and localize them in time and frequency
-    candidate_t candidate_list[kMax_candidates];
-    int num_candidates = ftx_find_sync(wf, kMax_candidates, candidate_list, kMin_score);
+    ftx_candidate_t candidate_list[kMax_candidates];
+    int num_candidates = ftx_find_candidates(wf, kMax_candidates, candidate_list, kMin_score);
 
     // Hash table for decoded messages (to check for duplicates)
     int num_decoded = 0;
@@ -148,7 +147,7 @@ void decode(const monitor_t* mon)
     // Go over candidates and attempt to decode messages
     for (int idx = 0; idx < num_candidates; ++idx)
     {
-        const candidate_t* cand = &candidate_list[idx];
+        const ftx_candidate_t* cand = &candidate_list[idx];
 
         float freq_hz = (mon->min_bin + cand->freq_offset + (float)cand->freq_sub / wf->freq_osr) / mon->symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / wf->time_osr) * mon->symbol_period;
@@ -167,11 +166,9 @@ void decode(const monitor_t* mon)
 #endif
 
         ftx_message_t message;
-        decode_status_t status;
-        if (!ftx_decode(wf, cand, kLDPC_iterations, &message, &status))
+        ftx_decode_status_t status;
+        if (!ftx_decode_candidate(wf, cand, kLDPC_iterations, &message, &status))
         {
-            // float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
-            // printf("000000 %2.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, "---");
             if (status.ldpc_errors > 0)
             {
                 LOG(LOG_DEBUG, "LDPC decode: %d errors\n", status.ldpc_errors);
@@ -215,25 +212,17 @@ void decode(const monitor_t* mon)
             ++num_decoded;
 
             char text[FTX_MAX_MESSAGE_LENGTH];
-            // int unpack_status = unpack77(message.payload, text, NULL);
-            int unpack_status = ftx_message_decode(&message, &hash_if, text);
-            if (unpack_status != 0)
+            ftx_message_rc_t unpack_status = ftx_message_decode(&message, &hash_if, text);
+            if (unpack_status != FTX_MESSAGE_RC_OK)
             {
-                strcpy(text, "Error while unpacking!");
+                snprintf(text, sizeof(text), "Error [%d] while unpacking!", (int)unpack_status);
             }
-
-            // uint8_t i3 = ftx_message_get_i3(&message);
-            // if (i3 == 0)
-            // {
-            //     uint8_t n3 = ftx_message_get_n3(&message);
-            //     printf("000000 %02d %+4.2f %4.0f [%d.%d] ~  %s\n", cand->score, time_sec, freq_hz, i3, n3, text);
-            // }
-            // else
-            //     printf("000000 %02d %+4.2f %4.0f [%d  ] ~  %s\n", cand->score, time_sec, freq_hz, i3, text);
 
             // Fake WSJT-X-like output for now
             float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
-            printf("000000 %+05.1f %+4.2f %4.0f ~  %s\n", snr, time_sec, freq_hz, text);
+            printf("%02d%02d%02d %+05.1f %+4.2f %4.0f ~  %s\n",
+                tm_slot_start->tm_hour, tm_slot_start->tm_min, tm_slot_start->tm_sec,
+                snr, time_sec, freq_hz, text);
         }
     }
     LOG(LOG_INFO, "Decoded %d messages, callsign hashtable size %d\n", num_decoded, callsign_hashtable_size);
@@ -306,9 +295,9 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    float slot_time = ((protocol == FTX_PROTOCOL_FT8) ? FT8_SLOT_TIME : FT4_SLOT_TIME);
+    float slot_period = ((protocol == FTX_PROTOCOL_FT8) ? FT8_SLOT_TIME : FT4_SLOT_TIME);
     int sample_rate = 12000;
-    int num_samples = slot_time * sample_rate;
+    int num_samples = slot_period * sample_rate;
     float signal[num_samples];
     bool is_live = false;
 
@@ -326,7 +315,7 @@ int main(int argc, char** argv)
     {
         audio_init();
         audio_open(dev_name);
-        num_samples = (slot_time - 0.4f) * sample_rate;
+        num_samples = (slot_period - 0.4f) * sample_rate;
         is_live = true;
     }
 
@@ -348,6 +337,7 @@ int main(int argc, char** argv)
 
     do
     {
+        struct tm tm_slot_start = { 0 };
         if (is_live)
         {
             // Wait for the start of time slot
@@ -355,12 +345,18 @@ int main(int argc, char** argv)
             {
                 struct timespec spec;
                 clock_gettime(CLOCK_REALTIME, &spec);
-                float time_within_slot = fmod((double)spec.tv_sec + (spec.tv_nsec * 1e-9) - time_shift, slot_time);
-                if (time_within_slot > slot_time / 3)
+                double time = (double)spec.tv_sec + (spec.tv_nsec / 1e9);
+                double time_within_slot = fmod(time - time_shift, slot_period);
+                if (time_within_slot > slot_period / 4)
+                {
                     audio_read(signal, mon.block_size);
+                }
                 else
                 {
-                    LOG(LOG_INFO, "Time within slot: %.3f s\n", time_within_slot);
+                    time_t time_slot_start = (time_t)(time - time_within_slot);
+                    gmtime_r(&time_slot_start, &tm_slot_start);
+                    LOG(LOG_INFO, "Time within slot %02d%02d%02d: %.3f s\n", tm_slot_start.tm_hour,
+                        tm_slot_start.tm_min, tm_slot_start.tm_sec, time_within_slot);
                     break;
                 }
             }
@@ -383,7 +379,7 @@ int main(int argc, char** argv)
         LOG(LOG_INFO, "Max magnitude: %.1f dB\n", mon.max_mag);
 
         // Decode accumulated data (containing slightly less than a full time slot)
-        decode(&mon);
+        decode(&mon, &tm_slot_start);
 
         // Reset internal variables for the next time slot
         monitor_reset(&mon);

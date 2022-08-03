@@ -2,7 +2,6 @@
 #include "constants.h"
 #include "crc.h"
 #include "ldpc.h"
-#include "unpack.h"
 
 #include <stdbool.h>
 #include <math.h>
@@ -15,8 +14,8 @@
 /// @param[in] cand Candidate to extract the message from
 /// @param[in] code_map Symbol encoding map
 /// @param[out] log174 Output of decoded log likelihoods for each of the 174 message bits
-static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174);
-static void ft8_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174);
+static void ft4_extract_likelihood(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, float* log174);
+static void ft8_extract_likelihood(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, float* log174);
 
 /// Packs a string of bits each represented as a zero/non-zero byte in bit_array[],
 /// as a string of packed bits starting from the MSB of the first byte of packed[]
@@ -27,15 +26,15 @@ static void pack_bits(const uint8_t bit_array[], int num_bits, uint8_t packed[])
 
 static float max2(float a, float b);
 static float max4(float a, float b, float c, float d);
-static void heapify_down(candidate_t heap[], int heap_size);
-static void heapify_up(candidate_t heap[], int heap_size);
+static void heapify_down(ftx_candidate_t heap[], int heap_size);
+static void heapify_up(ftx_candidate_t heap[], int heap_size);
 
 static void ftx_normalize_logl(float* log174);
 static void ft4_extract_symbol(const WF_ELEM_T* wf, float* logl);
 static void ft8_extract_symbol(const WF_ELEM_T* wf, float* logl);
 static void ft8_decode_multi_symbols(const WF_ELEM_T* wf, int num_bins, int n_syms, int bit_idx, float* log174);
 
-static const WF_ELEM_T* get_cand_mag(const waterfall_t* wf, const candidate_t* candidate)
+static const WF_ELEM_T* get_cand_mag(const ftx_waterfall_t* wf, const ftx_candidate_t* candidate)
 {
     int offset = candidate->time_offset;
     offset = (offset * wf->time_osr) + candidate->time_sub;
@@ -44,7 +43,7 @@ static const WF_ELEM_T* get_cand_mag(const waterfall_t* wf, const candidate_t* c
     return wf->mag + offset;
 }
 
-static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
+static int ft8_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* candidate)
 {
     int score = 0;
     int num_average = 0;
@@ -110,7 +109,7 @@ static int ft8_sync_score(const waterfall_t* wf, const candidate_t* candidate)
     return score;
 }
 
-static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
+static int ft4_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* candidate)
 {
     int score = 0;
     int num_average = 0;
@@ -173,13 +172,13 @@ static int ft4_sync_score(const waterfall_t* wf, const candidate_t* candidate)
     return score;
 }
 
-int ftx_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[], int min_score)
+int ftx_find_candidates(const ftx_waterfall_t* wf, int num_candidates, ftx_candidate_t heap[], int min_score)
 {
-    int (*sync_fun)(const waterfall_t*, const candidate_t*) = (wf->protocol == FTX_PROTOCOL_FT4) ? ft4_sync_score : ft8_sync_score;
+    int (*sync_fun)(const ftx_waterfall_t*, const ftx_candidate_t*) = (wf->protocol == FTX_PROTOCOL_FT4) ? ft4_sync_score : ft8_sync_score;
     int num_tones = (wf->protocol == FTX_PROTOCOL_FT4) ? 4 : 8;
 
     int heap_size = 0;
-    candidate_t candidate;
+    ftx_candidate_t candidate;
 
     // Here we allow time offsets that exceed signal boundaries, as long as we still have all data bits.
     // I.e. we can afford to skip the first 7 or the last 7 Costas symbols, as long as we track how many
@@ -226,7 +225,7 @@ int ftx_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
         // exchange it with the last element in the heap, and decrease the heap size.
         // Then restore the heap property in the new, smaller heap.
         // At the end the elements will be sorted in descending order.
-        candidate_t tmp = heap[len_unsorted - 1];
+        ftx_candidate_t tmp = heap[len_unsorted - 1];
         heap[len_unsorted - 1] = heap[0];
         heap[0] = tmp;
         len_unsorted--;
@@ -236,7 +235,7 @@ int ftx_find_sync(const waterfall_t* wf, int num_candidates, candidate_t heap[],
     return heap_size;
 }
 
-static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174)
+static void ft4_extract_likelihood(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, float* log174)
 {
     const WF_ELEM_T* mag = get_cand_mag(wf, cand); // Pointer to 4 magnitude bins of the first symbol
 
@@ -262,7 +261,7 @@ static void ft4_extract_likelihood(const waterfall_t* wf, const candidate_t* can
     }
 }
 
-static void ft8_extract_likelihood(const waterfall_t* wf, const candidate_t* cand, float* log174)
+static void ft8_extract_likelihood(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, float* log174)
 {
     const WF_ELEM_T* mag = get_cand_mag(wf, cand); // Pointer to 8 magnitude bins of the first symbol
 
@@ -310,7 +309,7 @@ static void ftx_normalize_logl(float* log174)
     }
 }
 
-bool ftx_decode(const waterfall_t* wf, const candidate_t* cand, int max_iterations, ftx_message_t* message, decode_status_t* status)
+bool ftx_decode_candidate(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status)
 {
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
     if (wf->protocol == FTX_PROTOCOL_FT4)
@@ -383,7 +382,7 @@ static float max4(float a, float b, float c, float d)
     return max2(max2(a, b), max2(c, d));
 }
 
-static void heapify_down(candidate_t heap[], int heap_size)
+static void heapify_down(ftx_candidate_t heap[], int heap_size)
 {
     // heapify from the root down
     int current = 0; // root node
@@ -409,14 +408,14 @@ static void heapify_down(candidate_t heap[], int heap_size)
         }
 
         // Exchange the current node with the smallest child and move down to it
-        candidate_t tmp = heap[smallest];
+        ftx_candidate_t tmp = heap[smallest];
         heap[smallest] = heap[current];
         heap[current] = tmp;
         current = smallest;
     }
 }
 
-static void heapify_up(candidate_t heap[], int heap_size)
+static void heapify_up(ftx_candidate_t heap[], int heap_size)
 {
     // heapify from the last node up
     int current = heap_size - 1;
@@ -429,7 +428,7 @@ static void heapify_up(candidate_t heap[], int heap_size)
         }
 
         // Exchange the current node with its parent and move up
-        candidate_t tmp = heap[parent];
+        ftx_candidate_t tmp = heap[parent];
         heap[parent] = heap[current];
         heap[current] = tmp;
         current = parent;
