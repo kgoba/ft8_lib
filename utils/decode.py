@@ -17,8 +17,8 @@ FT8_PAYLOAD_BITS = 77
 MIN_FREQ = 300
 MAX_FREQ = 3000
 
-def lin_to_db(x):
-    return 20*np.log10(x + 1e-12)
+def lin_to_db(x, eps=1e-12):
+    return 20*np.log10(x + eps)
 
 def db_to_lin(x):
     return 10**(x/20)
@@ -39,42 +39,69 @@ def quantize(H, mag_db_step=0.5, phase_divs=256):
     return db_to_lin(mag_db) * np.exp(1j * phase)
 
 class Waterfall:
-    def __init__(self):
+    def __init__(self, freq_osr=2, time_osr=2, freq_min=300, freq_max=3000):
         self.H = None
-        self.freq_osr = self.time_osr = None
-        pass
+        self.freq_osr = freq_osr
+        self.time_osr = time_osr
+        self.window_type = 'hann'
+        self.freq_step = FT8_TONE_DEVIATION / self.freq_osr # frequency step corresponding to one bin, Hz
+        self.time_step = FT8_SYMBOL_PERIOD / self.time_osr  # time step corresponding to one STFT position, seconds
+        self.bin_min = int(freq_min / self.freq_step)
+        self.bin_max = int(freq_max / self.freq_step) + 1
+        # self.freq_first = self.bin_min * self.freq_step
+        # self.time_first = FT8_SYMBOL_PERIOD * self.freq_osr / 2
+
+    def load_signal(self, sig, fs):
+        sym_size = int(fs * FT8_SYMBOL_PERIOD)
+        nfft = sym_size * self.freq_osr
+        _, _, H = signal.stft(sig, window=self.window_type, nfft=nfft, nperseg=nfft, noverlap=nfft - (sym_size//self.time_osr), boundary=None, padded=None)
+        self.H = quantize(H)
+        A = np.abs(H)
+        self.Apow = A**2
+        self.Adb = lin_to_db(A)
+        print(f'Max magnitude {self.Adb[:, self.bin_min:self.bin_max].max(axis=(0, 1)):.1f} dB')
+        print(f'Waterfall shape {H.shape}')
 
 
-def search_sync_coarse(H, bin_min, bin_max, freq_osr, time_osr, min_score=4.0, max_cand=30):
-    Adb = lin_to_db(np.abs(H))
-    freq_step = FT8_TONE_DEVIATION / freq_osr
-    time_step = FT8_SYMBOL_PERIOD / time_osr
-    print(f'Using bins {bin_min}..{bin_max} ({bin_max - bin_min})')
+def search_sync_coarse(wf, min_score=2.5, max_cand=30, snr_mode=2):
+    print(f'Using bins {wf.bin_min}..{wf.bin_max} ({wf.bin_max - wf.bin_min})')
     score_map = dict()
-    for freq_sub in range(freq_osr):
-        for bin_first in range(bin_min + freq_sub, bin_max - FT8_NUM_TONES * freq_osr, freq_osr):
+    for freq_sub in range(wf.freq_osr):
+        for bin_first in range(wf.bin_min + freq_sub, wf.bin_max - FT8_NUM_TONES * wf.freq_osr, wf.freq_osr):
             for time_sub in range(time_osr):
-                for time_start in range(-10 * time_osr + time_sub, 21 * time_osr + time_sub, time_osr):
+                for time_start in range(-10 * wf.time_osr + time_sub, 21 * wf.time_osr + time_sub, wf.time_osr):
                     # calc sync score at (bin_first, time_start)
                     score = []
+                    snr_sig = snr_noise = 0
                     for sync_start in FT8_SYNC_POS:
-                        for sync_pos, sync_tone in enumerate(FT8_SYNC_SYMS):
-                            pos = time_start + (sync_start + sync_pos) * time_osr
-                            if pos >= 0 and pos < Adb.shape[1]:
-                                sym_db = Adb[bin_first + sync_tone * freq_osr, pos]
-                                if pos - 1 >= 0:
-                                    sym_prev_db = Adb[bin_first + sync_tone * freq_osr, pos - 1]
-                                    score.append(sym_db - sym_prev_db)
-                                if pos + 1 < H.shape[1]:
-                                    sym_next_db = Adb[bin_first + sync_tone * freq_osr, pos + 1]
-                                    score.append(sym_db - sym_next_db)
-                                if bin_first + (sync_tone - 1) * freq_osr >= bin_min:
-                                    sym_down_db = Adb[bin_first + (sync_tone - 1) * freq_osr, pos]
-                                    score.append(sym_db - sym_down_db)
-                                if bin_first + (sync_tone + 1) * freq_osr < bin_max:
-                                    sym_up_db = Adb[bin_first + (sync_tone + 1) * freq_osr, pos]
-                                    score.append(sym_db - sym_up_db)
-                    score_avg = np.mean(score)
+                        for sync_pos, sync_tone in enumerate(FT8_SYNC_SYMS, start=sync_start):
+                            pos = time_start + sync_pos * wf.time_osr
+                            if pos >= 0 and pos < wf.Adb.shape[1]:
+                                if snr_mode == 0:
+                                    snr_sig += wf.Apow[bin_first + sync_tone * wf.freq_osr, pos]
+                                    for noise_tone in range(7):
+                                        if noise_tone != sync_tone:
+                                            snr_noise += wf.Apow[bin_first + noise_tone * wf.freq_osr, pos]
+                                else:
+                                    sym_db = wf.Adb[bin_first + sync_tone * wf.freq_osr, pos]
+                                    if bin_first + (sync_tone - 1) * freq_osr >= wf.bin_min:
+                                        sym_down_db = wf.Adb[bin_first + (sync_tone - 1) * wf.freq_osr, pos]
+                                        score.append(sym_db - sym_down_db)
+                                    if bin_first + (sync_tone + 1) * wf.freq_osr < wf.bin_max:
+                                        sym_up_db = wf.Adb[bin_first + (sync_tone + 1) * wf.freq_osr, pos]
+                                        score.append(sym_db - sym_up_db)
+                                    if snr_mode == 2:
+                                        if pos - 1 >= 0:
+                                            sym_prev_db = wf.Adb[bin_first + sync_tone * wf.freq_osr, pos - 1]
+                                            score.append(sym_db - sym_prev_db)
+                                        if pos + 1 < wf.Adb.shape[1]:
+                                            sym_next_db = wf.Adb[bin_first + sync_tone * wf.freq_osr, pos + 1]
+                                            score.append(sym_db - sym_next_db)
+                    if snr_mode == 0:
+                        score_avg = 10*np.log10(snr_sig / (snr_noise / 6))
+                    else:
+                        score_avg = np.mean(score)
+
                     if score_avg > min_score:
                         is_better = True
                         # if (bin_first, time_start) in score_map:
@@ -93,7 +120,9 @@ def search_sync_coarse(H, bin_min, bin_max, freq_osr, time_osr, min_score=4.0, m
 
     top_keys = sorted(score_map.keys(), key=lambda x: score_map[x], reverse=True)[:max_cand]
     for idx, (bin, pos) in enumerate(sorted(top_keys)):
-        print(f'{idx+1}: {freq_step * bin:.2f}\t{time_step * pos:+.02f}\t{score_map[(bin, pos)]:.2f}')
+        print(f'{idx+1}: {wf.freq_step * bin:.2f}\t{wf.time_step * pos:+.02f}\t{score_map[(bin, pos)]:.2f}')
+    time_offset = FT8_SYMBOL_PERIOD / 4
+    return [(wf.freq_step * bin, wf.time_step * pos - time_offset) for (bin, pos) in sorted(top_keys)]
 
 
 def downsample_fft(H, bin_f0, fs2=100, freq_osr=1, time_osr=1):
@@ -112,15 +141,15 @@ def downsample_fft(H, bin_f0, fs2=100, freq_osr=1, time_osr=1):
     H2 = np.roll(H2, -shift, axis=0)
     _, sig2 = signal.istft(H2, window='hann', nperseg=nfft2, noverlap=nfft2 - (sym_size2//time_osr), input_onesided=False)
 
-    f0_new = (taper_width + pad_width - shift) * freq_step2
-    return sig2, f0_new
+    f0_down = (taper_width + pad_width - shift) * freq_step2
+    return sig2, f0_down
 
 
-def search_sync_fine(sig2, fs2, f0_new, pos_start):
+def search_sync_fine(sig2, fs2, f0_down, pos_start):
     sym_size2 = int(fs2 * FT8_SYMBOL_PERIOD)
     n = np.arange(sym_size2)
 
-    f_tones = np.arange(f0_new, f0_new + FT8_NUM_TONES*FT8_TONE_DEVIATION, FT8_TONE_DEVIATION)
+    f_tones = np.arange(f0_down, f0_down + FT8_NUM_TONES*FT8_TONE_DEVIATION, FT8_TONE_DEVIATION)
     ctones_conj = np.exp(-1j * 2*np.pi * np.expand_dims(n, n.ndim) * np.expand_dims(f_tones/fs2, 0))
     ctweak_plus_tone = np.exp(-1j * 2*np.pi * n * FT8_TONE_DEVIATION/fs2)
     ctweak_minus_tone = np.exp(1j * 2*np.pi * n * FT8_TONE_DEVIATION/fs2)
@@ -128,11 +157,12 @@ def search_sync_fine(sig2, fs2, f0_new, pos_start):
     max_power, max_freq_offset, max_pos_offset = None, None, None
     all_powers = []
     win = signal.windows.kaiser(sym_size2, beta=2.0)
-    for freq_offset in np.linspace(-2.5, 2.5, 21):
+    for freq_offset in np.linspace(-3.2, 3.2, 21):
         power_time = []
         ctweak = np.exp(-1j * 2*np.pi * n * freq_offset/fs2)
         for pos_offset in range(-sym_size2//2, sym_size2//2 + 1):
-            power = 0
+            power_sig = 0
+            power_nse = 1e-12
             for sync_start in FT8_SYNC_POS:
                 for sync_pos, sync_tone in enumerate(FT8_SYNC_SYMS):
                     pos1 = pos_start + pos_offset + sym_size2 * (sync_start + sync_pos)
@@ -140,23 +170,25 @@ def search_sync_fine(sig2, fs2, f0_new, pos_start):
                     if pos1 >= 0 and pos1 + sym_size2 < len(sig2):
                         demod = win * sig2[pos1:pos1 + sym_size2] * ctones_conj[:, sync_tone] * ctweak
                         mag2_sym = np.abs(np.sum(demod))**2
-                        # power += mag2_sym
                         mag2_minus = np.abs(np.sum(demod * ctweak_minus_tone))**2
                         mag2_plus = np.abs(np.sum(demod * ctweak_plus_tone))**2
-                        power += 2*mag2_sym - mag2_minus - mag2_plus
+                        power_sig += mag2_sym
+                        power_nse += (mag2_minus + mag2_plus)/2
 
                         # demod_prev = win * sig2[pos1 - sym_size2:pos1] * ctones_conj[:, sync_tone] * ctweak
                         # demod_next = win * sig2[pos1 + sym_size2:pos1 + 2*sym_size2] * ctones_conj[:, sync_tone] * ctweak
                         # mag2_prev = np.abs(np.sum(demod_prev))**2
                         # mag2_next = np.abs(np.sum(demod_next))**2
                         # power += 2*mag2_sym - mag2_prev - mag2_next
+            # power = lin_to_db(power_sig / power_nse)/2
+            power = power_sig / power_nse
             power_time.append(power)
             if max_power is None or power > max_power:
                 max_power = power
                 max_freq_offset = freq_offset
                 max_pos_offset = pos_offset
             
-        print(f'{freq_offset:.1f}, {(np.argmax(power_time) - sym_size2//2)/fs2:.3f}, {np.max(power_time)}')
+        # print(f'{freq_offset:.1f}, {(np.argmax(power_time) - sym_size2//2)/fs2:.3f}, {np.max(power_time)}')
         all_powers.append(power_time)
 
     return max_freq_offset, max_pos_offset
@@ -194,63 +226,69 @@ print(f'Sample rate {fs} Hz')
 freq_osr = 2
 time_osr = 2
 
-sym_size = int(fs * FT8_SYMBOL_PERIOD)
-nfft = sym_size * freq_osr
-freq_step = fs / nfft
-_, _, H = signal.stft(sig, window='hann', nperseg=nfft, noverlap=nfft - (sym_size//time_osr), boundary=None, padded=None)
-H = quantize(H)
-Adb = lin_to_db(np.abs(H))
-print(f'Max magnitude {Adb.max(axis=(0, 1)):.1f} dB')
-print(f'Waterfall shape {Adb.shape}')
-
-bin_min = int(MIN_FREQ / freq_step)
-bin_max = int(MAX_FREQ / freq_step) + 1
-search_sync_coarse(H, bin_min, bin_max, freq_osr, time_osr)
+wf = Waterfall(freq_osr=freq_osr, time_osr=time_osr, freq_min=MIN_FREQ, freq_max=MAX_FREQ)
+wf.load_signal(sig, fs)
 
 use_downsample = True
-f0 = float(sys.argv[2])
-time_start = float(sys.argv[3])
-
-bin_f0 = int(0.5 + f0 / freq_step)
-f0_real = bin_f0 * freq_step
-print(f'Frequency {f0:.2f} Hz (bin {bin_f0}), coarse {f0_real:.2f} Hz')
-
-if use_downsample:
-    fs2 = 100
-    env_alpha = 0.06
-
-    sig2, f0_new = downsample_fft(H[:, ::time_osr], bin_f0, fs2=fs2, freq_osr=freq_osr, time_osr=1)
-    print(f'Downsampled signal to {fs2} Hz sample rate, freq shift {f0_real} Hz -> {f0_new} Hz')
-
-    pos_start = int(0.5 + time_start * fs2)
-    max_freq_offset, max_pos_offset = search_sync_fine(sig2, fs2, f0_new, pos_start)
-    print(f'Max power at {f0_real:.2f} + {max_freq_offset:.2f} = {f0_real + max_freq_offset:.2f} Hz, {max_pos_offset/fs2:.3f} s')
-
-    env = signal.filtfilt(env_alpha, [1, -(1-env_alpha)], np.abs(sig2))
-
-    # max_freq_offset = f0 - f0_real
-    # max_pos_offset = 0
-    sym_size2 = int(fs2 * FT8_SYMBOL_PERIOD)
-    ctweak = np.exp(-1j * 2*np.pi * np.arange(len(sig2)) * (f0_new + max_freq_offset)/fs2)
-    sig3 = (sig2*ctweak)[pos_start + max_pos_offset:pos_start + max_pos_offset + int(FT8_NUM_SYMBOLS*FT8_SYMBOL_PERIOD*fs2)]
-    _, _, H2 = signal.stft(sig3, window='boxcar', nperseg=sym_size2, noverlap=0, return_onesided=False, boundary=None, padded=False)
-    A2db = lin_to_db(np.abs(H2))
-    A2db = A2db[0:FT8_NUM_TONES, :]
+if len(sys.argv) > 2:
+    f0 = float(sys.argv[2])
+    time_start = float(sys.argv[3])
+    candidates = [(f0, time_start)]
 else:
-    pos_start = int(0.5 + (time_start + FT8_SYMBOL_PERIOD/2) * fs / sym_size * time_osr)
-    print(f'Start time {time_start:.3f} s (pos {pos_start}), coarse {pos_start / time_osr * sym_size / fs - FT8_SYMBOL_PERIOD/2:.3f} s')
-    A2db = Adb[bin_f0:bin_f0+freq_osr*FT8_NUM_TONES:freq_osr, pos_start:pos_start+FT8_NUM_SYMBOLS*time_osr:time_osr]
+    candidates = search_sync_coarse(wf)
 
-A2db -= np.max(A2db, axis=0)
+num_decoded = 0
+for f0, time_start in candidates:
+    bin_f0 = int(0.5 + f0 / wf.freq_step)
+    f0_real = bin_f0 * wf.freq_step
+    print(f'Frequency {f0:.2f} Hz (bin {bin_f0}), coarse {f0_real:.2f} Hz')
 
-bits_logl, A2db_bits = extract_logl_db(A2db)
-(num_errors, bits) = ldpc.bp_solve(bits_logl, max_iters=30, max_no_improvement=15)
-print(f'LDPC decode: {num_errors} errors')
-if num_errors == 0:
-    print(f'Payload bits: {"".join([str(x) for x in bits[:FT8_PAYLOAD_BITS]])}')
-    print(f'CRC bits    : {"".join([str(x) for x in bits[FT8_PAYLOAD_BITS:FT8_LDPC_PAYLOAD_BITS]])}')
-    print(f'Parity bits : {"".join([str(x) for x in bits[FT8_LDPC_PAYLOAD_BITS:]])}')
+    if use_downsample:
+        fs2 = 100
+        env_alpha = 0.06
 
+        sig2, f0_down = downsample_fft(wf.H[:, ::time_osr], bin_f0, fs2=fs2, freq_osr=freq_osr, time_osr=1)
+        print(f'Downsampled signal to {fs2} Hz sample rate, freq shift {f0_real} Hz -> {f0_down} Hz')
+
+        pos_start = int(0.5 + time_start * fs2)
+        max_freq_offset, max_pos_offset = search_sync_fine(sig2, fs2, f0_down, pos_start)
+        f0_down_fine, pos_fine = max_freq_offset + f0_down, pos_start + max_pos_offset
+        print(f'Fine sync at {f0_real:.2f} + {max_freq_offset:.2f} = {f0_real + max_freq_offset:.2f} Hz, {pos_start/fs2:.3f} + {max_pos_offset/fs2:.3f} = {pos_fine/fs2:.3f} s')
+
+        env = signal.filtfilt(env_alpha, [1, -(1-env_alpha)], np.abs(sig2))
+
+        sym_size2 = int(fs2 * FT8_SYMBOL_PERIOD)
+        ctweak = np.exp(-1j * 2*np.pi * np.arange(len(sig2)) * f0_down_fine/fs2)
+        slice_pos = pos_start + max_pos_offset
+        slice_length = int(FT8_NUM_SYMBOLS*FT8_SYMBOL_PERIOD*fs2)
+        pad_left = pad_right = 0
+        if slice_pos < 0:
+            pad_left = -slice_pos
+            slice_pos = 0
+        if slice_pos + slice_length > len(sig2) + pad_left:
+            pad_right = slice_pos + slice_length - (len(sig2) + pad_left)
+        sig3 = np.pad(sig2*ctweak, (pad_left, pad_right), mode='constant', constant_values=(0, 0))[slice_pos:slice_pos + slice_length]
+        _, _, H2 = signal.stft(sig3, window='boxcar', nperseg=sym_size2, noverlap=0, return_onesided=False, boundary=None, padded=False)
+        A2db = lin_to_db(np.abs(H2[0:FT8_NUM_TONES, :]))
+    else:
+        time_offset = FT8_SYMBOL_PERIOD / 4
+        pos_start = int(0.5 + (time_start + time_offset) / wf.time_step)
+        print(f'Start time {time_start:.3f} s (pos {pos_start}), coarse {pos_start * wf.time_step - time_offset:.3f} s')
+        # TODO: zero padding for time axis
+        A2db = wf.Adb[bin_f0:bin_f0+freq_osr*FT8_NUM_TONES:freq_osr, pos_start:pos_start+FT8_NUM_SYMBOLS*time_osr:time_osr]
+
+    A2db -= np.max(A2db, axis=0)
+
+    bits_logl, A2db_bits = extract_logl_db(A2db)
+    (num_errors, bits) = ldpc.bp_solve(bits_logl, max_iters=30, max_no_improvement=15)
+    print(f'LDPC decode: {num_errors} errors')
+    if num_errors == 0:
+        print(f'Payload bits: {"".join([str(x) for x in bits[:FT8_PAYLOAD_BITS]])}')
+        print(f'CRC bits    : {"".join([str(x) for x in bits[FT8_PAYLOAD_BITS:FT8_LDPC_PAYLOAD_BITS]])}')
+        print(f'Parity bits : {"".join([str(x) for x in bits[FT8_LDPC_PAYLOAD_BITS:]])}')
+        num_decoded += 1
+
+print(f'Total decoded: {num_decoded}')
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
