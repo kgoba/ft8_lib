@@ -358,7 +358,7 @@ int pack77(const char* msg, uint8_t* c77)
         if(hex_ok >= 0) {
             return 0;
         } else {
-            return 1;
+            return -1;
         }
     }
 
