@@ -217,6 +217,71 @@ int pack77_1(const char* msg, uint8_t* b77)
     return 0;
 }
 
+static void hex2bin(const char* in, unsigned char* out) {
+    size_t len = strlen(in);
+    static const unsigned char TBL[] = {
+        0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  58,  59,  60,  61,
+        62,  63,  64,  10,  11,  12,  13,  14,  15,  71,  72,  73,  74,  75,
+        76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,
+        90,  91,  92,  93,  94,  95,  96,  10,  11,  12,  13,  14,  15
+    };
+    static const unsigned char *LOOKUP = TBL - 48;
+    const char* end = in + len;
+    while(in < end) 
+    {
+        *(out++) = LOOKUP[(int)*(in)] << 4 | LOOKUP[(int)*(in+1)];
+        in += 2;
+    }
+}
+
+static int is_hex_digit(char c) {
+    if((c >= 'A' && c <= 'F' ) || (c >= 'a' && c <= 'f') || (c >= '0' && c <= '9') ) 
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static int verify_hex(const char* hex) {
+    size_t len = strlen(hex);
+    for(int i=0; i<len; i++) 
+    {
+        if(!is_hex_digit(hex[i])) 
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int packtelemetryhex77(const char* hex, uint8_t* b77)
+{
+    if(!verify_hex(hex))
+    {
+        return -1;
+    }
+    uint8_t raw_bytes[9];
+    hex2bin(hex, raw_bytes);
+    for (int i = 0; i < 9; ++i)
+    {
+        b77[i] =  raw_bytes[i];
+    }
+
+    // Shift bits in b77 left by 1 bit
+    uint8_t carry = 0;
+    uint8_t prev_carry = 0;
+    for (int i = 9; i >= 0; --i)
+    {
+        carry = (b77[i] & 0b10000000);
+        b77[i] = (prev_carry ? 1 : 0) | (b77[i] << 1);
+        prev_carry = carry;
+    }
+    // Set n3=5 (bits 71..73) and i3=0 (bits 74..76)
+    b77[8] |= 0b0000001;
+    b77[9] = 0b01000000;
+    return 0;
+}
+
 void packtext77(const char* text, uint8_t* b77)
 {
     int length = strlen(text);
@@ -288,9 +353,14 @@ int pack77(const char* msg, uint8_t* c77)
     {
         return 0;
     }
-
-    // TODO:
-    // Check 0.5 (telemetry)
+    if(strlen(msg) == 18) {
+        int hex_ok = packtelemetryhex77(msg, c77);
+        if(hex_ok >= 0) {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
 
     // Check Type 4 (One nonstandard call and one hashed call)
 
