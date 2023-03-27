@@ -1,7 +1,7 @@
 #include "monitor.h"
 #include <common/common.h>
 
-#define LOG_LEVEL LOG_INFO
+#define LOG_LEVEL LOG_WARN
 #include <ft8/debug.h>
 
 #include <stdlib.h>

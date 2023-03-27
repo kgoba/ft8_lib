@@ -113,11 +113,20 @@ ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg)
     }
 }
 
+// make && ./gen_ft8 '7FFFFFFFFFFFFFFFFF' out.wav && ./decode_ft8 out.wav
+//  000000 +16.5 +1.36 1000 ~  7FFFFFFFFFFFFFFFFF
+// 
 ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, const char* message_text)
 {
     char call_to[12];
     char call_de[12];
     char extra[20];
+    ftx_message_rc_t rc = FTX_MESSAGE_RC_ERROR_TYPE;
+
+    rc = ftx_message_encode_telemetry_hex(msg, message_text); // expects exactly 18 hex characters.
+    if (rc == FTX_MESSAGE_RC_OK) {
+        return rc;
+    }
 
     const char* parse_position = message_text;
     parse_position = copy_token(call_to, 12, parse_position);
@@ -139,18 +148,81 @@ ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interf
         // token too long
         return FTX_MESSAGE_RC_ERROR_GRID;
     }
-
-    ftx_message_rc_t rc;
+    
     rc = ftx_message_encode_std(msg, hash_if, call_to, call_de, extra);
     if (rc == FTX_MESSAGE_RC_OK)
         return rc;
     rc = ftx_message_encode_nonstd(msg, hash_if, call_to, call_de, extra);
     if (rc == FTX_MESSAGE_RC_OK)
         return rc;
-
-    // rc = ftx_message_encode_telemetry_hex(msg, hash_if, call_to, call_de, extra);
-
     return rc;
+}
+
+static void hex2bin(const char* in, unsigned char* out) {
+    size_t len = strlen(in);
+    static const unsigned char TBL[] = {
+        0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  58,  59,  60,  61,
+        62,  63,  64,  10,  11,  12,  13,  14,  15,  71,  72,  73,  74,  75,
+        76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,
+        90,  91,  92,  93,  94,  95,  96,  10,  11,  12,  13,  14,  15
+    };
+    static const unsigned char *LOOKUP = TBL - 48;
+    const char* end = in + len;
+    while(in < end) {
+        *(out++) = LOOKUP[(int)*(in)] << 4 | LOOKUP[(int)*(in+1)];
+        in += 2;
+    }
+ }
+
+ static int is_hex_digit(char c) {
+    if((c >= 'A' && c <= 'F' ) || (c >= 'a' && c <= 'f') || (c >= '0' && c <= '9') )  {
+        return 1;
+    }
+    return 0;
+ }
+
+ static int verify_hex(const char* hex) {
+     size_t len = strlen(hex);
+     for(int i=0; i<len; i++) {
+         if(!is_hex_digit(hex[i])) {
+             return 0;
+         }
+     }
+     return 1;
+ }
+
+#define FTX_TELEMETRY_MESSAGE_LENGTH_BYTES 9
+
+// Quick test: make && ./gen_ft8 '7FFFFFFFFFFFFFFFFF' out.wav && ./decode_ft8 out.wav
+ftx_message_rc_t ftx_message_encode_telemetry_hex(ftx_message_t* msg, const char* telemetry_hex)
+{
+    if(strlen(telemetry_hex) != (FTX_TELEMETRY_MESSAGE_LENGTH_BYTES*2) || !verify_hex(telemetry_hex)) {
+        //LOG(LOG_WARN, "telemetry expected 18 hex characters, 71 bits.\n");
+        //LOG(LOG_WARN, "Note: The most significant byte has only the 7 least significant bits used. E.g. '7FFFFFFFFFFFFFFFFF'\n");
+        return FTX_MESSAGE_RC_ERROR_TYPE;
+    }
+    uint8_t raw_bytes[FTX_PAYLOAD_LENGTH_BYTES];
+    hex2bin(telemetry_hex, raw_bytes);
+    return ftx_message_encode_telemetry(msg, raw_bytes);
+}
+
+ftx_message_rc_t ftx_message_encode_telemetry(ftx_message_t* msg, const uint8_t telemetry_data[FTX_TELEMETRY_MESSAGE_LENGTH_BYTES])
+{
+    for (int i = 0; i < FTX_TELEMETRY_MESSAGE_LENGTH_BYTES; ++i){
+         msg->payload[i] = telemetry_data[i];
+    }
+    // Shift bits in b77 left by 1 bit
+     uint8_t carry = 0;
+     uint8_t prev_carry = 0;
+     for (int i = FTX_PAYLOAD_LENGTH_BYTES; i >= 0; --i) {
+         carry = (msg->payload[i] & 0b10000000);
+         msg->payload[i] = (prev_carry ? 1 : 0) | (msg->payload[i] << 1);
+         prev_carry = carry;
+     }
+     // Set n3=5 (bits 71..73) and i3=0 (bits 74..76)
+     msg->payload[8] |= 0b0000001;
+     msg->payload[9] = 0b01000000;
+     return FTX_MESSAGE_RC_OK;
 }
 
 ftx_message_rc_t ftx_message_encode_std(ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, const char* call_to, const char* call_de, const char* extra)
