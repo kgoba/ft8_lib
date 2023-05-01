@@ -52,3 +52,9 @@ Of course in moments of frustration I have looked up the original WSJT-X code, w
 
 Karlis Goba,
 YL3JG
+
+------
+This has been patched by Dangerous Devices / Pripyat Automations to build as
+usable shared library.
+
+I'll try to keep it up to day!.
