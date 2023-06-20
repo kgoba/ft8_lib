@@ -119,7 +119,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     me->fft_norm = 2.0f / me->nfft;
     // const int len_window = 1.8f * me->block_size; // hand-picked and optimized
 
-    me->window = (float *)malloc(me->nfft * sizeof(me->window[0]));
+    me->window = (float *)calloc(me->nfft * sizeof(me->window[0]));
     for (int i = 0; i < me->nfft; ++i)
     {
         // window[i] = 1;
@@ -128,7 +128,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
         // me->window[i] = hamming_i(i, me->nfft);
         // me->window[i] = (i < len_window) ? hann_i(i, len_window) : 0;
     }
-    me->last_frame = (float *)malloc(me->nfft * sizeof(me->last_frame[0]));
+    me->last_frame = (float *)calloc(me->nfft * sizeof(me->last_frame[0]));
 
     size_t fft_work_size;
     kiss_fftr_alloc(me->nfft, 0, 0, &fft_work_size);
