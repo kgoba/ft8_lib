@@ -6,12 +6,12 @@
 
 #include "common/common.h"
 #include "common/wave.h"
-#include "common/debug.h"
-#include "ft8/pack.h"
+#include "ft8/message.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"
 
 #define LOG_LEVEL LOG_INFO
+#include "ft8/debug.h"
 
 #define FT8_SYMBOL_BT 2.0f ///< symbol smoothing filter bandwidth factor (BT)
 #define FT4_SYMBOL_BT 1.0f ///< symbol smoothing filter bandwidth factor (BT)
@@ -130,19 +130,19 @@ int main(int argc, char** argv)
     bool is_ft4 = (argc > 4) && (0 == strcmp(argv[4], "-ft4"));
 
     // First, pack the text data into binary message
-    uint8_t packed[FTX_LDPC_K_BYTES];
-    int rc = pack77(message, packed);
-    if (rc < 0)
+    ftx_message_t msg;
+    ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
+    if (rc != FTX_MESSAGE_RC_OK)
     {
         printf("Cannot parse message!\n");
-        printf("RC = %d\n", rc);
+        printf("RC = %d\n", (int)rc);
         return -2;
     }
 
     printf("Packed data: ");
     for (int j = 0; j < 10; ++j)
     {
-        printf("%02x ", packed[j]);
+        printf("%02x ", msg.payload[j]);
     }
     printf("\n");
 
@@ -155,11 +155,11 @@ int main(int argc, char** argv)
     uint8_t tones[num_tones]; // Array of 79 tones (symbols)
     if (is_ft4)
     {
-        ft4_encode(packed, tones);
+        ft4_encode(msg.payload, tones);
     }
     else
     {
-        ft8_encode(packed, tones);
+        ft8_encode(msg.payload, tones);
     }
 
     printf("FSK tones: ");
