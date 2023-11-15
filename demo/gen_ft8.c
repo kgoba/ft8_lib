@@ -120,6 +120,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    uint8_t tones[128]; // Array of 79 tones (symbols)
     const char* message = argv[1];
     const char* wav_path = argv[2];
     float frequency = 1000.0;
@@ -128,6 +129,15 @@ int main(int argc, char** argv)
         frequency = atof(argv[3]);
     }
     bool is_ft4 = (argc > 4) && (0 == strcmp(argv[4], "-ft4"));
+    int num_tones = (is_ft4) ? FT4_NN : FT8_NN;
+    float symbol_period = (is_ft4) ? FT4_SYMBOL_PERIOD : FT8_SYMBOL_PERIOD;
+    float symbol_bt = (is_ft4) ? FT4_SYMBOL_BT : FT8_SYMBOL_BT;
+    float slot_time = (is_ft4) ? FT4_SLOT_TIME : FT8_SLOT_TIME;
+
+    if(getenv("DEBUG_TONES_DATA")) {
+        printf("Note: DEBUG_TONES_DATA is set! Using it to generate the WAVE file...\n");
+        goto DEBUG_TONES_DATA;
+    }
 
     // First, pack the text data into binary message
     ftx_message_t msg;
@@ -146,13 +156,7 @@ int main(int argc, char** argv)
     }
     printf("\n");
 
-    int num_tones = (is_ft4) ? FT4_NN : FT8_NN;
-    float symbol_period = (is_ft4) ? FT4_SYMBOL_PERIOD : FT8_SYMBOL_PERIOD;
-    float symbol_bt = (is_ft4) ? FT4_SYMBOL_BT : FT8_SYMBOL_BT;
-    float slot_time = (is_ft4) ? FT4_SLOT_TIME : FT8_SLOT_TIME;
-
     // Second, encode the binary message as a sequence of FSK tones
-    uint8_t tones[num_tones]; // Array of 79 tones (symbols)
     if (is_ft4)
     {
         ft4_encode(msg.payload, tones);
@@ -160,6 +164,18 @@ int main(int argc, char** argv)
     else
     {
         ft8_encode(msg.payload, tones);
+    }
+
+DEBUG_TONES_DATA:
+    if(getenv("DEBUG_TONES_DATA")) {
+        char *tmp = getenv("DEBUG_TONES_DATA");
+        int j = 0;
+
+        for (int i = 0; i < strlen(tmp); i++) {
+            if (tmp[i] == ' ')
+                continue;
+            tones[j++] = tmp[i] - '0';
+        }
     }
 
     printf("FSK tones: ");
