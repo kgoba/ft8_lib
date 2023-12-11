@@ -992,3 +992,67 @@ static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra)
 
     return 0;
 }
+
+void packtext77(const char* text, uint8_t* b77)
+{
+    int length = strlen(text);
+
+    // Skip leading and trailing spaces
+    while (*text == ' ' && *text != 0)
+    {
+        ++text;
+        --length;
+    }
+    while (length > 0 && text[length - 1] == ' ')
+    {
+        --length;
+    }
+
+    // Clear the first 72 bits representing a long number
+    for (int i = 0; i < 9; ++i)
+    {
+        b77[i] = 0;
+    }
+
+    // Now express the text as base-42 number stored
+    // in the first 72 bits of b77
+    for (int j = 0; j < 13; ++j)
+    {
+        // Multiply the long integer in b77 by 42
+        uint16_t x = 0;
+        for (int i = 8; i >= 0; --i)
+        {
+            x += b77[i] * (uint16_t)42;
+            b77[i] = (x & 0xFF);
+            x >>= 8;
+        }
+
+        // Get the index of the current char
+        if (j < length)
+        {
+            int q = nchar(text[j], FT8_CHAR_TABLE_FULL);
+            x = (q > 0) ? q : 0;
+        }
+        else
+        {
+            x = 0;
+        }
+        // Here we double each added number in order to have the result multiplied
+        // by two as well, so that it's a 71 bit number left-aligned in 72 bits (9 bytes)
+        x <<= 1;
+
+        // Now add the number to our long number
+        for (int i = 8; i >= 0; --i)
+        {
+            if (x == 0)
+                break;
+            x += b77[i];
+            b77[i] = (x & 0xFF);
+            x >>= 8;
+        }
+    }
+
+    // Set n3=0 (bits 71..73) and i3=0 (bits 74..76)
+    b77[8] &= 0xFE;
+    b77[9] &= 0x00;
+}
