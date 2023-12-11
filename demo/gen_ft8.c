@@ -111,6 +111,8 @@ void usage()
     printf("(Note that you might have to enclose your message in quote marks if it contains spaces)\n");
 }
 
+void packtext77(const char* text, uint8_t* b77);
+
 int main(int argc, char** argv)
 {
     // Expect two command-line arguments
@@ -134,9 +136,14 @@ int main(int argc, char** argv)
     ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
     if (rc != FTX_MESSAGE_RC_OK)
     {
-        printf("Cannot parse message!\n");
-        printf("RC = %d\n", (int)rc);
-        return -2;
+        // Try 'free text' encoding
+        if (strlen(message) <= 13)
+            packtext77(message, (uint8_t *)&msg.payload);
+        else {
+            printf("Cannot parse message!\n");
+            printf("RC = %d\n", (int)rc);
+            return -2;
+       }
     }
 
     printf("Packed data: ");
