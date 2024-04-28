@@ -7,6 +7,7 @@
 #include "ft8/text.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"
+#include "ft8/sysdefs.h"
 
 #include "fft/kiss_fftr.h"
 #include "common/common.h"
