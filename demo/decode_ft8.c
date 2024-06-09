@@ -17,6 +17,10 @@
 #define LOG_LEVEL LOG_INFO
 #include <ft8/debug.h>
 
+#ifdef _WIN32
+#define gmtime_r(timep, result) gmtime_s(result, timep)
+#endif
+
 const int kMin_score = 10; // Minimum sync score threshold for candidates
 const int kMax_candidates = 140;
 const int kLDPC_iterations = 25;

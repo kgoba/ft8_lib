@@ -1,5 +1,7 @@
 BUILD_DIR = .build
 
+USE_ASAN = 1  # Set to 1 to enable AddressSanitizer
+
 FT8_SRC  = $(wildcard ft8/*.c)
 FT8_OBJ  = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FT8_SRC))
 
@@ -11,9 +13,14 @@ FFT_OBJ  = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FFT_SRC))
 
 TARGETS  = gen_ft8 decode_ft8 test_ft8
 
-CFLAGS   = -fsanitize=address -O3 -ggdb3
+CFLAGS   = -D_GNU_SOURCE -O3 -ggdb3
 CPPFLAGS = -std=c11 -I.
-LDFLAGS  = -fsanitize=address -lm
+LDFLAGS  = -lm
+
+ifeq ($(USE_ASAN), 1)
+CFLAGS  += -fsanitize=address
+LDFLAGS += -fsanitize=address
+endif
 
 # Optionally, use Portaudio for live audio input
 ifdef PORTAUDIO_PREFIX
