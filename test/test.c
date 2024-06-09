@@ -15,6 +15,16 @@
 #define LOG_LEVEL LOG_INFO
 #include "ft8/debug.h"
 
+#ifndef HAVE_STPCPY
+#define HAVE_STPCPY
+
+static char *stpcpy(char *dest, const char *src) {
+    strcpy(dest, src);
+    return dest + strlen(src);
+}
+
+#endif
+
 // void convert_8bit_to_6bit(uint8_t* dst, const uint8_t* src, int nBits)
 // {
 //     // Zero-fill the destination array as we will only be setting bits later

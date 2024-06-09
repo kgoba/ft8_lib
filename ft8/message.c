@@ -10,6 +10,16 @@
 #define NTOKENS  ((uint32_t)2063592ul)
 #define MAXGRID4 ((uint16_t)32400ul)
 
+#ifndef HAVE_STPCPY
+#define HAVE_STPCPY
+
+static char *stpcpy(char *dest, const char *src) {
+    strcpy(dest, src);
+    return dest + strlen(src);
+}
+
+#endif
+
 ////////////////////////////////////////////////////// Static function prototypes //////////////////////////////////////////////////////////////
 
 static bool trim_brackets(char* result, const char* original, int length);
