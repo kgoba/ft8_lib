@@ -11,13 +11,13 @@ FFT_OBJ  = $(patsubst %.c,$(BUILD_DIR)/%.o,$(FFT_SRC))
 
 TARGETS  = gen_ft8 decode_ft8 test_ft8
 
-CFLAGS   = -fsanitize=address -O3 -ggdb3
-CPPFLAGS = -std=c11 -I.
+CFLAGS   = -fsanitize=address -O3 -ggdb3 -DHAVE_STPCPY -I.
 LDFLAGS  = -fsanitize=address -lm
 
 # Optionally, use Portaudio for live audio input
+# Portaudio is a C++ library, so then you need to set CC=clang++ or CC=g++
 ifdef PORTAUDIO_PREFIX
-CPPFLAGS += -DUSE_PORTAUDIO -I$(PORTAUDIO_PREFIX)/include
+CFLAGS   += -DUSE_PORTAUDIO -I$(PORTAUDIO_PREFIX)/include
 LDFLAGS  += -lportaudio -L$(PORTAUDIO_PREFIX)/lib
 endif
 
@@ -26,7 +26,7 @@ endif
 all: $(TARGETS)
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGETS) 
+	rm -rf $(BUILD_DIR) $(TARGETS)
 
 run_tests: test_ft8
 	@./test_ft8
@@ -46,4 +46,4 @@ test_ft8: $(BUILD_DIR)/test/test.o $(FT8_OBJ)
 
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $^
+	$(CC) $(CFLAGS) -o $@ -c $^
