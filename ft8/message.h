@@ -105,9 +105,8 @@ ftx_message_rc_t ftx_message_encode_std(ftx_message_t* msg, ftx_callsign_hash_in
 /// Pack Type 4 (One nonstandard call and one hashed call) message
 ftx_message_rc_t ftx_message_encode_nonstd(ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, const char* call_to, const char* call_de, const char* extra);
 
-void ftx_message_encode_free(const char* text);
-void ftx_message_encode_telemetry_hex(const char* telemetry_hex);
-void ftx_message_encode_telemetry(const uint8_t* telemetry);
+ftx_message_rc_t ftx_message_encode_free(ftx_message_t* msg, const char* text);
+ftx_message_rc_t ftx_message_encode_telemetry(ftx_message_t* msg, const uint8_t* telemetry);
 
 ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* message);
 ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* call_to, char* call_de, char* extra);

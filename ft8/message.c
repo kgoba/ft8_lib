@@ -147,8 +147,9 @@ ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interf
     rc = ftx_message_encode_nonstd(msg, hash_if, call_to, call_de, extra);
     if (rc == FTX_MESSAGE_RC_OK)
         return rc;
-
-    // rc = ftx_message_encode_telemetry_hex(msg, hash_if, call_to, call_de, extra);
+    rc = ftx_message_encode_free(msg, message_text);
+    if (rc == FTX_MESSAGE_RC_OK)
+        return rc;
 
     return rc;
 }
@@ -174,6 +175,13 @@ ftx_message_rc_t ftx_message_encode_std(ftx_message_t* msg, ftx_callsign_hash_in
         {
             return FTX_MESSAGE_RC_ERROR_SUFFIX;
         }
+    }
+
+    char* slash_de = strchr(call_de, '/');
+    uint8_t icq = (uint8_t)equals(call_to, "CQ");
+    if (slash_de && (slash_de - call_de >= 2) && icq && !(equals(slash_de, "/P") || equals(slash_de, "/R")))
+    {
+        return FTX_MESSAGE_RC_ERROR_CALLSIGN2; // nonstandard call: need a type 4 message
     }
 
     uint16_t igrid4 = packgrid(extra);
@@ -215,14 +223,11 @@ ftx_message_rc_t ftx_message_encode_nonstd(ftx_message_t* msg, ftx_callsign_hash
     int len_call_to = strlen(call_to);
     int len_call_de = strlen(call_de);
 
-    // if ((icq != 0) || (pack_basecall(call_to, len_call_to) >= 0))
-    // {
-    //     if (pack_basecall(call_de, len_call_de) >= 0)
-    //     {
-    //         // no need for encode_nonstd, should use encode_std
-    //         return FTX_MESSAGE_RC_ERROR_CALLSIGN2;
-    //     }
-    // }
+    if ((icq != 0) || (pack_basecall(call_to, len_call_to) < 0))
+    {
+        // CQ with non-std call, should use free text (without hash)
+        return FTX_MESSAGE_RC_ERROR_CALLSIGN2;
+    }
 
     if ((icq == 0) && ((len_call_to < 3)))
         return FTX_MESSAGE_RC_ERROR_CALLSIGN1;
@@ -293,6 +298,58 @@ ftx_message_rc_t ftx_message_encode_nonstd(ftx_message_t* msg, ftx_callsign_hash
     return FTX_MESSAGE_RC_OK;
 }
 
+ftx_message_rc_t ftx_message_encode_free(ftx_message_t* msg, const char* text)
+{
+    uint8_t str_len = strlen(text);
+    if (str_len > 13)
+    {
+        // Too long text
+        return FTX_MESSAGE_RC_ERROR_TYPE;
+    }
+
+    uint8_t b71[9];
+    memset(b71, 0, 9);
+    int8_t cid;
+    char c;
+
+    for (int idx = 0; idx < 13; idx++)
+    {
+        if (idx < str_len)
+        {
+            c = text[idx];
+        }
+        else
+        {
+            c = ' ';
+        }
+        cid = nchar(c, FT8_CHAR_TABLE_FULL);
+        if (cid == -1)
+        {
+            return FTX_MESSAGE_RC_ERROR_TYPE;
+        }
+        uint16_t rem = cid;
+        for (int i = 8; i >= 0; i--)
+        {
+            rem += b71[i] * 42;
+            b71[i] = rem & 0xff;
+            rem = rem >> 8;
+        }
+    }
+    return ftx_message_encode_telemetry(msg, b71);
+}
+
+ftx_message_rc_t ftx_message_encode_telemetry(ftx_message_t* msg, const uint8_t* telemetry)
+{
+    // Shift bits in telemetry left by 1 bit to right-align the data
+    uint8_t carry = 0;
+    for (int i = 8; i >= 0; --i)
+    {
+        msg->payload[i] = (telemetry[i] << 1) | (carry >> 7);
+        carry = telemetry[i] & 0x80;
+    }
+    return FTX_MESSAGE_RC_OK;
+}
+
 ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* message)
 {
     ftx_message_rc_t rc;
@@ -340,7 +397,7 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
         {
             message = append_string(message, " ");
             message = append_string(message, field2);
-            if (field3 != NULL)
+            if ((field3 != NULL) && (field3[0] != NULL))
             {
                 message = append_string(message, " ");
                 message = append_string(message, field3);
@@ -452,7 +509,6 @@ ftx_message_rc_t ftx_message_decode_nonstd(const ftx_message_t* msg, ftx_callsig
         extra[0] = '\0';
     }
     strcpy(call_de, call_2);
-
     LOG(LOG_INFO, "Decoded non-standard (type %d) message [%s] [%s] [%s]\n", i3, call_to, call_de, extra);
     return FTX_MESSAGE_RC_OK;
 }
