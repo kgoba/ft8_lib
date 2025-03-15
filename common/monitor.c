@@ -12,27 +12,27 @@ static float hann_i(int i, int N)
     return x * x;
 }
 
-// static float hamming_i(int i, int N)
-// {
-//     const float a0 = (float)25 / 46;
-//     const float a1 = 1 - a0;
+static float hamming_i(int i, int N)
+{
+    const float a0 = (float)25 / 46;
+    const float a1 = 1 - a0;
 
-//     float x1 = cosf(2 * (float)M_PI * i / N);
-//     return a0 - a1 * x1;
-// }
+    float x1 = cosf((float)TWO_PI * i / N);
+    return a0 - a1 * x1;
+}
 
-// static float blackman_i(int i, int N)
-// {
-//     const float alpha = 0.16f; // or 2860/18608
-//     const float a0 = (1 - alpha) / 2;
-//     const float a1 = 1.0f / 2;
-//     const float a2 = alpha / 2;
+static float blackman_i(int i, int N)
+{
+    const float alpha = 0.16f; // or 2860/18608
+    const float a0 = (1 - alpha) / 2;
+    const float a1 = 1.0f / 2;
+    const float a2 = alpha / 2;
 
-//     float x1 = cosf(2 * (float)M_PI * i / N);
-//     float x2 = 2 * x1 * x1 - 1; // Use double angle formula
+    float x1 = cosf((float)TWO_PI * i / N);
+    float x2 = 2 * x1 * x1 - 1; // Use double angle formula
 
-//     return a0 - a1 * x1 + a2 * x2;
-// }
+    return a0 - a1 * x1 + a2 * x2;
+}
 
 static void waterfall_init(ftx_waterfall_t* me, int max_blocks, int num_bins, int time_osr, int freq_osr)
 {
@@ -86,7 +86,7 @@ void monitor_init(monitor_t* me, const monitor_config_t* cfg)
     LOG(LOG_DEBUG, "FFT work area = %zu\n", fft_work_size);
 
 #ifdef WATERFALL_USE_PHASE
-    me->nifft = 64; // Gives 200 Hz sample rate for FT8 (160ms symbol period)
+    me->nifft = 64; // Gives 100 Hz sample rate for FT8 (160ms symbol period)
 
     size_t ifft_work_size = 0;
     kiss_fft_alloc(me->nifft, 1, 0, &ifft_work_size);
@@ -192,20 +192,14 @@ void monitor_process(monitor_t* me, const float* frame)
 }
 
 #ifdef WATERFALL_USE_PHASE
-void monitor_resynth(const monitor_t* me, const candidate_t* candidate, float* signal)
+void monitor_resynth(const monitor_t* me, const ftx_candidate_t* cand, float* signal)
 {
     const int num_ifft = me->nifft;
     const int num_shift = num_ifft / 2;
-    const int taper_width = 4;
-    const int num_tones = 8;
+    const int taper_width = 1;
 
-    // Starting offset is 3 subblocks due to analysis buffer loading
-    int offset = 1;                          // candidate->time_offset;
-    offset = (offset * me->wf.time_osr) + 1; // + candidate->time_sub;
-    offset = (offset * me->wf.freq_osr);     // + candidate->freq_sub;
-    offset = (offset * me->wf.num_bins);     // + candidate->freq_offset;
-
-    WF_ELEM_T* el = me->wf.mag + offset;
+    // Starting offset is 1 block and 1 subblock due to how data is shifted to analysis buffer
+    WF_ELEM_T* el = wfall_get_element(&me->wf, 0, 0, 0, cand->freq_sub);
 
     // DFT frequency data - initialize to zero
     kiss_fft_cpx freqdata[num_ifft];
@@ -218,20 +212,20 @@ void monitor_resynth(const monitor_t* me, const candidate_t* candidate, float* s
     int pos = 0;
     for (int num_block = 1; num_block < me->wf.num_blocks; ++num_block)
     {
-        // Extract frequency data around the selected candidate only
-        for (int i = candidate->freq_offset - taper_width - 1; i < candidate->freq_offset + 8 + taper_width - 1; ++i)
+        // Extract frequency data around the selected cand only
+        for (int i = cand->freq_offset - taper_width - 1; i < cand->freq_offset + 8 + taper_width - 1; ++i)
         {
             if ((i >= 0) && (i < me->wf.num_bins))
             {
-                int tgt_bin = (me->wf.freq_osr * (i - candidate->freq_offset) + num_ifft) % num_ifft;
+                int tgt_bin = (me->wf.freq_osr * (i - cand->freq_offset) + num_ifft) % num_ifft;
                 float weight = 1.0f;
-                if (i < candidate->freq_offset)
+                if (i < cand->freq_offset)
                 {
-                    weight = ((i - candidate->freq_offset) + taper_width) / (float)taper_width;
+                    weight = ((i - cand->freq_offset) + taper_width) / (float)taper_width;
                 }
-                else if (i > candidate->freq_offset + 7)
+                else if (i > cand->freq_offset + 7)
                 {
-                    weight = ((candidate->freq_offset + 7 - i) + taper_width) / (float)taper_width;
+                    weight = ((cand->freq_offset + 7 - i) + taper_width) / (float)taper_width;
                 }
 
                 // Convert (dB magnitude, phase) to (real, imaginary)

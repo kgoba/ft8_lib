@@ -4,8 +4,8 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "common/common.h"
-#include "common/wave.h"
+#include <common/common.h>
+#include <common/wave.h>
 #include "ft8/message.h"
 #include "ft8/encode.h"
 #include "ft8/constants.h"
@@ -55,13 +55,13 @@ void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, fl
     LOG(LOG_DEBUG, "n_spsym = %d\n", n_spsym);
     // Compute the smoothed frequency waveform.
     // Length = (nsym+2)*n_spsym samples, first and last symbols extended
-    float dphi_peak = 2 * M_PI * hmod / n_spsym;
+    float dphi_peak = (float)TWO_PI * hmod / n_spsym;
     float dphi[n_wave + 2 * n_spsym];
 
     // Shift frequency up by f0
     for (int i = 0; i < n_wave + 2 * n_spsym; ++i)
     {
-        dphi[i] = 2 * M_PI * f0 / signal_rate;
+        dphi[i] = (float)TWO_PI * f0 / signal_rate;
     }
 
     float pulse[3 * n_spsym];
@@ -88,14 +88,14 @@ void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, fl
     for (int k = 0; k < n_wave; ++k)
     { // Don't include dummy symbols
         signal[k] = sinf(phi);
-        phi = fmodf(phi + dphi[k + n_spsym], 2 * M_PI);
+        phi = fmodf(phi + dphi[k + n_spsym], (float)TWO_PI);
     }
 
     // Apply envelope shaping to the first and last symbols
     int n_ramp = n_spsym / 8;
     for (int i = 0; i < n_ramp; ++i)
     {
-        float env = (1 - cosf(2 * M_PI * i / (2 * n_ramp))) / 2;
+        float env = (1 - cosf((float)TWO_PI * i / (2 * n_ramp))) / 2;
         signal[i] *= env;
         signal[n_wave - 1 - i] *= env;
     }

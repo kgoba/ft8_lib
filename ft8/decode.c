@@ -5,13 +5,14 @@
 
 #include <stdbool.h>
 #include <math.h>
+#include <complex.h>
 
 // #define LOG_LEVEL LOG_DEBUG
 // #include "debug.h"
 
 // Lookup table for y = 10*log10(1 + 10^(x/10)), where
-//   y - increase in signal level dB when adding a weaker independent signal
-//   x - specific relative strength of the weaker signal in dB
+//   y - increase in signal power dB when adding a weaker independent signal
+//   x - relative power of the weaker signal in dB
 // Table index corresponds to x in dB (index 0: 0 dB, index 1: -1 dB etc)
 static const float db_power_sum[40] = {
     3.01029995663981f, 2.53901891043867f, 2.1244260279434f, 1.76434862436485f, 1.45540463109294f,
@@ -51,11 +52,7 @@ static void ft8_decode_multi_symbols(const WF_ELEM_T* wf, int num_bins, int n_sy
 
 static const WF_ELEM_T* get_cand_mag(const ftx_waterfall_t* wf, const ftx_candidate_t* candidate)
 {
-    int offset = candidate->time_offset;
-    offset = (offset * wf->time_osr) + candidate->time_sub;
-    offset = (offset * wf->freq_osr) + candidate->freq_sub;
-    offset = (offset * wf->num_bins) + candidate->freq_offset;
-    return wf->mag + offset;
+    return wfall_get_element(wf, candidate->time_offset, candidate->time_sub, candidate->freq_offset, candidate->freq_sub);
 }
 
 static int ft8_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* candidate)
@@ -84,10 +81,6 @@ static int ft8_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* cand
 
             // Weighted difference between the expected and all other symbols
             // Does not work as well as the alternative score below
-            // score += 8 * p8[kFT8_Costas_pattern[k]] -
-            //          p8[0] - p8[1] - p8[2] - p8[3] -
-            //          p8[4] - p8[5] - p8[6] - p8[7];
-            // ++num_average;
 
             // Check only the neighbors of the expected symbol frequency- and time-wise
             int sm = kFT8_Costas_pattern[k]; // Index of the expected bin
@@ -149,9 +142,6 @@ static int ft4_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* cand
             const WF_ELEM_T* p4 = mag_cand + (block * wf->block_stride);
 
             int sm = kFT4_Costas_pattern[m][k]; // Index of the expected bin
-
-            // score += (4 * p4[sm]) - p4[0] - p4[1] - p4[2] - p4[3];
-            // num_average += 4;
 
             // Check only the neighbors of the expected symbol frequency- and time-wise
             if (sm > 0)
@@ -250,6 +240,20 @@ int ftx_find_candidates(const ftx_waterfall_t* wf, int num_candidates, ftx_candi
     return heap_size;
 }
 
+void ftx_extract_likelihood(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, float* log174)
+{
+    if (wf->protocol == FTX_PROTOCOL_FT4)
+    {
+        ft4_extract_likelihood(wf, cand, log174);
+    }
+    else
+    {
+        ft8_extract_likelihood(wf, cand, log174);
+    }
+
+    ftx_normalize_logl(log174);
+}
+
 static void ft4_extract_likelihood(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, float* log174)
 {
     const WF_ELEM_T* mag = get_cand_mag(wf, cand); // Pointer to 4 magnitude bins of the first symbol
@@ -324,20 +328,8 @@ static void ftx_normalize_logl(float* log174)
     }
 }
 
-bool ftx_decode_candidate(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status)
+bool ftx_decode_candidate(const float* log174, ftx_protocol_t protocol, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status)
 {
-    float log174[FTX_LDPC_N]; // message bits encoded as likelihood
-    if (wf->protocol == FTX_PROTOCOL_FT4)
-    {
-        ft4_extract_likelihood(wf, cand, log174);
-    }
-    else
-    {
-        ft8_extract_likelihood(wf, cand, log174);
-    }
-
-    ftx_normalize_logl(log174);
-
     uint8_t plain174[FTX_LDPC_N]; // message bits (0/1)
     bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
     // ldpc_decode(log174, max_iterations, plain174, &status->ldpc_errors);
@@ -366,7 +358,7 @@ bool ftx_decode_candidate(const ftx_waterfall_t* wf, const ftx_candidate_t* cand
     // Reuse CRC value as a hash for the message (TODO: 14 bits only, should perhaps use full 16 or 32 bits?)
     message->hash = status->crc_calculated;
 
-    if (wf->protocol == FTX_PROTOCOL_FT4)
+    if (protocol == FTX_PROTOCOL_FT4)
     {
         // '[..] for FT4 only, in order to avoid transmitting a long string of zeros when sending CQ messages,
         // the assembled 77-bit message is bitwise exclusive-OR’ed with [a] pseudorandom sequence before computing the CRC and FEC parity bits'

@@ -22,6 +22,7 @@ const int kMax_candidates = 140;
 const int kLDPC_iterations = 25;
 
 const int kMax_decoded_messages = 50;
+const int kMax_callsign_age = 10;
 
 const int kFreq_osr = 2; // Frequency oversampling rate (bin subdivision)
 const int kTime_osr = 2; // Time oversampling rate (symbol subdivision)
@@ -152,22 +153,33 @@ void decode(const monitor_t* mon, struct tm* tm_slot_start)
         float freq_hz = (mon->min_bin + cand->freq_offset + (float)cand->freq_sub / wf->freq_osr) / mon->symbol_period;
         float time_sec = (cand->time_offset + (float)cand->time_sub / wf->time_osr) * mon->symbol_period;
 
+        float log174[FTX_LDPC_N];
+
 #ifdef WATERFALL_USE_PHASE
-        // int resynth_len = 12000 * 16;
-        // float resynth_signal[resynth_len];
-        // for (int pos = 0; pos < resynth_len; ++pos)
-        // {
-        //     resynth_signal[pos] = 0;
-        // }
-        // monitor_resynth(mon, cand, resynth_signal);
-        // char resynth_path[80];
-        // sprintf(resynth_path, "resynth_%04f_%02.1f.wav", freq_hz, time_sec);
-        // save_wav(resynth_signal, resynth_len, 12000, resynth_path);
+        float slot_period = ((wf->protocol == FTX_PROTOCOL_FT8) ? FT8_SLOT_TIME : FT4_SLOT_TIME);
+        int resamp_len = wf->num_blocks * FT8_DS_SYM_LEN;
+        float resamp_wave[resamp_len];
+        for (int pos = 0; pos < resamp_len; ++pos)
+        {
+            resamp_wave[pos] = 0;
+        }
+        monitor_resynth(mon, cand, resamp_wave);
+
+        int offset_crude = cand->time_offset * FT8_DS_SYM_LEN + cand->time_sub * FT8_DS_SYM_LEN / 2;
+        int offset_fine;
+        float df_fine;
+        find_sync_fine(resamp_wave, resamp_len, FT8_DS_RATE, offset_crude, &offset_fine, &df_fine);
+
+        float dfphi = (float)TWO_PI * df_fine / FT8_DS_RATE;
+        extract_likelihood_fine(resamp_wave, resamp_len, offset_crude + offset_fine, dfphi, log174);
+#else
+        ftx_extract_likelihood(wf, cand, log174);
 #endif
 
         ftx_message_t message;
         ftx_decode_status_t status;
-        if (!ftx_decode_candidate(wf, cand, kLDPC_iterations, &message, &status))
+        // if (!ftx_decode_candidate(wf, cand, kLDPC_iterations, &message, &status))
+        if (!ftx_decode_candidate(log174, wf->protocol, kLDPC_iterations, &message, &status))
         {
             if (status.ldpc_errors > 0)
             {
@@ -223,10 +235,17 @@ void decode(const monitor_t* mon, struct tm* tm_slot_start)
             printf("%02d%02d%02d %+05.1f %+4.2f %4.0f ~  %s\n",
                 tm_slot_start->tm_hour, tm_slot_start->tm_min, tm_slot_start->tm_sec,
                 snr, time_sec, freq_hz, text);
+
+#ifdef WATERFALL_USE_PHASE
+            LOG(LOG_INFO, "offset_crude = %d, offset_fine = %d, df_fine = %f\n", offset_crude, offset_fine, df_fine);
+            char resamp_path[80];
+            snprintf(resamp_path, 80, "test/resamp/resamp_%04.0f_%04.0f.wav", freq_hz, 1000 * time_sec);
+            save_wav(resamp_wave, resamp_len, FT8_DS_RATE, resamp_path);
+#endif
         }
     }
     LOG(LOG_INFO, "Decoded %d messages, callsign hashtable size %d\n", num_decoded, callsign_hashtable_size);
-    hashtable_cleanup(10);
+    hashtable_cleanup(kMax_callsign_age);
 }
 
 int main(int argc, char** argv)

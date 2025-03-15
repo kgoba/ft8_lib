@@ -10,9 +10,11 @@ extern "C"
 
 #define FT8_SYMBOL_PERIOD (0.160f) ///< FT8 symbol duration, defines tone deviation in Hz and symbol rate
 #define FT8_SLOT_TIME     (15.0f)  ///< FT8 slot period
+#define FT8_NUM_TONES     (8)
 
 #define FT4_SYMBOL_PERIOD (0.048f) ///< FT4 symbol duration, defines tone deviation in Hz and symbol rate
 #define FT4_SLOT_TIME     (7.5f)   ///< FT4 slot period
+#define FT4_NUM_TONES     (4)
 
 // Define FT8 symbol counts
 // FT8 message structure:

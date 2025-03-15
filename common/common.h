@@ -1,3 +1,5 @@
 #ifndef M_PI
     #define M_PI 3.14159265358979323846
 #endif
+
+#define TWO_PI 6.28318530717958647692

@@ -52,7 +52,7 @@ void monitor_process(monitor_t* me, const float* frame);
 void monitor_free(monitor_t* me);
 
 #ifdef WATERFALL_USE_PHASE
-void monitor_resynth(const monitor_t* me, const candidate_t* candidate, float* signal);
+void monitor_resynth(const monitor_t* me, const ftx_candidate_t* candidate, float* signal);
 #endif
 
 #ifdef __cplusplus

@@ -25,7 +25,7 @@ static float fast_atanh(float x);
 // plain is a return value, 174 ints, to be 0 or 1.
 // max_iters is how hard to try.
 // ok == 87 means success.
-void ldpc_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
+void ldpc_decode(const float codeword[], int max_iters, uint8_t plain[], int* ok)
 {
     float m[FTX_LDPC_M][FTX_LDPC_N]; // ~60 kB
     float e[FTX_LDPC_M][FTX_LDPC_N]; // ~60 kB
@@ -127,7 +127,7 @@ static int ldpc_check(uint8_t codeword[])
     return errors;
 }
 
-void bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
+void bp_decode(const float codeword[], int max_iters, uint8_t plain[], int* ok)
 {
     float tov[FTX_LDPC_N][3];
     float toc[FTX_LDPC_M][7];
