@@ -518,11 +518,11 @@ void ftx_message_decode_telemetry(const ftx_message_t* msg, uint8_t* telemetry)
 void ftx_message_print(ftx_message_t* msg)
 {
     printf("[");
-    for (int i = 0; i < PAYLOAD_LENGTH_BYTES; ++i)
+    for (int i = 0; i < FTX_PAYLOAD_LENGTH_BYTES; ++i)
     {
         if (i > 0)
             printf(" ");
-        printf("%02x", msg->payload[i]));
+        printf("%02x", msg->payload[i]);
     }
     printf("]");
 }
