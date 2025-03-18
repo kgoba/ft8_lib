@@ -221,10 +221,9 @@ void decode(const monitor_t* mon, struct tm* tm_slot_start)
             }
 
             // Fake WSJT-X-like output for now
-            float snr = cand->score * 0.5f; // TODO: compute better approximation of SNR
-            printf("%02d%02d%02d %+05.1f %+4.2f %4.0f ~  %s\n",
+            printf("%02d%02d%02d %+d %+4.2f %4.0f ~  %s\n",
                 tm_slot_start->tm_hour, tm_slot_start->tm_min, tm_slot_start->tm_sec,
-                snr, time_sec, freq_hz, text);
+                cand->snr, time_sec, freq_hz, text);
         }
     }
     LOG(LOG_INFO, "Decoded %d messages, callsign hashtable size %d\n", num_decoded, callsign_hashtable_size);
