@@ -107,6 +107,7 @@ void fmtmsg(char* msg_out, const char* msg_in)
     *msg_out = 0; // Add zero termination
 }
 
+// Returns pointer to the null terminator within the given string (destination)
 char* append_string(char* string, const char* token)
 {
     while (*token != '\0')

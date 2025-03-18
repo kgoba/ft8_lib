@@ -35,7 +35,7 @@ static int32_t pack28(const char* callsign, const ftx_callsign_hash_interface_t*
 /// @param[in] i3      Payload type (3 bits), 1 or 2
 /// @param[in] hash_if Callsign hash table interface (can be NULL)
 /// @param[out] result Unpacked callsign (max size: 13 characters including the terminating \0)
-static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_hash_interface_t* hash_if, char* result);
+static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_hash_interface_t* hash_if, char* result, ftx_field_t* field_type);
 
 /// Pack a non-standard base call into a 28-bit integer.
 static bool pack58(const ftx_callsign_hash_interface_t* hash_if, const char* callsign, uint64_t* n58);
@@ -44,7 +44,7 @@ static bool pack58(const ftx_callsign_hash_interface_t* hash_if, const char* cal
 static bool unpack58(uint64_t n58, const ftx_callsign_hash_interface_t* hash_if, char* callsign);
 
 static uint16_t packgrid(const char* grid4);
-static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra);
+static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra, ftx_field_t* extra_field_type);
 
 /////////////////////////////////////////////////////////// Exported functions /////////////////////////////////////////////////////////////////
 
@@ -355,7 +355,7 @@ ftx_message_rc_t ftx_message_encode_telemetry(ftx_message_t* msg, const uint8_t*
     return FTX_MESSAGE_RC_OK;
 }
 
-ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* message)
+ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* message, ftx_message_offsets_t* offsets)
 {
     ftx_message_rc_t rc;
 
@@ -365,15 +365,20 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
     char* field3 = buf + 14 + 14;
 
     message[0] = '\0';
+    for (int i = 0; i < FTX_MAX_MESSAGE_FIELDS; ++i)
+    {
+        offsets->types[i] = FTX_FIELD_UNKNOWN;
+        offsets->offsets[i] = -1;
+    }
 
     ftx_message_type_t msg_type = ftx_message_get_type(msg);
     switch (msg_type)
     {
     case FTX_MESSAGE_TYPE_STANDARD:
-        rc = ftx_message_decode_std(msg, hash_if, field1, field2, field3);
+        rc = ftx_message_decode_std(msg, hash_if, field1, field2, field3, offsets->types);
         break;
     case FTX_MESSAGE_TYPE_NONSTD_CALL:
-        rc = ftx_message_decode_nonstd(msg, hash_if, field1, field2, field3);
+        rc = ftx_message_decode_nonstd(msg, hash_if, field1, field2, field3, offsets->types);
         break;
     case FTX_MESSAGE_TYPE_FREE_TEXT:
         ftx_message_decode_free(msg, field1);
@@ -397,14 +402,18 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
     if (field1 != NULL)
     {
         // TODO join fields via whitespace
+        const char* message_start = message;
         message = append_string(message, field1);
+        offsets->offsets[0] = 0;
         if (field2 != NULL)
         {
             message = append_string(message, " ");
+            offsets->offsets[1] = message - message_start;
             message = append_string(message, field2);
-            if ((field3 != NULL) && (field3[0] != NULL))
+            if ((field3 != NULL) && (field3[0] != 0))
             {
                 message = append_string(message, " ");
+                offsets->offsets[2] = message - message_start;
                 message = append_string(message, field3);
             }
         }
@@ -413,7 +422,8 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
     return rc;
 }
 
-ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* call_to, char* call_de, char* extra)
+ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if,
+    char* call_to, char* call_de, char* extra, ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS])
 {
     uint32_t n29a, n29b;
     uint16_t igrid4;
@@ -441,15 +451,15 @@ ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_h
     call_to[0] = call_de[0] = extra[0] = '\0';
 
     // Unpack both callsigns
-    if (unpack28(n29a >> 1, n29a & 1u, i3, hash_if, call_to) < 0)
+    if (unpack28(n29a >> 1, n29a & 1u, i3, hash_if, call_to, &field_types[0]) < 0)
     {
         return FTX_MESSAGE_RC_ERROR_CALLSIGN1;
     }
-    if (unpack28(n29b >> 1, n29b & 1u, i3, hash_if, call_de) < 0)
+    if (unpack28(n29b >> 1, n29b & 1u, i3, hash_if, call_de, &field_types[1]) < 0)
     {
         return FTX_MESSAGE_RC_ERROR_CALLSIGN2;
     }
-    if (unpackgrid(igrid4, ir, extra) < 0)
+    if (unpackgrid(igrid4, ir, extra, &field_types[2]) < 0)
     {
         return FTX_MESSAGE_RC_ERROR_GRID;
     }
@@ -459,7 +469,8 @@ ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_h
 }
 
 // non-standard messages, code originally by KD8CEC
-ftx_message_rc_t ftx_message_decode_nonstd(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, char* call_to, char* call_de, char* extra)
+ftx_message_rc_t ftx_message_decode_nonstd(const ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if,
+    char* call_to, char* call_de, char* extra, ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS])
 {
     uint16_t n12, iflip, nrpt, icq;
     uint64_t n58;
@@ -499,21 +510,37 @@ ftx_message_rc_t ftx_message_decode_nonstd(const ftx_message_t* msg, ftx_callsig
     if (icq == 0)
     {
         strcpy(call_to, call_1);
+        field_types[0] = FTX_FIELD_CALL;
         if (nrpt == 1)
+        {
             strcpy(extra, "RRR");
+            field_types[2] = FTX_FIELD_TOKEN;
+        }
         else if (nrpt == 2)
+        {
             strcpy(extra, "RR73");
+            field_types[2] = FTX_FIELD_TOKEN;
+        }
         else if (nrpt == 3)
+        {
             strcpy(extra, "73");
+            field_types[2] = FTX_FIELD_TOKEN;
+        }
         else
+        {
             extra[0] = '\0';
+            field_types[2] = FTX_FIELD_NONE;
+        }
     }
     else
     {
         strcpy(call_to, "CQ");
         extra[0] = '\0';
+        field_types[0] = FTX_FIELD_TOKEN;
+        field_types[2] = FTX_FIELD_NONE;
     }
     strcpy(call_de, call_2);
+    field_types[1] = FTX_FIELD_CALL;
     LOG(LOG_INFO, "Decoded non-standard (type %d) message [%s] [%s] [%s]\n", i3, call_to, call_de, extra);
     return FTX_MESSAGE_RC_OK;
 }
@@ -790,7 +817,7 @@ static int32_t pack28(const char* callsign, const ftx_callsign_hash_interface_t*
     return -1; // Error
 }
 
-static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_hash_interface_t* hash_if, char* result)
+static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_hash_interface_t* hash_if, char* result, ftx_field_t* field_type)
 {
     LOG(LOG_DEBUG, "unpack28() n28=%d i3=%d\n", n28, i3);
     // Check for special tokens DE, QRZ, CQ, CQ_nnn, CQ_aaaa
@@ -799,11 +826,20 @@ static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_has
         if (n28 <= 2u)
         {
             if (n28 == 0)
+            {
                 strcpy(result, "DE");
+                *field_type = FTX_FIELD_TOKEN;
+            }
             else if (n28 == 1)
+            {
                 strcpy(result, "QRZ");
-            else /* if (n28 == 2) */
+                *field_type = FTX_FIELD_TOKEN;
+            }
+            else
+            { /* if (n28 == 2) */
                 strcpy(result, "CQ");
+                *field_type = FTX_FIELD_TOKEN;
+            }
             return 0; // Success
         }
         if (n28 <= 1002u)
@@ -811,6 +847,7 @@ static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_has
             // CQ nnn with 3 digits
             strcpy(result, "CQ ");
             int_to_dd(result + 3, n28 - 3, 3, false);
+            *field_type = FTX_FIELD_TOKEN_WITH_ARG;
             return 0; // Success
         }
         if (n28 <= 532443ul)
@@ -830,6 +867,7 @@ static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_has
 
             strcpy(result, "CQ ");
             strcat(result, trim_front(aaaa));
+            *field_type = FTX_FIELD_TOKEN_WITH_ARG;
             return 0; // Success
         }
         // unspecified
@@ -841,6 +879,7 @@ static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_has
     {
         // This is a 22-bit hash of a result
         lookup_callsign(hash_if, FTX_CALLSIGN_HASH_22_BITS, n28, result);
+        *field_type = FTX_FIELD_CALL;
         return 0; // Success
     }
 
@@ -898,6 +937,7 @@ static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_has
     // Save the result to hash table
     save_callsign(hash_if, result, NULL, NULL, NULL);
 
+    *field_type = FTX_FIELD_CALL;
     return 0; // Success
 }
 
@@ -1001,7 +1041,7 @@ static uint16_t packgrid(const char* grid4)
     return MAXGRID4 + 1;
 }
 
-static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra)
+static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra, ftx_field_t* extra_field_type)
 {
     char* dst = extra;
 
@@ -1023,7 +1063,8 @@ static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra)
         dst[1] = 'A' + (n % 18); // A..R
         n /= 18;
         dst[0] = 'A' + (n % 18); // A..R
-        // if (ir > 0 && strncmp(call_to, "CQ", 2) == 0) return -1;
+                                 // if (ir > 0 && strncmp(call_to, "CQ", 2) == 0) return -1;
+        *extra_field_type = FTX_FIELD_GRID;
     }
     else
     {
@@ -1031,22 +1072,31 @@ static int unpackgrid(uint16_t igrid4, uint8_t ir, char* extra)
         int irpt = igrid4 - MAXGRID4;
 
         // Check special cases first (irpt > 0 always)
-        if (irpt == 1)
-            dst[0] = '\0';
-        else if (irpt == 2)
-            strcpy(dst, "RRR");
-        else if (irpt == 3)
-            strcpy(dst, "RR73");
-        else if (irpt == 4)
-            strcpy(dst, "73");
-        else
+        switch (irpt)
         {
+        case 1:
+            dst[0] = '\0';
+            *extra_field_type = FTX_FIELD_NONE;
+            break;
+        case 2:
+            strcpy(dst, "RRR");
+            *extra_field_type = FTX_FIELD_TOKEN;
+            break;
+        case 3:
+            strcpy(dst, "RR73");
+            *extra_field_type = FTX_FIELD_TOKEN;
+            break;
+        case 4:
+            strcpy(dst, "73");
+            *extra_field_type = FTX_FIELD_TOKEN;
+            break;
+        default:
             // Extract signal report as a two digit number with a + or - sign
             if (ir > 0)
-            {
                 *dst++ = 'R'; // Add "R" before report
-            }
             int_to_dd(dst, irpt - 35, 2, true);
+            *extra_field_type = FTX_FIELD_RST;
+            break;
         }
         // if (irpt >= 2 && strncmp(call_to, "CQ", 2) == 0) return -1;
     }

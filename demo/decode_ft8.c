@@ -213,7 +213,8 @@ void decode(const monitor_t* mon, struct tm* tm_slot_start)
             ++num_decoded;
 
             char text[FTX_MAX_MESSAGE_LENGTH];
-            ftx_message_rc_t unpack_status = ftx_message_decode(&message, &hash_if, text);
+            ftx_message_offsets_t offsets;
+            ftx_message_rc_t unpack_status = ftx_message_decode(&message, &hash_if, text, &offsets);
             if (unpack_status != FTX_MESSAGE_RC_OK)
             {
                 snprintf(text, sizeof(text), "Error [%d] while unpacking!", (int)unpack_status);

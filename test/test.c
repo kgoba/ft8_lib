@@ -173,7 +173,7 @@ ftx_callsign_hash_interface_t hash_if = {
     .save_hash = hashtable_add
 };
 
-void test_std_msg(const char* call_to_tx, const char* call_de_tx, const char* extra_tx)
+void test_std_msg(const char* call_to_tx, ftx_field_t to_field, const char* call_de_tx, ftx_field_t de_field, const char* extra_tx, ftx_field_t extra_field)
 {
     ftx_message_t msg;
     ftx_message_init(&msg);
@@ -185,17 +185,21 @@ void test_std_msg(const char* call_to_tx, const char* call_de_tx, const char* ex
     char call_to[14];
     char call_de[14];
     char extra[14];
-    ftx_message_rc_t rc_decode = ftx_message_decode_std(&msg, &hash_if, call_to, call_de, extra);
+    ftx_field_t types[FTX_MAX_MESSAGE_FIELDS];
+    ftx_message_rc_t rc_decode = ftx_message_decode_std(&msg, &hash_if, call_to, call_de, extra, types);
     CHECK(rc_decode == FTX_MESSAGE_RC_OK);
     printf("Decoded [%s] [%s] [%s]\n", call_to, call_de, extra);
     CHECK(0 == strcmp(call_to, call_to_tx));
     CHECK(0 == strcmp(call_de, call_de_tx));
     CHECK(0 == strcmp(extra, extra_tx));
+    CHECK(to_field == types[0]);
+    CHECK(de_field == types[1]);
+    CHECK(extra_field == types[2]);
     // CHECK(1 == 2);
     TEST_END;
 }
 
-void test_msg(const char* message_text, const char* expected, ftx_callsign_hash_interface_t *hash_if)
+void test_msg(const char* message_text, const char* expected, ftx_callsign_hash_interface_t* hash_if)
 {
     printf("Testing [%s]\n", message_text);
 
@@ -205,11 +209,14 @@ void test_msg(const char* message_text, const char* expected, ftx_callsign_hash_
     ftx_message_rc_t rc_encode = ftx_message_encode(&msg, hash_if, message_text);
     CHECK(rc_encode == FTX_MESSAGE_RC_OK);
 
-    char message_decoded[12+12+20];
-    ftx_message_rc_t rc_decode = ftx_message_decode(&msg, hash_if, message_decoded);
+    char message_decoded[12 + 12 + 20];
+    ftx_message_offsets_t offsets;
+    ftx_message_rc_t rc_decode = ftx_message_decode(&msg, hash_if, message_decoded, &offsets);
     CHECK(rc_decode == FTX_MESSAGE_RC_OK);
-    printf("Decoded [%s]\n", message_decoded);
+    printf("Decoded [%s]; offsets %d:%d %d:%d %d:%d\n", message_decoded,
+        offsets.offsets[0], offsets.types[0], offsets.offsets[1], offsets.types[1], offsets.offsets[2], offsets.types[2]);
     CHECK(0 == strcmp(expected, message_decoded));
+    // TODO check offsets
     // CHECK(1 == 2);
     TEST_END;
 }
@@ -222,7 +229,9 @@ int main()
     // test4();
     const char* callsigns[] = { "YL3JG", "W1A", "W1A/R", "W5AB", "W8ABC", "DE6ABC", "DE6ABC/R", "DE7AB", "DE9A", "3DA0X", "3DA0XYZ", "3DA0XYZ/R", "3XZ0AB", "3XZ0A" };
     const char* tokens[] = { "CQ", "QRZ", "CQ_123", "CQ_000", "CQ_POTA", "CQ_SA", "CQ_O", "CQ_ASD" };
+    const ftx_field_t token_types[] = { FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG };
     const char* grids[] = { "KO26", "RR99", "AA00", "RR09", "AA01", "RRR", "RR73", "73", "R+10", "R+05", "R-12", "R-02", "+10", "+05", "-02", "-02", "" };
+    const ftx_field_t grid_types[] = { FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_NONE };
 
     for (int idx_grid = 0; idx_grid < SIZEOF_ARRAY(grids); ++idx_grid)
     {
@@ -230,18 +239,18 @@ int main()
         {
             for (int idx_callsign2 = 0; idx_callsign2 < SIZEOF_ARRAY(callsigns); ++idx_callsign2)
             {
-                test_std_msg(callsigns[idx_callsign], callsigns[idx_callsign2], grids[idx_grid]);
+                test_std_msg(callsigns[idx_callsign], FTX_FIELD_CALL, callsigns[idx_callsign2], FTX_FIELD_CALL, grids[idx_grid], grid_types[idx_grid]);
             }
         }
         for (int idx_token = 0; idx_token < SIZEOF_ARRAY(tokens); ++idx_token)
         {
             for (int idx_callsign2 = 0; idx_callsign2 < SIZEOF_ARRAY(callsigns); ++idx_callsign2)
             {
-                test_std_msg(tokens[idx_token], callsigns[idx_callsign2], grids[idx_grid]);
+                test_std_msg(tokens[idx_token], token_types[idx_token], callsigns[idx_callsign2], FTX_FIELD_CALL, grids[idx_grid], grid_types[idx_grid]);
             }
         }
     }
-    test_msg("CQ EA8/G5LSI", "CQ EA8/G5LSI", NULL);
+    test_msg("CQ EA8/G5LSI", "CQ EA8/G5LSI", &hash_if);
     test_msg("EA8/G5LSI R2RFE RR73", "<EA8/G5LSI> R2RFE RR73", &hash_if);
     test_msg("R2RFE/P EA8/G5LSI R+12", "R2RFE/P <EA8/G5LSI> R+12", &hash_if);
 
