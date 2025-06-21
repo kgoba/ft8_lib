@@ -269,6 +269,10 @@ int main()
              "<EA8/G5LSI> R2RFE RR73", &hash_if);
     test_msg("R2RFE/P EA8/G5LSI R+12", FTX_MESSAGE_TYPE_STANDARD,
              "R2RFE/P <EA8/G5LSI> R+12", &hash_if);
+    test_msg("TNX BOB 73 GL", FTX_MESSAGE_TYPE_FREE_TEXT,
+             "TNX BOB 73 GL", &hash_if); // message with 4 tokens must be free text
+    test_msg("TNX BOB 73", FTX_MESSAGE_TYPE_STANDARD,
+             "<TNX> <BOB> 73", &hash_if); // can't distinguish special callsigns from other tokens
 
     return 0;
 }

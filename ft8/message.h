@@ -116,7 +116,11 @@ ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg);
 
 // bool ftx_message_check_recipient(const ftx_message_t* msg, const char* callsign);
 
-/// Pack (encode) a text message
+/// Pack (encode) a text message, guessing which message type to use and falling back on failure:
+/// if there are 3 or fewer tokens, try ftx_message_encode_std first,
+/// then ftx_message_encode_nonstd if that fails because of a non-standard callsign;
+/// otherwise fall back to ftx_message_encode_free.
+/// If you already know which type to use, you can call one of those functions directly.
 ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, const char* message_text);
 
 /// Pack Type 1 (Standard 77-bit message) or Type 2 (ditto, with a "/P" call) message
@@ -128,6 +132,7 @@ ftx_message_rc_t ftx_message_encode_std(ftx_message_t* msg, ftx_callsign_hash_in
 /// Pack Type 4 (One nonstandard call and one hashed call) message
 ftx_message_rc_t ftx_message_encode_nonstd(ftx_message_t* msg, ftx_callsign_hash_interface_t* hash_if, const char* call_to, const char* call_de, const char* extra);
 
+/// Pack plain text, up to 13 characters
 ftx_message_rc_t ftx_message_encode_free(ftx_message_t* msg, const char* text);
 ftx_message_rc_t ftx_message_encode_telemetry(ftx_message_t* msg, const uint8_t* telemetry);
 

@@ -142,15 +142,21 @@ ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interf
     }
 
     ftx_message_rc_t rc;
-    rc = ftx_message_encode_std(msg, hash_if, call_to, call_de, extra);
-    if (rc == FTX_MESSAGE_RC_OK)
-        return rc;
-    rc = ftx_message_encode_nonstd(msg, hash_if, call_to, call_de, extra);
-    if (rc == FTX_MESSAGE_RC_OK)
-        return rc;
+    if (!parse_position[0]) {
+        // up to 3 tokens with no leftovers
+        rc = ftx_message_encode_std(msg, hash_if, call_to, call_de, extra);
+        if (rc == FTX_MESSAGE_RC_OK)
+            return rc;
+        LOG(LOG_DEBUG, "   ftx_message_encode_std failed: %d\n", rc);
+        rc = ftx_message_encode_nonstd(msg, hash_if, call_to, call_de, extra);
+        if (rc == FTX_MESSAGE_RC_OK)
+            return rc;
+        LOG(LOG_DEBUG, "   ftx_message_encode_nonstd failed: %d\n", rc);
+    }
     rc = ftx_message_encode_free(msg, message_text);
     if (rc == FTX_MESSAGE_RC_OK)
         return rc;
+    LOG(LOG_DEBUG, "   ftx_message_encode_free failed: %d\n", rc);
 
     return rc;
 }
