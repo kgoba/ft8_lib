@@ -238,8 +238,8 @@ int main()
 {
     // test1();
     // test4();
-    const char* callsigns[] = { "YL3JG", "W1A", "W1A/R", "W5AB", "W8ABC", "DE6ABC", "DE6ABC/R", "DE7AB", "DE9A", "3DA0X", "3DA0XYZ", "3DA0XYZ/R", "3XZ0AB", "3XZ0A" };
-    const char* tokens[] = { "CQ", "QRZ", /*"CQ_123", "CQ_000", "CQ_POTA", "CQ_SA", "CQ_O", "CQ_ASD" */ };
+    const char* callsigns[] = { "YL3JG", "W1A", "W1A/R", "W5AB", "W8ABC", "DE6ABC", "DE6ABC/R", "DE7AB", "DE9A", "3DA0X", "3DA0XYZ", "3DA0XYZ/R", "3XZ0AB", "3XZ0A", "CQ1CQ" };
+    const char* tokens[] = { "CQ", "QRZ", "CQ 123", "CQ 000", "CQ POTA", "CQ SA", "CQ O", "CQ ASD" };
     const ftx_field_t token_types[] = { FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG };
     const char* grids[] = { "KO26", "RR99", "AA00", "RR09", "AA01", "RRR", "RR73", "73", "R+10", "R+05", "R-12", "R-02", "+10", "+05", "-02", "-02", "" };
     const ftx_field_t grid_types[] = { FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_NONE };
@@ -273,6 +273,14 @@ int main()
              "TNX BOB 73 GL", &hash_if); // message with 4 tokens must be free text
     test_msg("TNX BOB 73", FTX_MESSAGE_TYPE_STANDARD,
              "<TNX> <BOB> 73", &hash_if); // can't distinguish special callsigns from other tokens
+    test_msg("CQ YL/LB2JK KO16sw", FTX_MESSAGE_TYPE_NONSTD_CALL,
+             "CQ YL/LB2JK", &hash_if); // grid not allowed with nonstandard call
+    test_msg("CQ POTA YL/LB2JK KO16sw", FTX_MESSAGE_TYPE_NONSTD_CALL,
+             "CQ YL/LB2JK", &hash_if); // CQ modifier not allowed with nonstandard call
+    test_msg("CQ JA LB2JK JO59", FTX_MESSAGE_TYPE_STANDARD,
+             "CQ JA LB2JK JO59", &hash_if);
+    test_msg("CQ 123 LB2JK JO59", FTX_MESSAGE_TYPE_STANDARD,
+             "CQ 123 LB2JK JO59", &hash_if);
 
     return 0;
 }
