@@ -11,8 +11,8 @@ extern "C"
 
 // Utility functions for characters and strings
 
-const char* trim_front(const char* str);
-void trim_back(char* str);
+const char* trim_front(const char* str, char to_trim);
+void trim_back(char* str, char to_trim);
 
 /// In-place whitespace trim from front and back:
 /// 1) trims the back by changing whitespaces to '\0'
@@ -22,6 +22,12 @@ char* trim(char* str);
 
 /// Trim whitespace from start and end of string
 void trim_copy(char* trimmed, const char* str);
+
+/// In-place trim of <> characters from front and back:
+/// 1) trims the back by changing > to '\0'
+/// 2) trims the front by skipping <
+/// @return trimmed string (pointer to first non-whitespace character)
+char* trim_brackets(char* str);
 
 char to_upper(char c);
 bool is_digit(char c);

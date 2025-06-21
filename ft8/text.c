@@ -2,21 +2,21 @@
 
 #include <string.h>
 
-const char* trim_front(const char* str)
+const char* trim_front(const char* str, char to_trim)
 {
-    // Skip leading whitespace
-    while (*str == ' ')
+    // Skip leading to_trim characters
+    while (*str == to_trim)
     {
         str++;
     }
     return str;
 }
 
-void trim_back(char* str)
+void trim_back(char* str, char to_trim)
 {
-    // Skip trailing whitespace by replacing it with '\0' characters
+    // Skip trailing to_trim characters by replacing them with '\0' characters
     int idx = strlen(str) - 1;
-    while (idx >= 0 && str[idx] == ' ')
+    while (idx >= 0 && str[idx] == to_trim)
     {
         str[idx--] = '\0';
     }
@@ -24,15 +24,23 @@ void trim_back(char* str)
 
 char* trim(char* str)
 {
-    str = (char*)trim_front(str);
-    trim_back(str);
+    str = (char*)trim_front(str, ' ');
+    trim_back(str, ' ');
+    // return a pointer to the first non-whitespace character
+    return str;
+}
+
+char* trim_brackets(char* str)
+{
+    str = (char*)trim_front(str, '<');
+    trim_back(str, '>');
     // return a pointer to the first non-whitespace character
     return str;
 }
 
 void trim_copy(char* trimmed, const char* str)
 {
-    str = (char*)trim_front(str);
+    str = (char*)trim_front(str, ' ');
     int len = strlen(str) - 1;
     while (len >= 0 && str[len] == ' ')
     {

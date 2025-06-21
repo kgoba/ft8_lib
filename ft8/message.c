@@ -12,7 +12,6 @@
 
 ////////////////////////////////////////////////////// Static function prototypes //////////////////////////////////////////////////////////////
 
-static bool trim_brackets(char* result, const char* original, int length);
 static void add_brackets(char* result, const char* original, int length);
 
 /// Compute hash value for a callsign and save it in a hash table via the provided callsign hash interface.
@@ -124,7 +123,7 @@ ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interf
     parse_position = copy_token(call_de, 12, parse_position);
     parse_position = copy_token(extra, 20, parse_position);
 
-    LOG(LOG_DEBUG, "ftx_message_encode: parsed '%s' '%s' %d '%s'; remaining chars '%s'\n", call_to, call_de, is_call_de, extra, parse_position);
+    LOG(LOG_DEBUG, "ftx_message_encode: parsed '%s' '%s' '%s'; remaining chars '%s'\n", call_to, call_de, extra, parse_position);
 
     if (call_to[11] != '\0')
     {
@@ -160,9 +159,11 @@ ftx_message_rc_t ftx_message_encode_std(ftx_message_t* msg, ftx_callsign_hash_in
 {
     uint8_t ipa, ipb;
 
+    LOG(LOG_DEBUG, "ftx_message_encode_std '%s' '%s' '%s'\n", call_to, call_de, extra);
+
     int32_t n28a = pack28(call_to, hash_if, &ipa);
     int32_t n28b = pack28(call_de, hash_if, &ipb);
-    LOG(LOG_DEBUG, "n29a = %d, n29b = %d\n", n28a, n28b);
+    LOG(LOG_DEBUG, "   n29a = %d, n29b = %d\n", n28a, n28b);
 
     if (n28a < 0)
         return FTX_MESSAGE_RC_ERROR_CALLSIGN1;
@@ -221,15 +222,11 @@ ftx_message_rc_t ftx_message_encode_nonstd(ftx_message_t* msg, ftx_callsign_hash
 {
     uint8_t i3 = 4;
 
+    LOG(LOG_DEBUG, "ftx_message_encode_nonstd '%s' '%s' '%s'\n", call_to, call_de, extra);
+
     uint8_t icq = (uint8_t)equals(call_to, "CQ");
     int len_call_to = strlen(call_to);
     int len_call_de = strlen(call_de);
-
-    if ((icq != 0) || (pack_basecall(call_to, len_call_to) < 0))
-    {
-        // CQ with non-std call, should use free text (without hash)
-        return FTX_MESSAGE_RC_ERROR_CALLSIGN2;
-    }
 
     if ((icq == 0) && ((len_call_to < 3)))
         return FTX_MESSAGE_RC_ERROR_CALLSIGN1;
@@ -265,6 +262,7 @@ ftx_message_rc_t ftx_message_encode_nonstd(ftx_message_t* msg, ftx_callsign_hash
         iflip = 0;
         n12 = 0;
         call58 = call_de;
+        LOG(LOG_DEBUG, "CQ: 58-bit '%s'; omitting grid '%s'\n", call58, extra);
     }
 
     if (!pack58(hash_if, call58, &n58))
@@ -618,22 +616,6 @@ void ftx_message_print(ftx_message_t* msg)
 
 /////////////////////////////////////////////////////////// Static functions /////////////////////////////////////////////////////////////////
 
-static bool trim_brackets(char* result, const char* original, int length)
-{
-    if (original[0] == '<' && original[length - 1] == '>')
-    {
-        memcpy(result, original + 1, length - 2);
-        result[length - 2] = '\0';
-        return true;
-    }
-    else
-    {
-        memcpy(result, original, length);
-        result[length] = '\0';
-        return false;
-    }
-}
-
 static void add_brackets(char* result, const char* original, int length)
 {
     result[0] = '<';
@@ -806,10 +788,12 @@ static int32_t pack28(const char* callsign, const ftx_callsign_hash_interface_t*
     if ((length >= 3) && (length <= 11))
     {
         // Treat this as a nonstandard callsign: compute its 22-bit hash
-        LOG(LOG_DEBUG, "Encoding as non-standard callsign\n");
+        LOG(LOG_DEBUG, "Encoding '%s' as non-standard callsign\n", callsign);
         uint32_t n22;
-        if (!save_callsign(hash_if, callsign, &n22, NULL, NULL))
+        if (!save_callsign(hash_if, callsign, &n22, NULL, NULL)) {
+            LOG(LOG_DEBUG, "   Failed to save '%s'\n", callsign);
             return -1; // Error (some problem with callsign contents)
+        }
         *ip = 0;
         return NTOKENS + n22; // 22-bit hashed callsign
     }
@@ -866,7 +850,7 @@ static int unpack28(uint32_t n28, uint8_t ip, uint8_t i3, const ftx_callsign_has
             }
 
             strcpy(result, "CQ ");
-            strcat(result, trim_front(aaaa));
+            strcat(result, trim_front(aaaa, ' '));
             *field_type = FTX_FIELD_TOKEN_WITH_ARG;
             return 0; // Success
         }
