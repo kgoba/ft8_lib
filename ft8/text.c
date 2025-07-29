@@ -124,7 +124,7 @@ const char* copy_token(char* token, int length, const char* string)
     // Copy characters until a whitespace character or the end of string
     while (*string != ' ' && *string != '\0')
     {
-        if (length > 0)
+        if (length > 1)
         {
             *token = *string;
             token++;
