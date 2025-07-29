@@ -124,6 +124,8 @@ ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interf
     parse_position = copy_token(call_de, 12, parse_position);
     parse_position = copy_token(extra, 20, parse_position);
 
+    LOG(LOG_DEBUG, "ftx_message_encode: parsed '%s' '%s' %d '%s'; remaining chars '%s'\n", call_to, call_de, is_call_de, extra, parse_position);
+
     if (call_to[11] != '\0')
     {
         // token too long
@@ -335,9 +337,12 @@ ftx_message_rc_t ftx_message_encode_free(ftx_message_t* msg, const char* text)
             rem = rem >> 8;
         }
     }
-    return ftx_message_encode_telemetry(msg, b71);
+    ftx_message_rc_t ret = ftx_message_encode_telemetry(msg, b71);
+    msg->payload[9] = 0; // i3.n3 = 0.0; etc.
+    return ret;
 }
 
+// TODO set byte 9? or must the caller do it?
 ftx_message_rc_t ftx_message_encode_telemetry(ftx_message_t* msg, const uint8_t* telemetry)
 {
     // Shift bits in telemetry left by 1 bit to right-align the data
