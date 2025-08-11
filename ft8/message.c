@@ -24,8 +24,6 @@ static void add_brackets(char* result, const char* original, int length);
 static bool save_callsign(const ftx_callsign_hash_interface_t* hash_if, const char* callsign, uint32_t* n22_out, uint16_t* n12_out, uint16_t* n10_out);
 static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign);
 
-static int32_t pack_basecall(const char* callsign, int length);
-
 /// Pack a special token, a 22-bit hash code, or a valid base call into a 29-bit integer.
 static int32_t pack28(const char* callsign, const ftx_callsign_hash_interface_t* hash_if, uint8_t* ip);
 
@@ -689,7 +687,7 @@ static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_ca
     return found;
 }
 
-static int32_t pack_basecall(const char* callsign, int length)
+int32_t pack_basecall(const char* callsign, int length)
 {
     if (length > 2)
     {

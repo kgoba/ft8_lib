@@ -116,6 +116,12 @@ ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg);
 
 // bool ftx_message_check_recipient(const ftx_message_t* msg, const char* callsign);
 
+/// Pack (encode) a callsign in the standard way, and return the numeric representation.
+/// Returns -1 if \a callsign cannot be encoded in the standard way.
+/// This function can be used to decide whether to call ftx_message_encode_std() or ftx_message_decode_nonstd().
+/// Alternatively, ftx_message_encode_std() itself fails when one of the callsigns cannot be packed this way.
+int32_t pack_basecall(const char* callsign, int length);
+
 /// Pack (encode) a text message, guessing which message type to use and falling back on failure:
 /// if there are 3 or fewer tokens, try ftx_message_encode_std first,
 /// then ftx_message_encode_nonstd if that fails because of a non-standard callsign;
