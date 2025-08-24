@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -101,11 +102,19 @@ void test3() {
 }
 */
 
-#define CHECK(condition)                                       \
-    if (!(condition))                                          \
-    {                                                          \
-        printf("FAIL: Condition \'" #condition "' failed!\n"); \
-        return;                                                \
+#define CHECK(condition)                                               \
+    if (!(condition))                                                  \
+    {                                                                  \
+        printf("FAIL! Condition \'" #condition "' failed\n\n");        \
+        return;                                                        \
+    }
+
+#define CHECK_EQ_VAL(this, that)                                       \
+    if ((this) != (that))                                              \
+    {                                                                  \
+        printf("FAIL! Expected " #this " (%d) == " #that " (%d)\n\n",  \
+               (this), (that));                                        \
+        return;                                                        \
     }
 
 #define TEST_END printf("Test OK\n\n")
@@ -172,57 +181,54 @@ ftx_callsign_hash_interface_t hash_if = {
     .save_hash = hashtable_add
 };
 
-void test_std_msg(const char* call_to_tx, const char* call_de_tx, const char* extra_tx)
+void test_std_msg(const char* call_to_tx, ftx_field_t to_field, const char* call_de_tx, ftx_field_t de_field, const char* extra_tx, ftx_field_t extra_field)
 {
     ftx_message_t msg;
     ftx_message_init(&msg);
 
     ftx_message_rc_t rc_encode = ftx_message_encode_std(&msg, &hash_if, call_to_tx, call_de_tx, extra_tx);
-    CHECK(rc_encode == FTX_MESSAGE_RC_OK);
     printf("Encoded [%s] [%s] [%s]\n", call_to_tx, call_de_tx, extra_tx);
+    CHECK_EQ_VAL(rc_encode, FTX_MESSAGE_RC_OK);
 
-    char call_to[14];
-    char call_de[14];
+    char call_to_arr[14];
+    char call_de_arr[14];
     char extra[14];
-    ftx_message_rc_t rc_decode = ftx_message_decode_std(&msg, &hash_if, call_to, call_de, extra);
-    CHECK(rc_decode == FTX_MESSAGE_RC_OK);
+    char *call_to = call_to_arr;
+    char *call_de = call_de_arr;
+    ftx_field_t types[FTX_MAX_MESSAGE_FIELDS];
+    ftx_message_rc_t rc_decode = ftx_message_decode_std(&msg, &hash_if, call_to, call_de, extra, types);
+    CHECK_EQ_VAL(rc_decode, FTX_MESSAGE_RC_OK);
     printf("Decoded [%s] [%s] [%s]\n", call_to, call_de, extra);
-    CHECK(0 == strcmp(call_to, call_to_tx));
-    CHECK(0 == strcmp(call_de, call_de_tx));
-    CHECK(0 == strcmp(extra, extra_tx));
-    // CHECK(1 == 2);
+    call_to = trim_brackets(call_to);
+    call_de = trim_brackets(call_de);
+    CHECK_EQ_VAL(0, strcmp(call_to, call_to_tx));
+    CHECK_EQ_VAL(0, strcmp(call_de, call_de_tx));
+    CHECK_EQ_VAL(0, strcmp(extra, extra_tx));
+    CHECK_EQ_VAL(to_field, types[0]);
+    CHECK_EQ_VAL(de_field, types[1]);
+    CHECK_EQ_VAL(extra_field, types[2]);
     TEST_END;
 }
 
-void test_msg(const char* call_to_tx, const char* call_de_tx, const char* extra_tx)
+void test_msg(const char* message_text, ftx_message_type_t expected_type, const char* expected, ftx_callsign_hash_interface_t* hash_if)
 {
-    char message_text[12 + 12 + 20];
-    char* copy_ptr = message_text;
-    copy_ptr = stpcpy(copy_ptr, call_to_tx);
-    copy_ptr = stpcpy(copy_ptr, " ");
-    copy_ptr = stpcpy(copy_ptr, call_de_tx);
-    if (strlen(extra_tx) > 0)
-    {
-        copy_ptr = stpcpy(copy_ptr, " ");
-        copy_ptr = stpcpy(copy_ptr, extra_tx);
-    }
     printf("Testing [%s]\n", message_text);
 
     ftx_message_t msg;
     ftx_message_init(&msg);
 
-    ftx_message_rc_t rc_encode = ftx_message_encode(&msg, NULL, message_text);
-    CHECK(rc_encode == FTX_MESSAGE_RC_OK);
+    ftx_message_rc_t rc_encode = ftx_message_encode(&msg, hash_if, message_text);
+    CHECK_EQ_VAL(rc_encode, FTX_MESSAGE_RC_OK);
+    CHECK_EQ_VAL(expected_type, ftx_message_get_type(&msg));
 
-    char call_to[14];
-    char call_de[14];
-    char extra[14];
-    ftx_message_rc_t rc_decode = ftx_message_decode_std(&msg, NULL, call_to, call_de, extra);
-    CHECK(rc_decode == FTX_MESSAGE_RC_OK);
-    CHECK(0 == strcmp(call_to, call_to_tx));
-    CHECK(0 == strcmp(call_de, call_de_tx));
-    CHECK(0 == strcmp(extra, extra_tx));
-    // CHECK(1 == 2);
+    char message_decoded[12 + 12 + 20];
+    ftx_message_offsets_t offsets;
+    ftx_message_rc_t rc_decode = ftx_message_decode(&msg, hash_if, message_decoded, &offsets);
+    CHECK_EQ_VAL(rc_decode, FTX_MESSAGE_RC_OK);
+    printf("Decoded [%s]; offsets %d:%d %d:%d %d:%d\n", message_decoded,
+        offsets.offsets[0], offsets.types[0], offsets.offsets[1], offsets.types[1], offsets.offsets[2], offsets.types[2]);
+    CHECK_EQ_VAL(0, strcmp(expected, message_decoded));
+    // TODO check offsets
     TEST_END;
 }
 
@@ -232,9 +238,11 @@ int main()
 {
     // test1();
     // test4();
-    const char* callsigns[] = { "YL3JG", "W1A", "W1A/R", "W5AB", "W8ABC", "DE6ABC", "DE6ABC/R", "DE7AB", "DE9A", "3DA0X", "3DA0XYZ", "3DA0XYZ/R", "3XZ0AB", "3XZ0A" };
-    const char* tokens[] = { "CQ", "QRZ" };
+    const char* callsigns[] = { "YL3JG", "W1A", "W1A/R", "W5AB", "W8ABC", "DE6ABC", "DE6ABC/R", "DE7AB", "DE9A", "3DA0X", "3DA0XYZ", "3DA0XYZ/R", "3XZ0AB", "3XZ0A", "CQ1CQ" };
+    const char* tokens[] = { "CQ", "QRZ", "CQ 123", "CQ 000", "CQ POTA", "CQ SA", "CQ O", "CQ ASD" };
+    const ftx_field_t token_types[] = { FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG, FTX_FIELD_TOKEN_WITH_ARG };
     const char* grids[] = { "KO26", "RR99", "AA00", "RR09", "AA01", "RRR", "RR73", "73", "R+10", "R+05", "R-12", "R-02", "+10", "+05", "-02", "-02", "" };
+    const ftx_field_t grid_types[] = { FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_GRID, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_TOKEN, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_RST, FTX_FIELD_NONE };
 
     for (int idx_grid = 0; idx_grid < SIZEOF_ARRAY(grids); ++idx_grid)
     {
@@ -242,19 +250,37 @@ int main()
         {
             for (int idx_callsign2 = 0; idx_callsign2 < SIZEOF_ARRAY(callsigns); ++idx_callsign2)
             {
-                test_std_msg(callsigns[idx_callsign], callsigns[idx_callsign2], grids[idx_grid]);
+                test_std_msg(callsigns[idx_callsign], FTX_FIELD_CALL, callsigns[idx_callsign2], FTX_FIELD_CALL, grids[idx_grid], grid_types[idx_grid]);
             }
         }
         for (int idx_token = 0; idx_token < SIZEOF_ARRAY(tokens); ++idx_token)
         {
             for (int idx_callsign2 = 0; idx_callsign2 < SIZEOF_ARRAY(callsigns); ++idx_callsign2)
             {
-                test_std_msg(tokens[idx_token], callsigns[idx_callsign2], grids[idx_grid]);
+                test_std_msg(tokens[idx_token], token_types[idx_token], callsigns[idx_callsign2], FTX_FIELD_CALL, grids[idx_grid], grid_types[idx_grid]);
             }
         }
     }
-
-    // test_std_msg("YOMAMA", "MYMAMA/QRP", "73");
+    test_msg("CQ K7IHZ DM43", FTX_MESSAGE_TYPE_STANDARD,
+             "CQ K7IHZ DM43", &hash_if);
+    test_msg("CQ EA8/G5LSI", FTX_MESSAGE_TYPE_NONSTD_CALL,
+             "CQ EA8/G5LSI", &hash_if);
+    test_msg("EA8/G5LSI R2RFE RR73", FTX_MESSAGE_TYPE_STANDARD,
+             "<EA8/G5LSI> R2RFE RR73", &hash_if);
+    test_msg("R2RFE/P EA8/G5LSI R+12", FTX_MESSAGE_TYPE_STANDARD,
+             "R2RFE/P <EA8/G5LSI> R+12", &hash_if);
+    test_msg("TNX BOB 73 GL", FTX_MESSAGE_TYPE_FREE_TEXT,
+             "TNX BOB 73 GL", &hash_if); // message with 4 tokens must be free text
+    test_msg("TNX BOB 73", FTX_MESSAGE_TYPE_STANDARD,
+             "<TNX> <BOB> 73", &hash_if); // can't distinguish special callsigns from other tokens
+    test_msg("CQ YL/LB2JK KO16sw", FTX_MESSAGE_TYPE_NONSTD_CALL,
+             "CQ YL/LB2JK", &hash_if); // grid not allowed with nonstandard call
+    test_msg("CQ POTA YL/LB2JK KO16sw", FTX_MESSAGE_TYPE_NONSTD_CALL,
+             "CQ YL/LB2JK", &hash_if); // CQ modifier not allowed with nonstandard call
+    test_msg("CQ JA LB2JK JO59", FTX_MESSAGE_TYPE_STANDARD,
+             "CQ JA LB2JK JO59", &hash_if);
+    test_msg("CQ 123 LB2JK JO59", FTX_MESSAGE_TYPE_STANDARD,
+             "CQ 123 LB2JK JO59", &hash_if);
 
     return 0;
 }
