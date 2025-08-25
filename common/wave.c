@@ -89,27 +89,52 @@ int load_wav(float* signal, int* num_samples, int* sample_rate, const char* path
         return -1;
 
     // NOTE: works only on little-endian architecture
-    fread((void*)chunkID, sizeof(chunkID), 1, f);
-    fread((void*)&chunkSize, sizeof(chunkSize), 1, f);
-    fread((void*)format, sizeof(format), 1, f);
+    size_t readResult = fread((void*)chunkID, sizeof(chunkID), 1, f);
+    if (readResult != 1)
+        return -1;
+    readResult = fread((void*)&chunkSize, sizeof(chunkSize), 1, f);
+    if (readResult != 1)
+        return -1;
+    readResult = fread((void*)format, sizeof(format), 1, f);
+    if (readResult != 1)
+        return -1;
 
-    fread((void*)subChunk1ID, sizeof(subChunk1ID), 1, f);
-    fread((void*)&subChunk1Size, sizeof(subChunk1Size), 1, f);
+    readResult = fread((void*)subChunk1ID, sizeof(subChunk1ID), 1, f);
+    if (readResult != 1)
+        return -2;
+    readResult = fread((void*)&subChunk1Size, sizeof(subChunk1Size), 1, f);
+    if (readResult != 1)
+        return -2;
     if (subChunk1Size != 16)
         return -2;
 
-    fread((void*)&audioFormat, sizeof(audioFormat), 1, f);
-    fread((void*)&numChannels, sizeof(numChannels), 1, f);
-    fread((void*)&sampleRate, sizeof(sampleRate), 1, f);
-    fread((void*)&byteRate, sizeof(byteRate), 1, f);
-    fread((void*)&blockAlign, sizeof(blockAlign), 1, f);
-    fread((void*)&bitsPerSample, sizeof(bitsPerSample), 1, f);
-
+    readResult = fread((void*)&audioFormat, sizeof(audioFormat), 1, f);
+    if (readResult != 1)
+        return -3;
+    readResult = fread((void*)&numChannels, sizeof(numChannels), 1, f);
+    if (readResult != 1)
+        return -3;
+    readResult = fread((void*)&sampleRate, sizeof(sampleRate), 1, f);
+    if (readResult != 1)
+        return -3;
+    readResult = fread((void*)&byteRate, sizeof(byteRate), 1, f);
+    if (readResult != 1)
+        return -3;
+    readResult = fread((void*)&blockAlign, sizeof(blockAlign), 1, f);
+    if (readResult != 1)
+        return -3;
+    readResult = fread((void*)&bitsPerSample, sizeof(bitsPerSample), 1, f);
+    if (readResult != 1)
+        return -3;
     if (audioFormat != 1 || numChannels != 1 || bitsPerSample != 16)
         return -3;
 
-    fread((void*)subChunk2ID, sizeof(subChunk2ID), 1, f);
-    fread((void*)&subChunk2Size, sizeof(subChunk2Size), 1, f);
+    readResult = fread((void*)subChunk2ID, sizeof(subChunk2ID), 1, f);
+    if (readResult != 1)
+        return -4;
+    readResult = fread((void*)&subChunk2Size, sizeof(subChunk2Size), 1, f);
+    if (readResult != 1)
+        return -4;
 
     if (subChunk2Size / blockAlign > *num_samples)
         return -4;
@@ -119,7 +144,9 @@ int load_wav(float* signal, int* num_samples, int* sample_rate, const char* path
 
     int16_t* raw_data = (int16_t*)malloc(*num_samples * blockAlign);
 
-    fread((void*)raw_data, blockAlign, *num_samples, f);
+    readResult = fread((void*)raw_data, blockAlign, *num_samples, f);
+    if (readResult != *num_samples)
+        return -5;
     for (int i = 0; i < *num_samples; i++)
     {
         signal[i] = raw_data[i] / 32768.0f;
